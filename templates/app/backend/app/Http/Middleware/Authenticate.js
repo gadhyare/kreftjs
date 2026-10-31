@@ -33,10 +33,15 @@ class Authenticate {
       abort(419, 'CSRF token mismatch. Reload the page and try again.')
     }
 
-    // expired: AUTH_TOKEN_DAYS (default 30) without use, or past expires_at
+    // expired: session lifetime in minutes (inactivity timeout) or AUTH_TOKEN_DAYS without use
     const days = Number(process.env.AUTH_TOKEN_DAYS || 30)
+    const sessionMinutes = Number(process.env.SESSION_LIFETIME || 120)
     const lastUsed = new Date(token.last_used_at || token.created_at).getTime()
-    if ((days > 0 && Date.now() - lastUsed > days * 86400000) || (token.expires_at && new Date(token.expires_at).getTime() < Date.now())) {
+    const isSessionExpired = token.type === 'session' && !token.remember && sessionMinutes > 0 && (Date.now() - lastUsed > sessionMinutes * 60000)
+    const isDaysExpired = days > 0 && Date.now() - lastUsed > days * 86400000
+    const isHardExpired = token.expires_at && new Date(token.expires_at).getTime() < Date.now()
+
+    if (isSessionExpired || isDaysExpired || isHardExpired) {
       await token.delete()
       abort(401, 'Unauthenticated.')
     }

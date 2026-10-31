@@ -2290,6 +2290,60 @@
     return () => clearTimeout(id);
   }
 
+  // Inactivity watchdog for dashboards: tracks user interaction (mouse, touch, keyboard)
+  // and auto-redirects to login upon session expiration
+  function useInactivityTimer(options = {}) {
+    const cfg = typeof options === 'number' ? { timeout: options } : (options || {});
+    const envVal = typeof env !== 'undefined' && env && (env.PUBLIC_SESSION_TIMEOUT || env.SESSION_TIMEOUT);
+    const timeoutMs = (cfg.timeout != null ? cfg.timeout : (envVal ? Number(envVal) * 60000 : 15 * 60000));
+    const warningMs = cfg.warningTime != null ? cfg.warningTime : ((typeof env !== 'undefined' && env && env.PUBLIC_SESSION_WARNING) ? Number(env.PUBLIC_SESSION_WARNING) * 60000 : 0);
+    const redirectUrl = cfg.redirect || '/login?reason=inactive';
+    const events = cfg.events || ['mousemove', 'mousedown', 'keydown', 'touchstart', 'scroll', 'click'];
+
+    let timer = null;
+    let warningTimer = null;
+
+    function reset() {
+      if (timer) clearTimeout(timer);
+      if (warningTimer) clearTimeout(warningTimer);
+
+      if (warningMs > 0 && warningMs < timeoutMs && typeof cfg.onWarning === 'function') {
+        warningTimer = setTimeout(() => {
+          cfg.onWarning({ remainingMs: warningMs, remainingMinutes: Math.round(warningMs / 60000) });
+        }, timeoutMs - warningMs);
+      }
+
+      timer = setTimeout(() => {
+        if (typeof cfg.onTimeout === 'function') {
+          cfg.onTimeout();
+        } else if (typeof window !== 'undefined') {
+          if (typeof Som !== 'undefined' && Som.currentRouter && Som.currentRouter()) {
+            Som.currentRouter().go(redirectUrl);
+          } else {
+            window.location.href = redirectUrl;
+          }
+        }
+      }, timeoutMs);
+    }
+
+    function stop() {
+      if (timer) clearTimeout(timer);
+      if (warningTimer) clearTimeout(warningTimer);
+      if (typeof window !== 'undefined') {
+        events.forEach((evt) => window.removeEventListener(evt, reset, { passive: true }));
+      }
+    }
+
+    if (typeof window !== 'undefined') {
+      events.forEach((evt) => window.addEventListener(evt, reset, { passive: true }));
+    }
+    reset();
+
+    if (activeScope) activeScope.cleanups.push(stop);
+
+    return { reset, stop, timeoutMs };
+  }
+
   /* ================================================================
    * Som.app — create an application
    * ================================================================ */
@@ -4196,7 +4250,7 @@
     // lifecycle (inside init)
     onReady, onDestroy, onDestroyed, onUpdate, onShow, onHide,
     onMounted, onUnmounted, onBeforeUnmount, onUpdated,
-    useInterval, useTimeout,
+    useInterval, useTimeout, useInactivityTimer,
     // router
     router: createRouter, currentRoute, currentRouter,
   };

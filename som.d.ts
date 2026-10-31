@@ -414,6 +414,8 @@ export interface SomStatic {
   /** creates a timer that automatically cleans up when the component is unmounted */
   useInterval(fn: () => void, ms?: number): () => void
   useTimeout(fn: () => void, ms?: number): () => void
+  /** inactivity watchdog: tracks user interaction and auto-redirects upon session expiration */
+  useInactivityTimer(options?: number | InactivityTimerOptions): { reset: () => void; stop: () => void; timeoutMs: number }
 
   router(options: RouterOptions): Router
   currentRoute(): Route | null
@@ -494,6 +496,15 @@ export interface DesktopBridge {
   showMessageBox(options: any): Promise<any>
   showOpenDialog(options: any): Promise<any>
   showSaveDialog(options: any): Promise<any>
+}
+
+export interface InactivityTimerOptions {
+  timeout?: number
+  warningTime?: number
+  redirect?: string
+  events?: string[]
+  onWarning?: (info: { remainingMs: number; remainingMinutes: number }) => void
+  onTimeout?: () => void
 }
 
 declare const Som: SomStatic

@@ -32,9 +32,19 @@ FILESYSTEM_DISK=local
 # local while you work, production on the server
 APP_ENV=local
 
-# Security
+# Security & Sessions
 # A login token nobody used for this many days stops working
 AUTH_TOKEN_DAYS=30
+# Session lifetime in minutes (backend inactivity timeout)
+SESSION_LIFETIME=120
+SESSION_EXPIRE_ON_CLOSE=false
+SESSION_DRIVER=file
+
+# Frontend Inactivity Timer in minutes (auto-redirect to /login after inactivity)
+# Values starting with PUBLIC_ are sent to the browser and readable as {env.PUBLIC_...} in .som files
+PUBLIC_SESSION_TIMEOUT=15
+PUBLIC_SESSION_WARNING=2
+
 # Behind a proxy or load balancer (nginx, Cloudflare…), its address, so the visitor's real IP is used: 10.0.0.1 or *
 # TRUSTED_PROXIES=
 
