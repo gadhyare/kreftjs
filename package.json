@@ -1,11 +1,12 @@
 {
-  "name": "somjs",
-  "version": "2.3.0",
+  "name": "@somjs/somjs",
+  "version": "2.4.0",
   "description": "A tiny reactive framework with its own component language (.som files): router with nested routes, stores, saved data, animations, an API client, hot reload, DevTools and a template engine.",
   "main": "som.js",
   "browser": "som.js",
   "bin": {
-    "som": "bin/som.js"
+    "som": "bin/som.js",
+    "somjs": "bin/som.js"
   },
   "scripts": {
     "dev": "node bin/som.js dev --api demo/db.json --db sqlite:demo/database/demo.db --migrations demo/database/migrations --server demo/server --backend demo --seed",
@@ -54,5 +55,8 @@
   },
   "allowScripts": {
     "esbuild@0.28.2": true
+  },
+  "publishConfig": {
+    "access": "restricted"
   }
 }
