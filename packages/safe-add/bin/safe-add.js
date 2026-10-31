@@ -345,19 +345,19 @@ function runSecurityAudit(npmCmd, project, auditData) {
 
 function printHelp() {
   console.log(`
-  ${bold('safe-add <packages...>') }  (alias: ${dim('sadd')})
+  ${bold('som add <packages...>') }  (alias: ${dim('som install')}, ${dim('som i')})
 
-  Enterprise-Grade Security Gatekeeper & Safe Package Installer for Node.js.
+  Enterprise-Grade Security Gatekeeper & Package Installer for Som.js.
   Runs anywhere on any machine with zero external dependencies.
 
   Usage:
-    safe-add <packages...>           Install package(s) with full security gatekeeper verification
-    safe-add express lodash          Install multiple packages safely
-    safe-add -D vitest               Install as devDependency
-    safe-add --check <pkg>           Inspect package security report without installing (alias: --dry-run)
-    safe-add -y <pkg>                Auto-confirm unverified packages in CI/CD (alias: --yes)
-    safe-add --allow-scripts <pkg>   Allow lifecycle scripts (postinstall/build)
-    safe-add --force <pkg>           Bypass security warnings & redundancy checks
+    som add <packages...>           Install package(s) with full security gatekeeper verification
+    som add express lodash          Install multiple packages safely
+    som add -D vitest               Install as devDependency
+    som add --check <pkg>           Inspect package security report without installing (alias: --dry-run)
+    som add -y <pkg>                Auto-confirm unverified packages in CI/CD (alias: --yes)
+    som add --allow-scripts <pkg>   Allow lifecycle scripts (postinstall/build)
+    som add --force <pkg>           Bypass security warnings & redundancy checks
 
   Security Verification Rules:
     1. Homoglyph & Shell Injection Shield:
@@ -392,6 +392,12 @@ async function runSafeAdd(args = []) {
     return;
   }
 
+  // Handle subcommands: 'som add <pkgs>', 'som install <pkgs>', 'som i <pkgs>'
+  let inputArgs = [...args];
+  if (inputArgs[0] === 'add' || inputArgs[0] === 'install' || inputArgs[0] === 'i') {
+    inputArgs = inputArgs.slice(1);
+  }
+
   const targets = [];
   let isDev = false;
   let force = false;
@@ -400,8 +406,8 @@ async function runSafeAdd(args = []) {
   let dryRun = false;
   let targetDir = process.cwd();
 
-  for (let i = 0; i < args.length; i++) {
-    const a = args[i];
+  for (let i = 0; i < inputArgs.length; i++) {
+    const a = inputArgs[i];
     if (a === '-D' || a === '--save-dev') {
       isDev = true;
     } else if (a === '--force' || a === '-f') {
@@ -413,7 +419,7 @@ async function runSafeAdd(args = []) {
     } else if (a === '--dry-run' || a === '--check') {
       dryRun = true;
     } else if (a === '--dir' || a === '-C') {
-      targetDir = args[++i];
+      targetDir = inputArgs[++i];
     } else if (!a.startsWith('-')) {
       targets.push(a);
     }
@@ -426,7 +432,7 @@ async function runSafeAdd(args = []) {
 
   const project = findProjectDir(targetDir);
 
-  console.log(`\n  ${bold('Safe-Add Enterprise Security Gatekeeper')} ${dim('v1.0.0')}`);
+  console.log(`\n  ${bold('Som.js Security Gatekeeper & Package Installer')} ${dim('v1.0.1')}`);
   console.log(`  ${dim('Enforcing strict supply-chain security rules...')}\n`);
 
   // =========================================================================

@@ -17,7 +17,7 @@ Standard `npm install` blindly executes lifecycle scripts (`preinstall`, `instal
 
 ### Run instantly with NPX (No installation needed)
 ```bash
-npx @somjs/somjs express lodash
+npx @somjs/somjs add express lodash
 ```
 
 ### Install globally on any machine
@@ -25,10 +25,10 @@ npx @somjs/somjs express lodash
 npm install -g @somjs/somjs
 ```
 
-Once installed globally, you can use either `safe-add` or the short alias `sadd`:
+Once installed globally, you use the standard `som` command:
 ```bash
-safe-add express
-sadd -D vitest
+som add express
+som add -D vitest
 ```
 
 ---
@@ -69,24 +69,24 @@ sadd -D vitest
 
 ```bash
 # Basic installation with full verification
-safe-add <packages...>
+som add <packages...>
 
 # Install as development dependency
-safe-add -D vitest @types/node
+som add -D vitest @types/node
 
 # Dry-run security inspection without installing
-safe-add --check <package>
-safe-add --dry-run <package>
+som add --check <package>
+som add --dry-run <package>
 
 # Auto-confirm in CI/CD non-interactive pipelines
-safe-add -y <package>
-safe-add --yes <package>
+som add -y <package>
+som add --yes <package>
 
 # Allow lifecycle scripts for verified packages needing native C++ builds
-safe-add --allow-scripts <package>
+som add --allow-scripts <package>
 
 # Force installation (bypass warnings)
-safe-add --force <package>
+som add --force <package>
 ```
 
 ---

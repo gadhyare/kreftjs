@@ -1,13 +1,11 @@
 {
   "name": "@somjs/somjs",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "description": "Enterprise-Grade Security Gatekeeper & Safe Package Installer for Som.js",
   "main": "index.js",
   "bin": {
-    "somjs": "bin/safe-add.js",
     "som": "bin/safe-add.js",
-    "safe-add": "bin/safe-add.js",
-    "sadd": "bin/safe-add.js"
+    "somjs": "bin/safe-add.js"
   },
   "scripts": {
     "test": "node bin/safe-add.js --help"
