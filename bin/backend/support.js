@@ -211,14 +211,22 @@ const Lang = {
   get(key, replace = {}, locale = Lang.locale()) {
     const [file, ...rest] = String(key).split('.');
     const read = (loc) => {
+      if (!loc || !file || /[\/\\]|\.\./.test(file) || /[\/\\]|\.\./.test(loc) || ['__proto__', 'constructor', 'prototype'].includes(file)) return undefined;
       const k = loc + '/' + file;
       if (!langCache.has(k)) {
         let data = null;
-        if (langDir) { try { data = JSON.parse(require('fs').readFileSync(require('path').join(langDir, loc, file + '.json'), 'utf8')); } catch (_) { /* none */ } }
+        if (langDir) {
+          try {
+            const targetPath = require('path').resolve(langDir, loc, file + '.json');
+            if (targetPath.startsWith(require('path').resolve(langDir))) {
+              data = JSON.parse(require('fs').readFileSync(targetPath, 'utf8'));
+            }
+          } catch (_) { /* none */ }
+        }
         langCache.set(k, data);
       }
       const data = langCache.get(k);
-      return data ? rest.reduce((o, p) => (o == null ? undefined : o[p]), data) : undefined;
+      return data ? rest.reduce((o, p) => (o == null || ['__proto__', 'constructor', 'prototype'].includes(p) ? undefined : o[p]), data) : undefined;
     };
     let text = read(locale);
     if (text === undefined) text = read(process.env.APP_FALLBACK_LOCALE || 'en');

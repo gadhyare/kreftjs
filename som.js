@@ -795,14 +795,22 @@
   }
   function cleanHtml(raw) {
     if (raw == null) return '';
-    return String(raw)
-      .replace(/<script[\s\S]*?<\/script>/gi, '')
-      .replace(/<iframe[\s\S]*?<\/iframe>/gi, '')
-      .replace(/<object[\s\S]*?<\/object>/gi, '')
-      .replace(/<embed[\s\S]*?<\/embed>/gi, '')
-      .replace(/\son[a-z]+\s*=\s*(['"]).*?\1/gi, '')
-      .replace(/\son[a-z]+\s*=\s*[^>\s]+/gi, '')
-      .replace(/(href|src|action)\s*=\s*(['"])\s*(?:javascript|vbscript):.*?\2/gi, '$1="#"');
+    let html = String(raw);
+    let prev;
+    const blockRegex = /<(script|style|iframe|object|embed|applet)[\s\S]*?<\/\1>/gi;
+    const dangerousTagRegex = /<\/?(?:script|style|iframe|object|embed|applet|form|base|meta|link)\b[^>]*>/gi;
+    do {
+      prev = html;
+      html = html
+        .replace(blockRegex, '')
+        .replace(dangerousTagRegex, '')
+        .replace(/<!--[\s\S]*?-->/g, '');
+    } while (html !== prev);
+
+    return html
+      .replace(/[\s/]on[a-z0-9_-]+\s*=\s*(['"]).*?\1/gi, '')
+      .replace(/[\s/]on[a-z0-9_-]+\s*=\s*[^>\s]+/gi, '')
+      .replace(/(href|src|action)\s*=\s*(['"])\s*(?:javascript|vbscript|data(?!\s*:\s*image\/(?:png|jpeg|jpg|gif|webp))):.*?\2/gi, '$1="#"');
   }
 
   function compileElement(el, scope, inst) {

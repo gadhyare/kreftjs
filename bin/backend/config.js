@@ -19,6 +19,8 @@
 const fs = require('fs');
 const path = require('path');
 
+const BAD_KEYS = new Set(['__proto__', 'constructor', 'prototype']);
+
 class ConfigRepository {
   constructor(initialItems = {}) {
     this.items = { ...initialItems };
@@ -36,7 +38,7 @@ class ConfigRepository {
     let current = this.items;
 
     for (const segment of segments) {
-      if (current === null || current === undefined || typeof current !== 'object') {
+      if (BAD_KEYS.has(segment) || current === null || current === undefined || typeof current !== 'object') {
         return defaultValue;
       }
       current = current[segment];
@@ -52,7 +54,7 @@ class ConfigRepository {
     let current = this.items;
 
     for (const segment of segments) {
-      if (current === null || current === undefined || typeof current !== 'object' || !(segment in current)) {
+      if (BAD_KEYS.has(segment) || current === null || current === undefined || typeof current !== 'object' || !(segment in current)) {
         return false;
       }
       current = current[segment];
@@ -71,6 +73,10 @@ class ConfigRepository {
     }
 
     const segments = String(key).split('.');
+    if (segments.some((s) => BAD_KEYS.has(s))) {
+      return this;
+    }
+
     let current = this.items;
 
     for (let i = 0; i < segments.length - 1; i++) {

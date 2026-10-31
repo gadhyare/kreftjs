@@ -49,6 +49,9 @@ action add() { count++ }
 29. [Desktop Applications with Electron.js (som electron)](#29-desktop-applications-with-electronjs-som-electron)
 30. [Vite.js Bundling & Instant HMR (som vite)](#30-vitejs-bundling--instant-hmr-som-vite)
 31. [Advanced ORM: Soft Deletes, Eager Loading & Transactions](#31-advanced-orm-soft-deletes-eager-loading--transactions)
+32. [Configuration System (config/)](#32-configuration-system-config)
+33. [HTML Security, XSS Sanitization & Safe Display](#33-html-security-xss-sanitization--safe-display)
+34. [Session Lifetimes & Frontend Inactivity Watchdog](#34-session-lifetimes--frontend-inactivity-watchdog)
 
 ---
 
@@ -3469,3 +3472,214 @@ await db.transaction(async (tx) => {
 });
 ```
 If any error occurs inside the transaction callback, all queries are automatically rolled back.
+
+---
+
+## 32. Configuration System (`config/`)
+
+Som.js features a centralized configuration engine that unifies environment variables, configuration files, and defaults into a single repository.
+
+### 32.1 The `config(key, fallback)` Helper
+
+Access any configuration value using dot notation:
+
+```javascript
+const { config } = require('somjs/server');
+
+// Retrieve values with fallback defaults
+const appName = config('app.name', 'My Som App');
+const dbConnection = config('database.default', 'sqlite');
+const sessionLifetime = config('session.lifetime', 120);
+
+// Check if a key exists
+if (config.has('redis.connections.default')) {
+  // ...
+}
+
+// Modify configuration at runtime
+config.set('app.debug', false);
+
+// Retrieve all configuration items
+const allConfig = config.all();
+```
+
+### 32.2 Configuration Directory Structure
+
+Configuration files reside in `backend/config/` (or `config/` in root):
+
+```
+backend/config/
+├── app.js        -> config('app.*')
+├── database.js   -> config('database.*')
+├── session.js    -> config('session.*')
+├── redis.js      -> config('redis.*')
+└── auth.js       -> config('auth.*')
+```
+
+Example `backend/config/session.js`:
+
+```javascript
+module.exports = {
+  driver: process.env.SESSION_DRIVER || 'file',
+  lifetime: Number(process.env.SESSION_LIFETIME) || 120, // in minutes
+  expire_on_close: process.env.SESSION_EXPIRE_ON_CLOSE === 'true',
+  inactivity_timeout: Number(process.env.PUBLIC_SESSION_TIMEOUT) || 15, // in minutes
+  warning_before: Number(process.env.PUBLIC_SESSION_WARNING) || 2,
+  cookie: process.env.SESSION_COOKIE || 'som_session',
+  secure: process.env.APP_ENV === 'production',
+  http_only: true,
+  same_site: 'lax',
+};
+```
+
+---
+
+## 33. HTML Security, XSS Sanitization & Safe Display
+
+Som.js includes enterprise-grade, zero-dependency HTML sanitization and security utilities to safely accept rich text and display it without XSS risks.
+
+### 33.1 Backend Security Functions
+
+```javascript
+const { cleanHtml, stripTags, escapeHtml, SafeHtml, html } = require('somjs/server');
+
+// 1. cleanHtml: Strips <script>, <iframe>, dangerous event handlers (onerror, onload)
+// and unsafe protocols (javascript:, vbscript:, data:text/html) while keeping safe tags:
+const clean = cleanHtml(userInput);
+
+// 2. stripTags: Removes all HTML tags and returns clean plain text:
+const plainText = stripTags('<p>Hello <b>World</b></p>'); // "Hello World"
+
+// 3. escapeHtml / e: Escapes &, <, >, ", ' into HTML entities:
+const safeString = escapeHtml('<script>alert(1)</script>');
+
+// 4. SafeHtml & html template tag:
+const content = html`<div class="article">${clean}</div>`;
+```
+
+### 33.2 Request Helpers
+
+Sanitize user input directly on the `Request` object:
+
+```javascript
+class PostController {
+  async store(req) {
+    // Strips malicious scripts and dangerous event handlers
+    const safeBody = req.clean('body');
+
+    // Strips all tags for a clean title
+    const plainTitle = req.strip('title');
+
+    // Wraps directly into a SafeHtml object
+    const safeHtml = req.html('description');
+
+    await Post.create({ title: plainTitle, body: safeBody });
+    return { success: true };
+  }
+}
+```
+
+### 33.3 Model Casts for HTML
+
+Define automatic sanitization on Eloquent-style ORM models:
+
+```javascript
+const { Model } = require('somjs/server');
+
+class Article extends Model {
+  static casts = {
+    content: 'safe_html',     // Automatically sanitizes before DB write; hydrates as SafeHtml
+    headline: 'strip_tags',   // Strips all HTML tags before saving
+    raw_code: 'escape_html'   // Escapes all special characters
+  };
+}
+```
+
+### 33.4 Safe Display in Frontend Views (`.som`)
+
+In `.som` components, `s-html` automatically filters scripts and unsafe event handlers through `cleanHtml`:
+
+```html
+<template>
+  <div class="content">
+    <!-- Render rich HTML safely with built-in XSS protection -->
+    <div s-html="post.content"></div>
+  </div>
+</template>
+```
+
+---
+
+## 34. Session Lifetimes & Frontend Inactivity Watchdog
+
+To prevent unauthorized access when a user leaves their computer unattended, Som.js pairs server-side session lifetime enforcement with a frontend inactivity watchdog.
+
+### 34.1 Environment Configuration (`.env`)
+
+```env
+# Server session lifetime in minutes (inactivity timeout)
+SESSION_LIFETIME=120
+SESSION_EXPIRE_ON_CLOSE=false
+
+# Frontend inactivity timer in minutes (auto-redirect to /login)
+PUBLIC_SESSION_TIMEOUT=15
+PUBLIC_SESSION_WARNING=2
+```
+
+### 34.2 Backend Inactivity Enforcement
+
+In `Authenticate.js`, session tokens are automatically expired when inactive for longer than `SESSION_LIFETIME`:
+
+```javascript
+const sessionMinutes = Number(process.env.SESSION_LIFETIME || 120);
+const lastUsed = new Date(token.last_used_at || token.created_at).getTime();
+
+if (token.type === 'session' && !token.remember && (Date.now() - lastUsed > sessionMinutes * 60000)) {
+  await token.delete();
+  abort(401, 'Unauthenticated.');
+}
+```
+
+### 34.3 Frontend Inactivity Timer (`useInactivityTimer`)
+
+Use `useInactivityTimer` in dashboard layouts or components to detect user idle state and redirect to login:
+
+```html
+<template>
+  <div class="dashboard">
+    <div s-if="warning" class="alert alert-warning">
+      Your session will expire in { remainingMinutes } minutes due to inactivity.
+      <button @click="extend">Stay Signed In</button>
+    </div>
+    <slot />
+  </div>
+</template>
+
+<script>
+import { useInactivityTimer } from 'somjs';
+
+export default {
+  state: {
+    warning: false,
+    remainingMinutes: 2
+  },
+  init() {
+    const timer = useInactivityTimer({
+      timeout: Number(env.PUBLIC_SESSION_TIMEOUT || 15) * 60 * 1000,
+      warningTime: Number(env.PUBLIC_SESSION_WARNING || 2) * 60 * 1000,
+      redirect: '/login?reason=inactive',
+      onWarning: (info) => {
+        this.warning = true;
+        this.remainingMinutes = info.remainingMinutes;
+      }
+    });
+
+    this.extend = () => {
+      timer.reset();
+      this.warning = false;
+    };
+  }
+}
+</script>
+```
+

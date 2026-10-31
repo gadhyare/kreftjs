@@ -28,6 +28,7 @@ function options(args) {
     if (a.startsWith('--') && a.includes('=')) {
       const idx = a.indexOf('=');
       const k = a.slice(2, idx);
+      if (k === '__proto__' || k === 'constructor' || k === 'prototype') continue;
       const v = a.slice(idx + 1);
       o[k] = v;
       if (k === 'route' || k === 'routes' || k === 'route-file') o.route = v;
@@ -35,6 +36,7 @@ function options(args) {
       o.flags.add(k);
     } else if (a.startsWith('--')) {
       const k = a.slice(2);
+      if (k === '__proto__' || k === 'constructor' || k === 'prototype') continue;
       if (valKeys.test(k) && args[i + 1] && !args[i + 1].startsWith('-')) {
         const v = args[++i];
         o[k] = v;

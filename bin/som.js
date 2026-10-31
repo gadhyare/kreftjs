@@ -836,7 +836,7 @@ async function devServer(args, { production = false } = {}) {
       res.end(code);
     } catch (e) { jsError(e.code === 'MISSING' ? 404 : 500, e.message); }
   }
-  const privateDirs = [serverDir, ...(hasBackend ? ['app', 'routes', 'database'].map((d) => path.join(backendDir, d)) : [])];
+  const privateDirs = [serverDir, ...(hasBackend ? ['app', 'routes', 'database', 'config', 'storage'].map((d) => path.join(backendDir, d)) : []), path.join(root, 'config')];
   const insideServerDir = (file) => privateDirs.some((d) => file === d || file.startsWith(d + path.sep));
 
   // som down: storage/framework/down.json → a 503 for everyone, except with the secret (som down --secret=…)

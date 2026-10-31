@@ -97,10 +97,11 @@ function stripTags(html) {
 
 function isSafeUrl(url) {
   if (!url) return false;
-  const clean = String(url).trim().replace(/[\x00-\x1f\s]/g, '');
-  if (/^(?:javascript|vbscript|data):/i.test(clean)) {
-    // Only allow safe data:image/png;base64,... if needed
-    if (/^data:image\/(?:png|jpeg|jpg|gif|webp|svg\+xml);base64,/i.test(clean)) {
+  // Decode HTML entities and strip non-printable characters to prevent scheme evasion
+  const decoded = unescapeHtml(String(url)).trim().replace(/[\x00-\x1f\s]/g, '');
+  if (/^(?:javascript|vbscript|data):/i.test(decoded)) {
+    // Only allow safe static raster images in base64 data URIs (svg is blocked because it can execute script)
+    if (/^data:image\/(?:png|jpeg|jpg|gif|webp);base64,[A-Za-z0-9+/=]+$/i.test(decoded)) {
       return true;
     }
     return false;
@@ -119,8 +120,8 @@ function cleanStyle(styleValue) {
     const prop = rule.slice(0, colonIdx).trim().toLowerCase();
     const val = rule.slice(colonIdx + 1).trim();
 
-    // Block expression(), javascript:, url(javascript:)
-    if (/expression|javascript|behavior|import/i.test(val)) continue;
+    // Block expression(), javascript:, url(...), behavior, @import
+    if (/expression|javascript|behavior|import|url\s*\(/i.test(val)) continue;
 
     if (SAFE_STYLE_PROPS.has(prop)) {
       cleanRules.push(`${prop}: ${val}`);
@@ -138,16 +139,17 @@ function cleanHtml(rawHtml, options = {}) {
   const allowedAttrs = options.allowedAttributes || DEFAULT_ALLOWED_ATTRS;
   const allowStyle = options.allowStyle !== false;
 
-  // 1. Unconditionally strip active execution tags
-  html = html
-    .replace(/<script[\s\S]*?<\/script>/gi, '')
-    .replace(/<style[\s\S]*?<\/style>/gi, '')
-    .replace(/<iframe[\s\S]*?<\/iframe>/gi, '')
-    .replace(/<object[\s\S]*?<\/object>/gi, '')
-    .replace(/<embed[\s\S]*?>/gi, '')
-    .replace(/<applet[\s\S]*?<\/applet>/gi, '')
-    .replace(/<form[\s\S]*?<\/form>/gi, '')
-    .replace(/<!--[\s\S]*?-->/g, '');
+  // 1. Unconditionally strip active execution tags (loop to prevent nested tag bypasses)
+  let prev;
+  const dangerousTagRegex = /<\/?(?:script|style|iframe|object|embed|applet|form|base|meta|link)\b[^>]*>/gi;
+  const blockRegex = /<(script|style|iframe|object|embed|applet|form)[\s\S]*?<\/\1>/gi;
+  do {
+    prev = html;
+    html = html
+      .replace(blockRegex, '')
+      .replace(dangerousTagRegex, '')
+      .replace(/<!--[\s\S]*?-->/g, '');
+  } while (html !== prev);
 
   // 2. Parse and sanitize all tags and attributes
   const tagRegex = /<\/?([a-zA-Z0-9:-]+)((?:\s+[a-zA-Z0-9:-]+(?:\s*=\s*(?:"[^"]*"|'[^']*'|[^\s>]+))?)*)\s*(\/?)>/g;
