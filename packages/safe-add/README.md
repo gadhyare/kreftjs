@@ -1,15 +1,15 @@
-# @gadhyare/safe-add
+# @somjs/somjs
 
-> Enterprise-Grade Security Gatekeeper & Safe Package Installer for Node.js.  
+> Enterprise-Grade Security Gatekeeper & Safe Package Installer for Som.js.  
 > Works on any computer, server, or CI/CD environment with **zero external dependencies**.
 
 ---
 
-## 🔒 Why safe-add?
+## 🔒 Why @somjs/somjs?
 
 Standard `npm install` blindly executes lifecycle scripts (`preinstall`, `install`, `postinstall`), allows disposable newly registered malicious packages, and is susceptible to **typosquatting** and **unicode homoglyph** attacks.
 
-`safe-add` acts as an intelligent, automated security firewall between your project and the public npm registry.
+`@somjs/somjs` acts as an intelligent, automated security firewall between your project and the public npm registry.
 
 ---
 
@@ -17,12 +17,12 @@ Standard `npm install` blindly executes lifecycle scripts (`preinstall`, `instal
 
 ### Run instantly with NPX (No installation needed)
 ```bash
-npx @gadhyare/safe-add express lodash
+npx @somjs/somjs express lodash
 ```
 
 ### Install globally on any machine
 ```bash
-npm install -g @gadhyare/safe-add
+npm install -g @somjs/somjs
 ```
 
 Once installed globally, you can use either `safe-add` or the short alias `sadd`:

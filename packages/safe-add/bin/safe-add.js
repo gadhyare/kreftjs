@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 /*
- * @gadhyare/safe-add (safe-add)
+ * @somjs/somjs (safe-add / som)
  *
  * Enterprise-Grade Security Gatekeeper & Safe Package Installer for Node.js.
  * Zero-dependency, portable CLI that works anywhere on any computer or CI/CD environment.
