@@ -695,12 +695,18 @@ function castOut(C, key, v, cols) {
     // stored as UTC: 2026-10-29T08:30:00.000Z (new Date(…) reads it right in any time zone)
     case 'datetime': case 'timestamp': return toIso(v);
     case 'string': return String(v);
+    case 'safe_html': case 'html': { const { SafeHtml } = require('./html.js'); return SafeHtml.raw(String(v)); }
+    case 'escape_html': case 'escape': { const { escapeHtml } = require('./html.js'); return escapeHtml(String(v)); }
+    case 'strip_html': case 'strip_tags': { const { stripTags } = require('./html.js'); return stripTags(String(v)); }
     default: return v;
   }
 }
 function castIn(C, key, v) {
   const cast = String((C.casts || {})[key] || '').split(':')[0];
   if (v == null) return v;
+  if (['safe_html', 'html'].includes(cast)) { const { cleanHtml } = require('./html.js'); return cleanHtml(String(v)); }
+  if (['escape_html', 'escape'].includes(cast)) { const { escapeHtml } = require('./html.js'); return escapeHtml(String(v)); }
+  if (['strip_html', 'strip_tags'].includes(cast)) { const { stripTags } = require('./html.js'); return stripTags(String(v)); }
   if (['json', 'array', 'object', 'collection'].includes(cast) && typeof v !== 'string') return JSON.stringify(v);
   if (v instanceof Date) return v.toISOString().slice(0, 19).replace('T', ' ');
   if ((cast === 'datetime' || cast === 'timestamp') && typeof v === 'string' && /^\d{4}-\d\d-\d\dT/.test(v)) {
@@ -730,4 +736,4 @@ function factoryFile(name) {
   return null;
 }
 
-module.exports = { Model, ModelBuilder, ModelNotFoundError, forgetTables, snake, studly, singular, setBaseDir, getBaseDir, factoryFile };
+module.exports = { Model, ModelBuilder, ModelNotFoundError, forgetTables, snake, studly, singular, setBaseDir, getBaseDir, factoryFile, castIn, castOut };

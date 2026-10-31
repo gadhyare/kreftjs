@@ -105,10 +105,10 @@ const getPath = (obj, key) => {
 };
 
 class Request {
-  constructor(raw, res, { path, query, body, params }) {
+  constructor(raw = {}, res = {}, { path = '', query = {}, body = {}, params = {} } = {}) {
     Object.assign(this, { raw, res, path, query, body: body || {}, params });
-    this.method = raw.method.toUpperCase();
-    this.headers = raw.headers;
+    this.method = (raw.method || 'GET').toUpperCase();
+    this.headers = raw.headers || {};
     this.user = null;          // middleware like auth can put the user here
     this._validated = null;
   }
@@ -147,6 +147,21 @@ class Request {
   boolean(key, fallback = false) { const v = this.input(key); return v == null ? fallback : ['1', 'true', 'on', 'yes', true, 1].includes(v); }
   integer(key, fallback = 0) { const n = parseInt(this.input(key), 10); return Number.isNaN(n) ? fallback : n; }
   string(key, fallback = '') { const v = this.input(key); return v == null ? fallback : String(v); }
+  clean(key, options) {
+    const { cleanHtml } = require('./html.js');
+    const v = this.input(key);
+    return v == null ? '' : cleanHtml(String(v), options);
+  }
+  strip(key) {
+    const { stripTags } = require('./html.js');
+    const v = this.input(key);
+    return v == null ? '' : stripTags(String(v));
+  }
+  html(key, options) {
+    const { SafeHtml } = require('./html.js');
+    const clean = this.clean(key, options);
+    return SafeHtml.raw(clean);
+  }
   slug(key, sep = '-') { const { slug } = require('./support.js'); return slug(this.input(key), sep); }
   async uniqueSlug(target, column, key, sep = '-') { const { uniqueSlug } = require('./support.js'); return uniqueSlug(target, column, this.input(key), sep); }
   isMethod(m) { return this.method === String(m).toUpperCase(); }

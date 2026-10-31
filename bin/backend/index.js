@@ -357,6 +357,7 @@ module.exports = {
   abort: http.abort, abortIf: http.abortIf, abortUnless: http.abortUnless, HttpError: http.HttpError, ValidationError: http.ValidationError,
   slug: require('./support.js').slug, uniqueSlug: require('./support.js').uniqueSlug,
   ModelNotFoundError, createSchema, setConnection,
+  castIn: require('./model.js').castIn, castOut: require('./model.js').castOut,
   VerifyCsrfToken: http.VerifyCsrfToken, csrf: http.builtIn.csrf, generateCsrfToken: http.generateCsrfToken, verifyCsrfToken: http.verifyCsrfToken,
   ...require('./namespace.js'), // use, namespace
   ...require('./support.js'), // Hash, Str, slug, uniqueSlug, Url, Crypt, Log, Lang, __, Http, env, now
@@ -374,6 +375,8 @@ module.exports = {
   QR: require('./qr.js').QR,
   ...require('./gc.js'),
   ...require('./mcp.js'),
+  ...require('./config.js'), // config, Config, ConfigRepository
+  ...require('./html.js'),   // cleanHtml, sanitizeHtml, stripTags, escapeHtml, e, unescapeHtml, SafeHtml, html
   // for the som command
   createBackend, installAlias, migrator,
 };

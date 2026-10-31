@@ -786,6 +786,25 @@
     });
   }
 
+  const ESC_MAP = { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' };
+  function escapeHtml(s) {
+    return s == null ? '' : String(s).replace(/[&<>"']/g, (c) => ESC_MAP[c]);
+  }
+  function stripTags(html) {
+    return html == null ? '' : String(html).replace(/<[^>]*>/g, ' ').replace(/\s+/g, ' ').trim();
+  }
+  function cleanHtml(raw) {
+    if (raw == null) return '';
+    return String(raw)
+      .replace(/<script[\s\S]*?<\/script>/gi, '')
+      .replace(/<iframe[\s\S]*?<\/iframe>/gi, '')
+      .replace(/<object[\s\S]*?<\/object>/gi, '')
+      .replace(/<embed[\s\S]*?<\/embed>/gi, '')
+      .replace(/\son[a-z]+\s*=\s*(['"]).*?\1/gi, '')
+      .replace(/\son[a-z]+\s*=\s*[^>\s]+/gi, '')
+      .replace(/(href|src|action)\s*=\s*(['"])\s*(?:javascript|vbscript):.*?\2/gi, '$1="#"');
+  }
+
   function compileElement(el, scope, inst) {
     let model = null, textExpr = null, htmlExpr = null, shown = false;
     const anim = readAnimate(el);
@@ -820,7 +839,7 @@
       }
     }
     if (textExpr != null) renderEffect(() => { el.textContent = toDisplayString(evaluate(scope, textExpr, el)); });
-    else if (htmlExpr != null) renderEffect(() => { const h = evaluate(scope, htmlExpr, el); el.innerHTML = h == null ? '' : h; });
+    else if (htmlExpr != null) renderEffect(() => { const h = evaluate(scope, htmlExpr, el); el.innerHTML = h == null ? '' : cleanHtml(h); });
     else if (el.tagName !== 'SCRIPT' && el.tagName !== 'STYLE') compileNodes(el, [...el.childNodes], scope, inst);
     if (model) bindModel(el, model.expr, model.mods, scope); // after children, so <option>s exist
     if (anim && !shown) queuePostJob(() => animate(el, anim.name, 'in'), el); // plays when the element appears
@@ -893,7 +912,8 @@
       if (el.value !== s) el.value = s;
       return;
     }
-    if (key === 'innerHTML' || key === 'textContent') { el[key] = val == null ? '' : val; return; }
+    if (key === 'innerHTML') { el.innerHTML = val == null ? '' : cleanHtml(val); return; }
+    if (key === 'textContent') { el.textContent = val == null ? '' : val; return; }
     if (DANGEROUS_URI_ATTRS.has(String(key).toLowerCase())) {
       const s = String(val == null ? '' : val).trim();
       if (/^(?:javascript\s*:|data\s*:\s*text\/html)/i.test(s)) {
@@ -4168,6 +4188,7 @@
     read: unref, unwrap: toRaw, raw: markRaw,
     // saving data, talking to servers
     saved, storage, api, ApiError, resource, table, validate, form, selection, theme, slug, seo: applySEO, useSeo: applySEO,
+    cleanHtml, sanitizeHtml: cleanHtml, escapeHtml, e: escapeHtml, stripTags,
     // reacting to changes
     watch, effect: watchEffect, tick: nextTick, onCleanup: onScopeDispose,
     // sharing data

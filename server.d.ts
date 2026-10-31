@@ -30,6 +30,12 @@ export declare class Request {
   string(key: string, fallback?: string): string
   slug(key: string, sep?: string): string
   uniqueSlug(target: any, column: string, key: string, sep?: string): Promise<string>
+  /** Clean untrusted HTML input by stripping scripts and dangerous attributes */
+  clean(key: string, options?: CleanHtmlOptions): string
+  /** Strip all HTML tags from input returning plain text */
+  strip(key: string): string
+  /** Retrieve input wrapped in SafeHtml object */
+  html(key: string, options?: CleanHtmlOptions): SafeHtml
   isMethod(method: string): boolean
   expectsJson(): boolean
   /** Validation rules, plus unique:table,column[,ignoreId] and exists:table,column. Throws a 422 when they fail. */
@@ -594,6 +600,19 @@ export declare const Log: { debug: LogFn; info: LogFn; notice: LogFn; warning: L
 /** translations from backend/lang/<locale>.json: __('Welcome, :name', { name }) */
 export declare const Lang: { locale(): string; setLocale(locale: string): void; get(key: string, replace?: Record<string, any>, locale?: string): string; has(key: string, locale?: string): boolean }
 export declare function __(key: string, replace?: Record<string, any>): string
+export interface ConfigFn {
+  <T = any>(key?: string, defaultValue?: T): T
+  get<T = any>(key: string, defaultValue?: T): T
+  has(key: string): boolean
+  set(key: string | Record<string, any>, value?: any): ConfigFn
+  all(): Record<string, any>
+  load(projectRoot?: string): ConfigFn
+  reload(projectRoot?: string): ConfigFn
+  repository: any
+}
+/** configuration from config/*.js and som.config.json: config('app.name') */
+export declare const config: ConfigFn
+export declare const Config: ConfigFn
 export declare const SEO: {
   renderTags(options?: Record<string, any> | string): string
   sitemap(routes?: (string | { path: string; changefreq?: string; priority?: string })[], options?: { baseUrl?: string }): string
@@ -889,5 +908,35 @@ export declare class McpServer {
   listenStdio(): void
 }
 export declare function getMcpServer(options?: { baseDir?: string }): McpServer
+
+export interface CleanHtmlOptions {
+  allowedTags?: string[]
+  allowedAttributes?: Record<string, string[]>
+  allowedSchemes?: string[]
+  allowStyle?: boolean
+}
+
+export declare class SafeHtml {
+  constructor(html: string)
+  toHtml(): string
+  toString(): string
+  static raw(html: string): SafeHtml
+  static clean(rawHtml: string, options?: CleanHtmlOptions): SafeHtml
+  static isSafe(value: any): boolean
+}
+
+/** Sanitize HTML string by stripping script tags, event handlers and dangerous schemes */
+export declare function cleanHtml(rawHtml: any, options?: CleanHtmlOptions): string
+export declare const sanitizeHtml: typeof cleanHtml
+/** Strip all HTML tags, returning plain text */
+export declare function stripTags(html: any): string
+/** Escape HTML special characters (&, <, >, ", ') */
+export declare function escapeHtml(str: any): string
+export declare const e: typeof escapeHtml
+/** Unescape HTML entities */
+export declare function unescapeHtml(str: any): string
+/** Tagged template literal for safely composing HTML */
+export declare function html(strings: TemplateStringsArray, ...values: any[]): SafeHtml
+
 
 
