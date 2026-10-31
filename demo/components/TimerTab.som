@@ -1,0 +1,23 @@
+<!-- a running timer: on hide pauses it, on show starts it again -->
+state seconds = 0
+state paused = false
+let id = null
+
+action run() { clearInterval(id); id = setInterval(() => seconds++, 1000); paused = false }
+action pause() { clearInterval(id); paused = true }
+
+on ready { run() }
+on show { if (paused) run() }
+on hide { pause() }
+on destroy { clearInterval(id) }
+
+<view>
+  <div class="tab-body">
+    <p class="big">{seconds} s</p>
+    <p class="muted">Counts while you look. Hidden with keep, it pauses (on hide) and goes on (on show).</p>
+  </div>
+</view>
+
+<style scoped>
+.big { font-size: 32px; font-weight: 700; margin: 0; font-variant-numeric: tabular-nums; }
+</style>

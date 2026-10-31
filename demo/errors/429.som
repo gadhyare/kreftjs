@@ -1,0 +1,11 @@
+<!-- errors/429.som: shown after abort(429). Change the words as you like. -->
+layout 'errors/minimal.som'
+prop status = 429
+prop title = ''
+prop message = ''
+
+<view>
+  <som-section name="code">429</som-section>
+  <som-section name="title">Too Many Requests</som-section>
+  <som-section name="message">{message || 'Too many requests. Wait a moment, then try again.'}</som-section>
+</view>

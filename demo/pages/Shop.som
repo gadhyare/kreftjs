@@ -1,0 +1,40 @@
+<!-- Shop: changes the shared "cart" store; the header badge updates too -->
+use cart
+
+state products = [
+  { id: 1, name: 'Notebook', price: 4 },
+  { id: 2, name: 'Pen', price: 1 },
+  { id: 3, name: 'Backpack', price: 25 },
+]
+
+<view>
+  <section class="card">
+    <h2>Shop</h2>
+    <div class="grid">
+      <div class="product" s-each="p in products" s-key="p.id">
+        <strong>{p.name}</strong>
+        <span class="muted">${p.price}</span>
+        <button class="primary" @click="cart.add(p)">Add to cart</button>
+      </div>
+    </div>
+  </section>
+
+  <section class="card">
+    <h2>Cart <small class="muted">({cart.count})</small></h2>
+    <p s-if="!cart.count" class="muted">Your cart is empty.</p>
+    <ul s-else>
+      <li s-each="(item, i) in cart.items" s-key="i">
+        {item.name} — ${item.price}
+        <button @click="cart.remove(i)" aria-label="Remove">✕</button>
+      </li>
+    </ul>
+    <p><strong>Total: ${cart.total}</strong></p>
+  </section>
+</view>
+
+<style scoped>
+.grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(160px, 1fr)); gap: 12px; }
+.product { border: 1px solid var(--border); padding: 12px; display: flex; flex-direction: column; gap: 6px; }
+ul { padding-left: 18px; }
+li button { border: none; background: none; }
+</style>

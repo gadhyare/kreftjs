@@ -1,0 +1,158 @@
+<!-- The start page: what Som.js is, shown with a component that runs right here -->
+layout plain
+
+state count = 0
+state name = 'Maxamuud Xussen'
+state copied = false
+derive double = count * 2
+
+state words = [
+  { word: 'state', says: 'a value that can change', to: '/basics' },
+  { word: 'saved', says: 'a value kept after a reload', to: '/saved' },
+  { word: 'derive', says: 'a value worked out from others', to: '/basics' },
+  { word: 'load', says: 'data from an API or a database', to: '/posts' },
+  { word: 'action', says: 'something the page can do', to: '/basics' },
+  { word: 'when', says: 'run once a condition becomes true', to: '/lifecycle' },
+  { word: 'watch', says: 'run each time a value changes', to: '/lifecycle' },
+  { word: 'on', says: 'start, ready, update, show, hide, destroy', to: '/lifecycle' },
+  { word: 'prop', says: 'a value from the parent', to: '/components' },
+  { word: 'event', says: 'a message to the parent', to: '/components' },
+  { word: 'use', says: 'a shared store or shared logic', to: '/sharing' },
+  { word: 'share', says: 'a value for everything inside', to: '/sharing' },
+]
+state parts = [
+  { title: 'Router', text: 'Clean URLs, nested pages, guards.', to: '/router' },
+  { title: 'Database', text: 'SQLite, MySQL or PostgreSQL tables as an API.', to: '/database' },
+  { title: 'Forms', text: 'Expressive validation rules in the page and on the server.', to: '/posts' },
+  { title: 'Animations', text: 'Things come and go with s-animate.', to: '/animations' },
+  { title: 'Server code', text: 'server/*.js files with any npm package.', to: '/server' },
+  { title: 'Dev tools', text: 'Hot reload that keeps state, and DevTools.', to: '/tools' },
+]
+
+action add() { count++ }
+action copy() {
+  navigator.clipboard && navigator.clipboard.writeText('som new my-app --db sqlite')
+  copied = true
+  setTimeout(() => (copied = false), 1500)
+}
+
+<view>
+  <section class="hero">
+    <div class="pitch">
+      <h1>Write components in plain words.</h1>
+      <p class="sub">Som.js is a small JavaScript framework with its own component language. Say what can change, what follows from it and what the page can do. The page keeps itself up to date.</p>
+      <div class="cta">
+        <som-link to="/docs" class="btn primary lg">Read the docs</som-link>
+        <som-link to="/basics" class="btn lg">See every feature</som-link>
+      </div>
+      <p class="facts">One file with no dependencies. No build step while you work. Single braces provide clean and expressive templates.</p>
+    </div>
+
+    <div class="live" aria-label="A component and its result">
+      <div class="file">
+        <p class="tab">Hello.som</p>
+        <pre class="code"><span class="k">state</span> name = <span class="s">'Maxamuud Xussen'</span><span class="now">now {JSON.stringify(name)}</span>
+<span class="k">state</span> count = <span class="n">0</span><span class="now">now {count}</span>
+<span class="k">derive</span> double = count * <span class="n">2</span><span class="now">now {double}</span>
+
+<span class="k">action</span> add() \{ count++ }
+
+<span class="t">&lt;view&gt;</span>
+  <span class="t">&lt;h2&gt;</span>Hello \{name}<span class="t">&lt;/h2&gt;</span>
+  <span class="t">&lt;input</span> <span class="a">s-model</span>=<span class="s">"name"</span><span class="t">&gt;</span>
+  <span class="t">&lt;button</span> <span class="a">@click</span>=\{add}<span class="t">&gt;</span>
+    \{count} × 2 = \{double}
+  <span class="t">&lt;/button&gt;</span>
+<span class="t">&lt;/view&gt;</span></pre>
+      </div>
+      <div class="result">
+        <h2>Hello {name}</h2>
+        <input s-model="name" aria-label="Name">
+        <button class="primary" @click={add}>{count} × 2 = {double}</button>
+        <p class="hint">This runs here. Type a name or press the button, and watch the values in the file.</p>
+      </div>
+    </div>
+  </section>
+
+  <section class="language">
+    <h2>The whole language fits on one screen</h2>
+    <dl>
+      {for w in words key w.word}
+        <div><dt><som-link to={w.to}>{w.word}</som-link></dt><dd>{w.says}</dd></div>
+      {/for}
+    </dl>
+  </section>
+
+  <section class="inside">
+    <h2>Also in the box</h2>
+    <ul>
+      {for p in parts key p.title}
+        <li><som-link to={p.to}><strong>{p.title}</strong><span>{p.text}</span></som-link></li>
+      {/for}
+    </ul>
+  </section>
+
+  <section class="begin">
+    <h2>Start a project</h2>
+    <div class="term">
+      <code>som new my-app --db sqlite</code>
+      <button class="sm" @click={copy} aria-label="Copy the command">{copied ? 'Copied' : 'Copy'}</button>
+    </div>
+    <p>Then <code>cd my-app</code> and <code>npm run dev</code>. Coming from Vue? The <som-link to="/docs">docs</som-link> have a table with the Som.js name for every Vue feature.</p>
+  </section>
+</view>
+
+<style scoped>
+.hero { display: grid; grid-template-columns: minmax(0, 0.95fr) minmax(0, 1.05fr); gap: 56px; align-items: center; padding: 72px 0 72px; }
+.eyebrow { display: inline-flex; }
+h1 { font-size: clamp(38px, 5.4vw, 60px); line-height: 1.04; letter-spacing: -0.045em; font-weight: 700; margin: 0 0 20px; max-width: 12ch; }
+.sub { font-size: 18px; line-height: 1.6; color: var(--muted); max-width: 34em; margin: 0 0 28px; }
+.cta { display: flex; gap: 10px; flex-wrap: wrap; align-items: center; }
+.facts { margin: 24px 0 0; font-size: 14px; color: var(--muted); max-width: 32em; }
+
+.live { border: 1px solid var(--border); }
+.file { background: #09090b; color: #e4e4e7; }
+.tab { margin: 0; padding: 10px 16px; font-size: 12px; color: #a1a1aa; border-bottom: 1px solid #27272a; font-family: var(--mono); }
+.code { margin: 0; padding: 16px; background: none; font-size: 13px; line-height: 1.65; overflow-x: auto; color: #e4e4e7; }
+.k { color: #fafafa; font-weight: 600; }
+.s { color: #a7f3d0; }
+.n { color: #c4b5fd; }
+.t { color: #93c5fd; }
+.a { color: #fcd34d; }
+.now { color: #71717a; font-style: italic; margin-left: 2ch; }
+.now::before { content: '// '; }
+.result { background: var(--background); padding: 20px; display: grid; gap: 12px; justify-items: start; }
+.result h2 { margin: 0; font-size: 22px; letter-spacing: -0.03em; }
+.result input { width: min(100%, 260px); }
+.result button { font-variant-numeric: tabular-nums; }
+.hint { margin: 0; font-size: 13px; color: var(--muted); }
+
+section + section { border-top: 1px solid var(--border); }
+.language, .inside, .begin { padding: 56px 0; }
+.language h2, .inside h2, .begin h2 { font-size: 24px; letter-spacing: -0.03em; margin: 0 0 24px; }
+dl { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); column-gap: 40px; margin: 0; border-top: 1px solid var(--border); }
+dl div { display: grid; grid-template-columns: 96px 1fr; gap: 12px; padding: 10px 0; border-bottom: 1px solid var(--border); align-items: baseline; }
+dt a { font-family: var(--mono); font-size: 13px; font-weight: 500; color: var(--foreground); text-decoration: none; }
+dt a:hover { text-decoration: underline; }
+dd { margin: 0; color: var(--muted); }
+.inside ul { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); border-top: 1px solid var(--border); border-left: 1px solid var(--border); }
+.inside li { border-right: 1px solid var(--border); border-bottom: 1px solid var(--border); }
+.inside a { display: grid; gap: 4px; padding: 20px; height: 100%; color: var(--foreground); text-decoration: none; }
+.inside a:hover { background: var(--accent); }
+.inside a strong { font-size: 15px; font-weight: 600; }
+.inside a span { color: var(--muted); }
+.term { display: flex; align-items: center; justify-content: space-between; gap: 12px; border: 1px solid var(--border); background: var(--accent); padding: 8px 8px 8px 16px; max-width: 480px; margin-bottom: 16px; }
+.term code { background: none; font-size: 14px; padding: 0; }
+.term code::before { content: '$ '; color: var(--muted); }
+.begin p { color: var(--muted); max-width: 40em; }
+
+@media (max-width: 900px) {
+  .hero { grid-template-columns: minmax(0, 1fr); gap: 32px; padding-top: 40px; }
+  .inside ul { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+@media (max-width: 560px) {
+  dl { grid-template-columns: minmax(0, 1fr); }
+  .inside ul { grid-template-columns: minmax(0, 1fr); }
+  .code { font-size: 12px; }
+}
+</style>

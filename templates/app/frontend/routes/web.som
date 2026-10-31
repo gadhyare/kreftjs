@@ -1,0 +1,33 @@
+// Application Web Routes.
+// Every route uses the default dashboard shell (layouts/app.som) unless configured otherwise.
+// Developers can attach custom auth guards directly: .middleware('auth', 'admin') or custom guards.
+
+// Protected Dashboard & management pages (requires signed-in user)
+Route.middleware('auth').group(() => {
+  Route.view('/', 'pages/Dashboard.som').name('dashboard').title('Dashboard')
+  Route.view('/dashboard', 'pages/Dashboard.som').title('Dashboard')
+  Route.view('/users', 'pages/Users.som').name('users').title('Users')
+  Route.view('/profile', 'pages/Profile.som').name('profile').title('Profile')
+})
+
+// Public showcase page
+Route.view('/welcome', 'pages/Home.som').name('welcome').title('Showcase')
+
+// Authentication routes (pages/auth/), wrapped in guest layout
+Route.layout('guest').group(() => {
+  Route.middleware('guest').group(() => {
+    Route.view('/login', 'pages/auth/Login.som').name('login').title('Log In')
+    Route.view('/register', 'pages/auth/Register.som').name('register').title('Register')
+    Route.view('/forgot-password', 'pages/auth/ForgotPassword.som').name('password.request').title('Forgot Password')
+  })
+  Route.view('/reset-password/:token', 'pages/auth/ResetPassword.som').name('password.reset').title('Reset Password')
+  Route.view('/verify-email/:id?/:hash?', 'pages/auth/VerifyEmail.som').name('verification.notice').title('Verify Email')
+  Route.view('/confirm-password', 'pages/auth/ConfirmPassword.som').name('password.confirm').title('Confirm Password').middleware('auth')
+})
+
+// Documentation (docs/) and test suite (tests/)
+Route.view('/docs/:lang?', 'docs/Docs.som').name('docs').title('Documentation')
+Route.prefix('/tests').name('tests.').group(() => {
+  Route.view('/', 'tests/pages/Test.som').name('index').title('Test Suite')
+  Route.view('/about', 'tests/pages/About.som').name('about').title('About · Tests')
+})

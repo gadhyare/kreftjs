@@ -1,0 +1,109 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <!-- the folder this app lives in: the router and the .som paths start from here -->
+  <base href="/demo/">
+  <title>Som.js Demo</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600;700&family=Geist+Mono:wght@400;500&display=swap">
+  <!-- the look: quiet, like shadcn/ui, with square corners and no shadows -->
+  <link rel="stylesheet" href="ui.css">
+  <style>
+    /* page changes: <som-view s-animate.after="page"> */
+    .page-out { transition: opacity .12s ease; }
+    .page-out-to { opacity: 0; }
+    .page-in { transition: opacity .18s ease, transform .18s ease; }
+    .page-in-from { opacity: 0; transform: translateY(4px); }
+  </style>
+</head>
+<body>
+  <div id="app"></div>
+
+  <script src="../som.js"></script>
+  <script>
+    // 1) Shared stores — every component can read and change them
+    Som.store('cart', {
+      items: [],
+      get count() { return this.items.length },
+      get total() { return this.items.reduce((sum, p) => sum + p.price, 0) },
+      add(product) {
+        this.items.push(product)
+        Som.bus.send('toast', product.name + ' added to cart')
+      },
+      remove(index) { this.items.splice(index, 1) },
+    }, { saved: true }) // the cart survives a reload
+
+    Som.store('users', {
+      list: [
+        { id: 1, name: 'Maxamuud Cali', city: 'Hargeisa', role: 'Developer' },
+        { id: 2, name: 'Maxamuud Xussen', city: 'Mogadishu', role: 'Designer' },
+        { id: 3, name: 'Cabdi Yuusuf', city: 'Berbera', role: 'Manager' },
+      ],
+      find(id) { return this.list.find((u) => u.id == id) },
+    })
+
+    // 2) Routes — each page is a .som file, shown inside a layout (layouts/*.som)
+    const router = Som.router({
+      layout: 'main',       // every page: layouts/main.som (menu on the left)…
+      errors: 'errors',     // error pages: errors/404.som for unknown addresses, abort(403) → errors/403.som
+      routes: [
+        // Basics
+        { path: '/', component: 'pages/Start.som', meta: { title: 'Som.js · components in plain words' } },
+        // …unless a route names another one (Start.som says `layout plain` itself)
+        { path: '/docs/:lang?', component: '../docs/Docs.som', props: true, layout: 'plain', meta: { title: 'Documentation · Som.js' } },
+        { path: '/basics', component: 'pages/Home.som', meta: { title: 'Basics · Som.js' } },
+        { path: '/lifecycle', component: 'pages/Lifecycle.som', meta: { title: 'Lifecycle · Som.js' } },
+        // Views
+        { path: '/loops', component: 'pages/Loops.som', meta: { title: 'Loops · Som.js' } },
+        { path: '/forms', component: 'pages/Forms.som', meta: { title: 'Forms · Som.js' } },
+        { path: '/directives', component: 'pages/Directives.som', meta: { title: 'Directives · Som.js' } },
+        { path: '/animations', component: 'pages/Animations.som', meta: { title: 'Animations · Som.js' } },
+        { path: '/fast', component: 'pages/Fast.som', meta: { title: 'Fast views · Som.js' } },
+        { path: '/layouts', component: 'pages/Layouts.som', meta: { title: 'Layouts · Som.js' } },
+        { path: '/print', component: 'pages/Print.som', layout: false, meta: { title: 'Print · Som.js' } },
+        // Components
+        { path: '/components', component: 'pages/Components.som', meta: { title: 'Components · Som.js' } },
+        { path: '/keep', component: 'pages/KeepWait.som', meta: { title: 'Keep and wait · Som.js' } },
+        // Data
+        { path: '/saved', component: 'pages/Saved.som', meta: { title: 'Saved data · Som.js' } },
+        { path: '/sharing', component: 'pages/Sharing.som', meta: { title: 'Sharing · Som.js' } },
+        { path: '/shop', component: 'pages/Shop.som', meta: { title: 'Shop · Som.js' } },
+        { path: '/posts', component: 'pages/Posts.som', meta: { title: 'Posts · Som.js' } },
+        { path: '/logic', component: 'pages/Logic.som', meta: { title: 'Shared logic · Som.js' } },
+        { path: '/online', component: 'pages/Online.som', meta: { title: 'Online API · Som.js' } },
+        { path: '/database', component: 'pages/Database.som', meta: { title: 'Database · Som.js' } },
+        { path: '/backend', component: 'pages/Backend.som', meta: { title: 'Backend · Som.js' } },
+        { path: '/server', component: 'pages/Server.som', meta: { title: 'Server code · Som.js' } },
+        // Router
+        { path: '/users', component: 'pages/Users.som', meta: { title: 'Users · Som.js' } },
+        { path: '/users/:id', name: 'user', component: 'pages/User.som', props: true },
+        { path: '/router', component: 'pages/Router.som', meta: { title: 'Router · Som.js' } },
+        { path: '/secret', component: 'pages/Router.som', guard: () => '/router?blocked=1' },
+        { path: '/old-page', redirect: '/router?from=old-page' },
+        // nested routes: Settings is the frame, its own <som-view> shows the child
+        { path: '/settings', component: 'pages/Settings.som', meta: { title: 'Settings · Som.js', area: 'settings' }, children: [
+          { path: '', component: 'pages/settings/General.som' },
+          { path: 'account', component: 'pages/settings/Account.som', meta: { title: 'Account · Som.js' } },
+          { path: 'look', component: 'pages/settings/Look.som', meta: { title: 'Look · Som.js' } },
+        ] },
+        // Tools
+        { path: '/render', component: 'pages/Render.som', meta: { title: 'Template engine · Som.js' } },
+        { path: '/tools', component: 'pages/Tools.som', meta: { title: 'Dev tools · Som.js' } },
+      ],
+    })
+
+    // 3) The app itself is a .som file too
+    Som.app('App.som')
+      .component('SiteHeader', 'components/SiteHeader.som') // the bar both layouts use
+      .component('Counter', 'components/Counter.som')
+      .component('TodoList', 'components/TodoList.som')
+      // a custom directive: <input s-focus> gets the focus when it appears
+      .directive('focus', { ready(el) { el.focus() } })
+      .use(router)
+      .mount('#app')
+  </script>
+</body>
+</html>

@@ -1,0 +1,22 @@
+{
+  "posts": [
+    {
+      "id": 2,
+      "title": "Saved data",
+      "body": "Write saved instead of state and it survives a reload.",
+      "likes": 8
+    },
+    {
+      "id": 3,
+      "title": "Talking to an API",
+      "body": "api.get, post, put, patch and delete, with form validation errors.",
+      "likes": 0
+    }
+  ],
+  "$rules": {
+    "posts": {
+      "title": "required|min:3|max:120",
+      "body": "max:2000"
+    }
+  }
+}

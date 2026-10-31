@@ -1,0 +1,62 @@
+<!-- shared logic in .js files (use x = makeIt()) · store tools: $patch, $reset, $watch -->
+import { trackMouse } from '../logic/mouse.js'
+import { countdown } from '../logic/countdown.js'
+
+use cart
+use mouse = trackMouse()
+use timer = countdown(10)
+state changes = []
+
+on start {
+  // $watch runs on every change of the store; it stops by itself when this page closes
+  cart.$watch((now) => {
+    changes.unshift(now.items.length + ' item' + (now.items.length === 1 ? '' : 's') + ' at ' + new Date().toLocaleTimeString())
+    changes = changes.slice(0, 4)
+  })
+}
+
+action addTwo() {
+  cart.$patch((c) => {
+    c.items.push({ id: 101, name: 'Sticker', price: 2 })
+    c.items.push({ id: 102, name: 'Badge', price: 3 })
+  })
+}
+
+<view>
+  <section class="card">
+    <h1>Shared logic</h1>
+    <p class="lead">Put logic you use in many places in a <code>.js</code> file, then <code>use mouse = trackMouse()</code>. It can use <code>Som.state</code>, <code>Som.watch</code>, <code>Som.onDestroy</code>…</p>
+    <div class="two">
+      <div class="tile">
+        <h3><code>logic/mouse.js</code></h3>
+        <p class="big">{mouse.x}, {mouse.y}</p>
+        <p class="muted">{mouse.moves} moves. Move the mouse anywhere.</p>
+      </div>
+      <div class="tile">
+        <h3><code>logic/countdown.js</code></h3>
+        <p class="big">{timer.done ? 'Done!' : timer.left + ' s'}</p>
+        <button class="primary" @click={timer.start} disabled={timer.running || timer.done}>Start</button>
+        <button @click={timer.stop} disabled={!timer.running}>Stop</button>
+        <button @click={timer.reset}>Reset</button>
+      </div>
+    </div>
+  </section>
+
+  <section class="card">
+    <h2>Store tools</h2>
+    <p class="muted">Every store gets <code>$patch()</code> (change several things at once), <code>$reset()</code> (back to the start) and <code>$watch()</code>.</p>
+    <p>The cart has <strong>{cart.count}</strong> items, {cart.total} €.</p>
+    <button class="primary" @click={addTwo}>cart.$patch(…) two items</button>
+    <button @click={cart.$reset}>cart.$reset()</button>
+    <ul class="log">{for line in changes}<li>{line}</li>{empty}<li class="muted">Changes show up here.</li>{/for}</ul>
+  </section>
+</view>
+
+<style scoped>
+.two { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+.tile { padding: 14px; background: var(--accent); }
+.tile h3 { font-size: 14px; }
+.big { font-size: 28px; font-weight: 700; margin: 4px 0 8px; font-variant-numeric: tabular-nums; }
+.log { padding-left: 18px; margin-top: 12px; }
+@media (max-width: 560px) { .two { grid-template-columns: 1fr; } }
+</style>

@@ -1,0 +1,56 @@
+<!-- when · watch · on start / ready / destroy -->
+state count = 0
+state log = []
+
+derive even = count % 2 === 0
+
+action add() { count++ }
+action reset() { count = 0 }
+
+function write(message) {
+  log.unshift(new Date().toLocaleTimeString() + ' · ' + message)
+  if (log.length > 8) log.pop()
+}
+
+// runs each time the condition becomes true
+when count >= 5 {
+  write('when: count reached 5')
+  bus.send('toast', 'Count reached 5')
+}
+
+// runs on every change: value is the new one, old the one before
+watch count {
+  write('watch: ' + old + ' → ' + value)
+}
+
+on start { write('on start: the script ran, nothing is on screen yet') }
+on ready { write('on ready: the page is on screen') }
+on destroy { console.log('[demo] on destroy ran: the Lifecycle page was removed') }
+
+<view>
+  <section class="card">
+    <h1>Lifecycle</h1>
+    <p class="lead">React to changes with <code>when</code> and <code>watch</code>, and to the page appearing with <code>on</code>.</p>
+    <div class="row">
+      <button class="primary" @click={add}>Add one</button>
+      <button @click={reset}>Reset</button>
+      <strong class="count">{count}</strong>
+      <span class="muted">{even ? 'even' : 'odd'}</span>
+    </div>
+  </section>
+
+  <section class="card">
+    <h2>What happened</h2>
+    <ol class="log">
+      {for line in log}
+        <li>{line}</li>
+      {/for}
+    </ol>
+  </section>
+</view>
+
+<style scoped>
+.row { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
+.count { font-size: 28px; min-width: 2ch; }
+.log { margin: 0; padding-left: 20px; font-family: ui-monospace, monospace; font-size: 13px; line-height: 1.8; }
+</style>

@@ -1,0 +1,48 @@
+<!-- /register: make an account (POST /api/register, app/Http/Controllers/Auth/RegisteredUserController.js) -->
+state f = form(
+  { name: '', email: '', password: '', password_confirmation: '' },
+  { name: 'required|max:255', email: 'required|email|max:255', password: 'required|min:8|confirmed' },
+)
+state problem = ''
+
+action submit() {
+  problem = ''
+  try {
+    const res = await f.$submit((values) => api.post('/api/register', values))
+    if (!res) return
+    $store.auth.signIn(res)
+    $router.replace('/verify-email')
+  } catch (e) {
+    problem = e.message
+  }
+}
+
+<view>
+  <h1>Create an account</h1>
+  <p class="lead">It takes a minute. We'll send you an email to check the address.</p>
+  <p s-if="problem" class="alert danger" role="alert">{problem}</p>
+
+  <form @submit.prevent={submit} novalidate>
+    <field label="Name" error={f.$error('name')}>
+      <input s-model="f.name" autocomplete="name" autofocus>
+    </field>
+    <field label="Email" error={f.$error('email')}>
+      <input type="email" s-model="f.email" autocomplete="username">
+    </field>
+    <field label="Password" error={f.$error('password')} hint="At least 8 characters.">
+      <input type="password" s-model="f.password" autocomplete="new-password">
+    </field>
+    <field label="Confirm password" error={f.$error('password_confirmation')}>
+      <input type="password" s-model="f.password_confirmation" autocomplete="new-password">
+    </field>
+    <button class="primary wide" disabled={f.$busy}>{f.$busy ? 'Creating…' : 'Create account'}</button>
+  </form>
+
+  <p class="links">Already have an account? <som-link to="/login">Log in</som-link></p>
+</view>
+
+<style scoped>
+h1 { font-size: 24px; }
+.wide { width: 100%; margin-top: 4px; }
+.links { margin: 20px 0 0; font-size: 13px; color: var(--muted); }
+</style>

@@ -1,0 +1,31 @@
+<!-- A counter that starts from the "start" prop -->
+prop start = 0
+
+// saved: the count is kept in localStorage, so it survives a reload
+saved count = start
+derive double = count * 2
+derive big = count > 10
+
+action add() { count++ }
+action subtract() { count-- }
+
+when big {
+  bus.send('toast', 'Over ten!')
+}
+
+<view>
+  <section class="card">
+    <h2>Counter</h2>
+    <div class="row">
+      <button @click={subtract}>−</button>
+      <strong>{count}</strong>
+      <button @click={add}>+</button>
+    </div>
+    <p class="muted">Double: {double} · {big ? 'big number!' : 'keep going'}</p>
+  </section>
+</view>
+
+<style scoped>
+.row { display: flex; align-items: center; gap: 12px; }
+strong { font-size: 28px; min-width: 2ch; text-align: center; }
+</style>

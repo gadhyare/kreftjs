@@ -1,0 +1,79 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <!-- where the app lives: routes and .som paths start here -->
+  <base href="/">
+  <title>My Som.js app</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600;700&family=Geist+Mono:wght@400;500&display=swap">
+  <!-- buttons, fields, cards, tables: change the colors at the top of ui.css -->
+  <link rel="stylesheet" href="ui.css">
+</head>
+<body>
+  <div id="app"></div>
+
+  <script src="som.js"></script>
+  <script>
+    // Who is signed in. The login itself is an HttpOnly cookie that page scripts can't read (safe from XSS);
+    // this store only remembers the user's name and details for the pages. Som.api sends the cookie and
+    // the X-XSRF-TOKEN header by itself.
+    const auth = Som.store('auth', {
+      user: null,
+      signIn({ user }) { this.user = user },
+      signOut() { this.user = null },
+      async logout() {
+        try { await Som.api.post('/api/logout') } catch (_) { /* already logged out */ }
+        this.signOut()
+      },
+    }, { saved: ['user'] })
+
+    const router = Som.router({
+      routes: ['routes/web.som'], // the pages are in routes/web.som; add more files: som make:routes admin
+      layout: 'app',              // every page goes inside layouts/app.som…
+      errors: 'errors',           // error pages: errors/404.som for unknown addresses, abort(403) → errors/403.som
+      // the names routes use in .middleware(…): return an address to send the visitor there instead
+      middleware: {
+        auth: (to) => (auth.user ? true : '/login?redirect=' + encodeURIComponent(to.fullPath)),
+        guest: () => (auth.user ? '/dashboard' : true),
+        verified: () => (auth.user && !auth.user.email_verified_at ? '/verify-email' : true),
+      },
+    })
+
+    // the API says: not signed in any more (401), or type the password again first (423)
+    Som.api.onError((e) => {
+      if (e.status === 401 && auth.user) {
+        auth.signOut()
+        const current = router.route.fullPath || '/'
+        if (!['/login', '/register', '/forgot-password', '/welcome'].includes(router.route.path)) {
+          router.replace('/login?redirect=' + encodeURIComponent(current))
+        }
+      }
+      if (e.status === 419 && auth.user) Som.api.get('/api/user').catch(() => {}) // a fresh XSRF cookie; try again
+      if (e.status === 423) router.go('/confirm-password?redirect=' + encodeURIComponent(router.route.fullPath))
+    })
+
+    // Verify session on startup: if the backend rejected the user (e.g. app was reset/recreated), clear local auth state
+    if (auth.user) {
+      Som.api.get('/api/user').then(
+        (user) => { auth.user = user },
+        () => {
+          auth.signOut()
+          if (!['/login', '/register', '/forgot-password', '/welcome'].includes(router.route.path)) {
+            router.replace('/login')
+          }
+        }
+      )
+    }
+
+    Som.app('App.som')
+      .component('Field', 'components/Field.som')
+      .component('StatCard', 'components/StatCard.som')
+      .component('Counter', 'tests/components/Counter.som')
+      .use(router)
+      .mount('#app')
+  </script>
+</body>
+</html>

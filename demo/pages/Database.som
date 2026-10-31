@@ -1,0 +1,131 @@
+<!-- A real database: the notes table in demo/database/demo.db (SQLite), served by `som dev --db` at /api/notes -->
+const notes = table('notes')
+
+state search = ''
+state onlyPinned = false
+state sort = '-pinned,-id'
+// the same rules as "rules" for notes in the server settings; checked here first, so a bad note is never sent
+state draft = form({ title: '', body: '', color: 'yellow' }, { title: 'required|min:2|max:120', body: 'max:1000', color: 'required|in:yellow,blue,green,pink' })
+state editing = null
+state colors = ['yellow', 'blue', 'green', 'pink']
+
+// loads again by itself when search, onlyPinned or sort change
+load list = notes.all({ q: search || undefined, pinned: onlyPinned ? true : undefined, _sort: sort })
+
+derive total = (list.data || []).length
+
+action add() {
+  // $submit checks the rules first; a 422 from the server (a title that's already taken) fills the same errors
+  const note = await draft.$submit((values) => notes.create(values))
+  if (!note) return
+  list.data = [note, ...list.data]
+  draft.$reset({ title: '', body: '', color: draft.color })
+  bus.send('toast', 'Saved in the database')
+}
+action pin(note) {
+  Object.assign(note, await notes.patch(note.id, { pinned: !note.pinned }))
+}
+action edit(note) { editing = { id: note.id, title: note.title, body: note.body || '' } }
+action saveEdit(note) {
+  try {
+    Object.assign(note, await notes.patch(note.id, { title: editing.title, body: editing.body }))
+    editing = null
+  } catch (e) {
+    bus.send('toast', (e.errors && e.errors.title && e.errors.title[0]) || e.message)
+  }
+}
+action remove(note) {
+  await notes.remove(note.id)
+  list.data = list.data.filter((n) => n.id !== note.id)
+}
+
+<view>
+  <section class="card">
+    <h1>Database</h1>
+    <p class="lead">These notes are rows in a real SQLite database. <code>som dev --db sqlite:demo/database/demo.db</code> turns its tables into an API: <code>/api/notes</code>.</p>
+
+    <form class="new" @submit.prevent={add}>
+      <input s-model="draft.title" placeholder="Title" aria-label="Title">
+      <textarea s-model="draft.body" rows="2" placeholder="Note (optional)" aria-label="Note"></textarea>
+      <div class="row">
+        {for c in colors}
+          <label class="swatch {c}"><input type="radio" name="color" value={c} s-model="draft.color"><span>{c}</span></label>
+        {/for}
+        <button class="primary">Save note</button>
+      </div>
+      <p s-if="draft.$error('title')" class="bad">{draft.$error('title')}</p>
+      <p s-if="draft.$error('body')" class="bad">{draft.$error('body')}</p>
+    </form>
+  </section>
+
+  <section class="card">
+    <div class="row tools">
+      <input type="search" s-model.lazy="search" placeholder="Search title and text…" aria-label="Search">
+      <label class="check"><input type="checkbox" s-model="onlyPinned"> Pinned only</label>
+      <select s-model="sort" aria-label="Sort">
+        <option value="-pinned,-id">Pinned first</option>
+        <option value="-id">Newest</option>
+        <option value="title">A → Z</option>
+      </select>
+    </div>
+    <p class="muted">{list.loading ? 'Loading…' : total + ' note' + (total === 1 ? '' : 's')}</p>
+    <p s-if="list.error" class="bad">{list.error.message}</p>
+    <div class="grid">
+      {for note in list.data || [] key note.id animate scale}
+        <article class="note {note.color}">
+          <template s-if="editing && editing.id === note.id">
+            <input s-model="editing.title" aria-label="Title">
+            <textarea s-model="editing.body" rows="3" aria-label="Note"></textarea>
+            <div class="row">
+              <button class="primary" @click="saveEdit(note)">Save</button>
+              <button @click="editing = null">Cancel</button>
+            </div>
+          </template>
+          <template s-else>
+            <h3>{note.pinned ? '📌 ' : ''}{note.title}</h3>
+            <p>{note.body}</p>
+            <div class="row actions">
+              <button @click="pin(note)">{note.pinned ? 'Unpin' : 'Pin'}</button>
+              <button @click="edit(note)">Edit</button>
+              <button @click="remove(note)">Delete</button>
+            </div>
+            <small class="muted">#{note.id} · {note.created_at}</small>
+          </template>
+        </article>
+      {empty}
+        <p class="muted">No notes{search ? ' match "' + search + '"' : ''}.</p>
+      {/for}
+    </div>
+  </section>
+
+  <section class="card">
+    <h2>How it works</h2>
+    <pre>-- demo/database/migrations/001_create_notes.sql  (runs once, by itself)
+CREATE TABLE notes (id INTEGER PRIMARY KEY, title VARCHAR(120) NOT NULL, …);
+
+// in this page
+const notes = table('notes')
+load list = notes.all(\{ q: search, _sort: '-id' })
+await notes.create(values)      // POST   /api/notes
+await notes.patch(id, changes)  // PATCH  /api/notes/1
+await notes.remove(id)          // DELETE /api/notes/1</pre>
+    <p class="muted">The same works with MySQL (<code>--db mysql://…</code>) and PostgreSQL (<code>--db postgres://…</code>). A title is required and must be unique: try saving one twice.</p>
+  </section>
+</view>
+
+<style scoped>
+.new { display: grid; gap: 8px; }
+.new input, .new textarea, .note input, .note textarea { width: 100%; font: inherit; padding: 6px 10px; border: 1px solid var(--input); }
+.row { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
+.tools input[type=search] { flex: 1; min-width: 180px; }
+select { font: inherit; padding: 5px 8px;}
+.swatch { display: inline-flex; align-items: center; gap: 4px; padding: 4px 10px; cursor: pointer; font-size: 14px; }
+.swatch input { margin: 0; }
+.grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 10px; }
+.note { padding: 12px; display: flex; flex-direction: column; gap: 6px; }
+.note h3 { margin: 0; font-size: 16px; }
+.note p { margin: 0; white-space: pre-wrap; }
+.actions button { padding: 3px 9px; font-size: 13px; }
+.yellow { background: #FFF6D6; } .blue { background: #E3F0FF; } .green { background: #E1F7E7; } .pink { background: #FDE6EF; }
+.bad { color: var(--destructive); background: var(--destructive-bg); padding: 8px 12px; margin: 0; }
+</style>

@@ -1,0 +1,47 @@
+<!-- s-once: draw once, never update · s-memo: update only when the listed values change · on update -->
+state count = 0
+state opened = new Date().toLocaleTimeString()
+state selected = 1
+state rows = Array.from({ length: 200 }, (_, i) => ({ id: i + 1, name: 'Row ' + (i + 1) }))
+state counter = null
+let updates = 0
+
+// after every change that reached this page's view (not a state: changing state here would loop)
+on update {
+  updates++
+  if (counter) counter.textContent = updates
+}
+
+<view>
+  <section class="card">
+    <h1>Fast views</h1>
+    <p class="lead">Som already updates only the exact text or attribute that changed. These two go further.</p>
+
+    <h2><code>s-once</code></h2>
+    <button class="primary" @click="count++">Count: {count}</button>
+    <p s-once class="note">Drawn once: the page opened at {opened} and the count was {count}. This line never changes.</p>
+    <p class="note">Live: the count is {count}.</p>
+  </section>
+
+  <section class="card">
+    <h2><code>s-memo="[a, b]"</code></h2>
+    <p class="muted">Each row below only redraws when <code>row.id === selected</code> changes for it, so picking a row touches 2 rows, not 200.</p>
+    <ul class="rows">
+      {for row in rows key row.id}
+        <li s-memo="[row.id === selected]" class={row.id === selected ? 'on' : ''} @click="selected = row.id">{row.name}{row.id === selected ? ' ✓' : ''}</li>
+      {/for}
+    </ul>
+  </section>
+
+  <section class="card">
+    <h2><code>on update</code></h2>
+    <p>This page's view has updated <strong s-ref="counter">0</strong> times. Click the buttons above and watch it grow.</p>
+  </section>
+</view>
+
+<style scoped>
+.note { padding: 8px 12px; background: var(--accent); }
+.rows { list-style: none; padding: 0; margin: 0; max-height: 240px; overflow: auto; display: grid; grid-template-columns: repeat(auto-fill, minmax(90px, 1fr)); gap: 4px; }
+.rows li { padding: 6px 8px; background: var(--accent); cursor: pointer; font-size: 14px; }
+.rows li.on { background: var(--ember); color: #fff; }
+</style>

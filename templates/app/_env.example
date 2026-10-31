@@ -1,0 +1,43 @@
+# Settings for this app. Copy this file to .env and fill it in.
+# .env is never sent to the browser, never copied by som build, and not committed (see .gitignore).
+# Server code (routes/, app/, database/) reads it as process.env.NAME.
+APP_NAME="My app"
+
+# Signs the links in emails. som new makes one; keep it secret, and keep it the same once users have links.
+APP_KEY=
+# Where the app runs: links in emails start with this
+APP_URL=http://localhost:8000
+
+# Only values that start with PUBLIC_ also reach the browser: {env.PUBLIC_APP_NAME} in any .som file.
+# Never put a password or a secret key in a PUBLIC_ value.
+PUBLIC_APP_NAME="${APP_NAME}"
+
+# The database: sqlite:file.db, mysql://user:password@host:3306/name or postgres://user:password@host:5432/name
+DATABASE_URL=sqlite:backend/database/app.db
+
+# Background work: queued jobs, mail and notifications (redis, database: the jobs table, run by som dev / som queue:work; sync: at once)
+QUEUE_CONNECTION=database
+# Cache.put / Cache.remember: redis, database, file or memory
+CACHE_STORE=database
+# Storage.put: local (backend/storage/app, private) or public (served at /storage)
+FILESYSTEM_DISK=local
+
+# Redis (for Cache, Queue, and pub/sub): redis://default:secret@127.0.0.1:6379/0 or host/port
+# REDIS_URL=redis://127.0.0.1:6379/0
+# REDIS_HOST=127.0.0.1
+# REDIS_PORT=6379
+# REDIS_PASSWORD=
+# REDIS_DB=0
+# REDIS_PREFIX=som:
+# local while you work, production on the server
+APP_ENV=local
+
+# Security
+# A login token nobody used for this many days stops working
+AUTH_TOKEN_DAYS=30
+# Behind a proxy or load balancer (nginx, Cloudflare…), its address, so the visitor's real IP is used: 10.0.0.1 or *
+# TRUSTED_PROXIES=
+
+# Email. Without MAIL_URL, emails (verify email, reset password) are printed in the terminal.
+# MAIL_URL=smtp://user:password@smtp.example.com:587   (and: npm i nodemailer)
+# MAIL_FROM="My app <hello@example.com>"

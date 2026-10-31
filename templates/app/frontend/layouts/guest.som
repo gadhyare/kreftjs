@@ -1,0 +1,18 @@
+<!-- The layout of the sign-in pages (login, register, forgot password…): a small box in the middle.
+     The routes in index.html ask for it with layout: 'guest'. -->
+<view>
+  <main>
+    <som-link to="/" class="brand"><span class="mark" aria-hidden="true"></span>{env.PUBLIC_APP_NAME || 'My app'}</som-link>
+    <div class="box">
+      <slot></slot>
+    </div>
+  </main>
+</view>
+
+<style scoped>
+main { min-height: 100vh; display: flex; flex-direction: column; align-items: center; padding: 72px 16px 48px; background: var(--accent); }
+.brand { display: inline-flex; align-items: center; gap: 8px; margin-bottom: 24px; font-weight: 700; font-size: 16px; letter-spacing: -0.02em; color: var(--foreground); text-decoration: none; }
+.mark { width: 16px; height: 16px; background: var(--primary); }
+.box { width: 100%; max-width: 400px; background: var(--card); border: 1px solid var(--border); padding: 32px; }
+@media (max-width: 480px) { main { padding-top: 40px; } .box { padding: 24px 20px; } }
+</style>

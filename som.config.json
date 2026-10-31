@@ -1,0 +1,11 @@
+{
+  "tables": {
+    "notes": {
+      "rules": {
+        "title": "required|min:2|max:120",
+        "body": "max:1000",
+        "color": "required|in:yellow,blue,green,pink"
+      }
+    }
+  }
+}

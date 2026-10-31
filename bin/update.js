@@ -1,0 +1,234 @@
+/*
+ * som update [packages...]
+ *
+ * Updates npm dependencies and/or Som.js runtime files in the current project:
+ *
+ *   som update                 Update all packages (npm update) and refresh som.js / som.d.ts
+ *   som update <package...>    Update specific npm package(s)
+ *   som update --latest        Upgrade dependencies to their latest versions
+ *   som update --check         Check for outdated packages without installing (npm outdated)
+ *   som update --core          Update only Som.js runtime files (som.js, som.d.ts, server.d.ts)
+ *   som update --npm           Update only npm packages
+ */
+const fs = require('fs');
+const path = require('path');
+const { spawnSync } = require('child_process');
+const { layout } = require('./layout.js');
+const pkg = require('../package.json');
+
+const green = (s) => (process.stdout.isTTY ? `\x1b[32m${s}\x1b[0m` : s);
+const cyan = (s) => (process.stdout.isTTY ? `\x1b[36m${s}\x1b[0m` : s);
+const dim = (s) => (process.stdout.isTTY ? `\x1b[2m${s}\x1b[0m` : s);
+const bold = (s) => (process.stdout.isTTY ? `\x1b[1m${s}\x1b[0m` : s);
+const red = (s) => (process.stdout.isTTY ? `\x1b[31m${s}\x1b[0m` : s);
+
+module.exports = function update(args = []) {
+  const flags = new Set();
+  const pkgs = [];
+  let targetDir = '.';
+
+  for (let i = 0; i < args.length; i++) {
+    const a = args[i];
+    if (a === '--latest' || a === '-L') flags.add('latest');
+    else if (a === '--check' || a === '--dry-run') flags.add('check');
+    else if (a === '--core' || a === '--som') flags.add('core');
+    else if (a === '--npm') flags.add('npm');
+    else if (a === '--help' || a === '-h') {
+      printHelp();
+      return;
+    } else if (a.startsWith('--dir=')) {
+      targetDir = a.slice(6);
+    } else if (a === '--dir') {
+      targetDir = args[++i] || '.';
+    } else if (!a.startsWith('-')) {
+      pkgs.push(a);
+    }
+  }
+
+  const lay = layout(targetDir);
+  const project = lay.project || path.resolve(targetDir);
+  const onlyCore = flags.has('core');
+  const onlyNpm = flags.has('npm');
+
+  console.log(`\n  ${bold('Som.js ' + pkg.version)} ${dim('— updating packages and runtime')}\n`);
+
+  // 1. Update Som runtime files (som.js, som.d.ts, server.d.ts) unless --npm was requested
+  if (!onlyNpm) {
+    updateRuntimeFiles(lay, project);
+  }
+
+  // 2. Update npm dependencies unless --core was requested
+  if (!onlyCore) {
+    updateNpmPackages(project, pkgs, flags);
+  }
+
+  console.log(`\n  ${green('✓')} All updates completed.\n`);
+};
+
+function updateRuntimeFiles(lay, project) {
+  const rootPkgDir = path.join(__dirname, '..');
+  const sourceSomJs = path.join(rootPkgDir, 'som.js');
+  const sourceSomDts = path.join(rootPkgDir, 'som.d.ts');
+  const sourceServerDts = path.join(rootPkgDir, 'server.d.ts');
+
+  const targets = [];
+
+  // Check frontend / local som.js
+  const frontSomJs = path.join(lay.frontend, 'som.js');
+  const rootSomJs = path.join(project, 'som.js');
+  if (fs.existsSync(frontSomJs) && frontSomJs !== sourceSomJs) targets.push({ src: sourceSomJs, dest: frontSomJs, label: 'frontend/som.js' });
+  else if (fs.existsSync(rootSomJs) && rootSomJs !== sourceSomJs) targets.push({ src: sourceSomJs, dest: rootSomJs, label: 'som.js' });
+
+  // Check frontend / local som.d.ts
+  const frontSomDts = path.join(lay.frontend, 'som.d.ts');
+  const rootSomDts = path.join(project, 'som.d.ts');
+  if (fs.existsSync(frontSomDts) && frontSomDts !== sourceSomDts) targets.push({ src: sourceSomDts, dest: frontSomDts, label: 'frontend/som.d.ts' });
+  else if (fs.existsSync(rootSomDts) && rootSomDts !== sourceSomDts) targets.push({ src: sourceSomDts, dest: rootSomDts, label: 'som.d.ts' });
+
+  // Check backend server.d.ts
+  const backServerDts = path.join(lay.backend, 'server.d.ts');
+  const rootServerDts = path.join(project, 'server.d.ts');
+  if (fs.existsSync(backServerDts) && backServerDts !== sourceServerDts) targets.push({ src: sourceServerDts, dest: backServerDts, label: 'backend/server.d.ts' });
+  else if (fs.existsSync(rootServerDts) && rootServerDts !== sourceServerDts) targets.push({ src: sourceServerDts, dest: rootServerDts, label: 'server.d.ts' });
+
+  // Check tools/vite-plugin-som.js
+  const localVitePlugin = path.join(project, 'tools', 'vite-plugin-som.js');
+  const sourceVitePlugin = path.join(rootPkgDir, 'tools', 'vite-plugin-som.js');
+  if (fs.existsSync(localVitePlugin) && localVitePlugin !== sourceVitePlugin) {
+    targets.push({ src: sourceVitePlugin, dest: localVitePlugin, label: 'tools/vite-plugin-som.js' });
+  }
+
+  const localViteDts = path.join(project, 'tools', 'vite-plugin-som.d.ts');
+  const sourceViteDts = path.join(rootPkgDir, 'tools', 'vite-plugin-som.d.ts');
+  if (fs.existsSync(localViteDts) && localViteDts !== sourceViteDts) {
+    targets.push({ src: sourceViteDts, dest: localViteDts, label: 'tools/vite-plugin-som.d.ts' });
+  }
+
+  if (targets.length) {
+    console.log(`  ${cyan('Runtime files:')}`);
+    for (const t of targets) {
+      try {
+        if (fs.existsSync(t.dest)) {
+          const srcContent = fs.readFileSync(t.src);
+          const destContent = fs.readFileSync(t.dest);
+          if (srcContent.equals(destContent)) {
+            console.log(`    ${dim('SKIP')}  ${t.label} ${dim('(already up to date)')}`);
+            continue;
+          }
+          // Back up existing file to prevent user custom code loss
+          const backupPath = t.dest + '.bak';
+          fs.copyFileSync(t.dest, backupPath);
+        }
+        fs.copyFileSync(t.src, t.dest);
+        console.log(`    ${green('DONE')}  ${t.label} ${dim('(updated to v' + pkg.version + ', backup saved)')}`);
+      } catch (err) {
+        console.error(`    ${red('FAIL')}  ${t.label}: ${err.message}`);
+      }
+    }
+    console.log('');
+  }
+
+  upgradeAppLayout(lay);
+}
+
+function upgradeAppLayout(lay) {
+  const layoutFile = path.join(lay.frontend, 'layouts', 'app.som');
+  if (!fs.existsSync(layoutFile)) return;
+  let text = fs.readFileSync(layoutFile, 'utf8');
+  let changed = false;
+
+  const linkReplacements = [
+    [/to:\s*['"]\/['"](?=[\s\S]*?label:\s*['"]Dashboard['"])/, "to: 'dashboard'"],
+    [/to:\s*['"]\/users['"]/, "to: 'users'"],
+    [/to:\s*['"]\/profile['"]/, "to: 'profile'"],
+    [/to:\s*['"]\/welcome['"]/, "to: 'welcome'"],
+    [/to:\s*['"]\/docs['"]/, "to: 'docs'"],
+    [/to:\s*['"]\/tests['"]/, "to: 'tests.index'"],
+    [/<som-link to=['"]\/['"] class=['"]sidebar-brand['"]>/, '<som-link to="dashboard" class="sidebar-brand">'],
+    [/<som-link to=['"]\/profile['"] role=['"]menuitem['"]/, '<som-link to="profile" role="menuitem"'],
+    [/<path d=\{icons\[link\.icon\]\}><\/path>/, '<path d={icons[link.icon] || icons.panel}></path>'],
+  ];
+
+  for (const [pattern, repl] of linkReplacements) {
+    if (pattern.test(text)) {
+      text = text.replace(pattern, repl);
+      changed = true;
+    }
+  }
+
+  if (changed) {
+    try {
+      fs.writeFileSync(layoutFile, text);
+      console.log(`    ${green('DONE')}  frontend/layouts/app.som ${dim('(upgraded sidebar navigation to route names)')}`);
+    } catch (err) {
+      console.error(`    ${red('FAIL')}  frontend/layouts/app.som: ${err.message}`);
+    }
+  }
+}
+
+function updateNpmPackages(project, pkgs, flags) {
+  const pkgJsonPath = path.join(project, 'package.json');
+  if (!fs.existsSync(pkgJsonPath)) {
+    console.log(`  ${dim('No package.json found in ' + project + ' — skipping npm update.')}`);
+    return;
+  }
+
+  const npmCmd = process.platform === 'win32' ? 'npm.cmd' : 'npm';
+
+  if (flags.has('check')) {
+    console.log(`  ${cyan('Checking for outdated packages (npm outdated):')}\n`);
+    const res = spawnSync(npmCmd, ['outdated'], { stdio: 'inherit', cwd: project });
+    if (res.status === 0) {
+      console.log(`  ${green('All packages are up to date.')}`);
+    }
+    return;
+  }
+
+  const isLatest = flags.has('latest');
+  let cmdArgs = [];
+
+  if (pkgs.length > 0) {
+    if (isLatest) {
+      cmdArgs = ['install', ...pkgs.map((p) => (p.includes('@') ? p : `${p}@latest`))];
+      console.log(`  ${cyan('Upgrading packages to latest:')} ${pkgs.join(', ')}`);
+    } else {
+      cmdArgs = ['update', ...pkgs];
+      console.log(`  ${cyan('Updating packages:')} ${pkgs.join(', ')}`);
+    }
+  } else {
+    if (isLatest) {
+      // If --latest specified without pkgs, run npm update or inspect package.json
+      cmdArgs = ['update'];
+      console.log(`  ${cyan('Updating all packages in')} ${path.relative(process.cwd(), project) || '.'}...`);
+    } else {
+      cmdArgs = ['update'];
+      console.log(`  ${cyan('Updating all packages in')} ${path.relative(process.cwd(), project) || '.'}...`);
+    }
+  }
+
+  console.log(`  ${dim('$ ' + npmCmd + ' ' + cmdArgs.join(' '))}\n`);
+  const result = spawnSync(npmCmd, cmdArgs, { stdio: 'inherit', cwd: project });
+
+  if (result.error) {
+    console.error(`  ${red('Error running npm:')} ${result.error.message}`);
+    process.exitCode = 1;
+  } else if (result.status !== 0) {
+    console.error(`  ${red('npm exited with status')} ${result.status}`);
+    process.exitCode = result.status || 1;
+  } else {
+    console.log(`\n  ${green('DONE')}  npm packages updated.`);
+  }
+}
+
+function printHelp() {
+  console.log(`
+  Usage:
+    som update [package...]     Update project packages and Som runtime files
+    som update                  Update all packages in package.json and refresh som.js
+    som update <name>           Update a specific package (e.g. som update esbuild)
+    som update --latest         Upgrade packages to their latest versions
+    som update --check          Check for outdated packages (npm outdated)
+    som update --core           Update only Som.js runtime files (som.js, som.d.ts, server.d.ts)
+    som update --npm            Update only npm dependencies
+`);
+}

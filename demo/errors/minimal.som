@@ -1,0 +1,25 @@
+<!-- errors/minimal.som: the minimal error frame layout.
+     Each page fills it with <som-section name="code">, "title" and "message". -->
+<view>
+  <main class="error-page">
+    <p class="line">
+      <span class="code"><som-yield name="code"></som-yield></span>
+      <span class="title"><som-yield name="title"></som-yield></span>
+    </p>
+    <p class="message"><som-yield name="message"></som-yield></p>
+    <div class="actions">
+      <som-link to="/" class="btn primary">Go home</som-link>
+      <button @click="history.back()">Go back</button>
+    </div>
+    <slot></slot> <!-- the error page itself: it fills the sections above, and can add more here -->
+  </main>
+</view>
+
+<style scoped>
+.error-page { min-height: 100vh; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 0; padding: 32px 20px; text-align: center; }
+.line { display: flex; align-items: center; gap: 16px; margin: 0 0 12px; font-size: 18px; }
+.code { font-family: var(--mono, ui-monospace, monospace); font-weight: 600; padding-right: 16px; border-right: 1px solid var(--border, #e4e4e7); }
+.title { font-weight: 500; letter-spacing: -0.01em; }
+.message { margin: 0 0 24px; max-width: 30em; color: var(--muted, #71717a); }
+.actions { display: flex; gap: 8px; }
+</style>

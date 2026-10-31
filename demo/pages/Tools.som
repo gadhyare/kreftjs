@@ -1,0 +1,40 @@
+<!-- what `som dev` gives you while you work, and what `som build` gives you when you ship -->
+state devServer = !!window.__SOM_DEV__
+state count = 0
+
+action openTools() { if (window.__somOpenDevtools) window.__somOpenDevtools() }
+
+<view>
+  <section class="card">
+    <h1>Dev tools</h1>
+    <p class="lead">Everything here comes with Som.js. No plugins to install.</p>
+
+    <h2>Hot reload</h2>
+    <p>While <code>npm run dev</code> runs, save a <code>.som</code> file and only that component is swapped on the page. Its state stays. Try it: count up, then change this file's text and save.</p>
+    <button class="primary" @click="count++">Count: {count}</button>
+    <p class="muted">A <code>.css</code> file reloads its styles only; other files reload the page. Mistakes show in a box on the page.</p>
+
+    <h2>Som DevTools</h2>
+    <p>The <b>S</b> button (or <kbd>Alt</kbd>+<kbd>Shift</kbd>+<kbd>D</kbd>) opens a panel with the component tree, each component's props, state and derived values (you can change state there), the stores, the route and a timeline of store actions and bus messages.</p>
+    <button @click={openTools} disabled={!devServer}>Open DevTools</button>
+    <span class="muted" s-if="!devServer"> (only with <code>som dev</code>)</span>
+  </section>
+
+  <section class="card">
+    <h2>In your editor</h2>
+    <ul>
+      <li><code>som vscode</code> adds colors, folding and snippets for <code>.som</code> files to VS Code (and Cursor, VSCodium).</li>
+      <li><code>som.d.ts</code> has the types of everything in <code>Som</code>, for TypeScript and for hints in plain JavaScript.</li>
+    </ul>
+  </section>
+
+  <section class="card">
+    <h2>When you ship</h2>
+    <pre>som build               # .som files compiled ahead, works under a strict CSP
+som build --prerender   # also every page as ready HTML, for search engines (npm i -D jsdom)</pre>
+  </section>
+</view>
+
+<style scoped>
+kbd { padding: 1px 6px; border: 1px solid var(--input); border-bottom-width: 2px; font-size: 0.9em; }
+</style>

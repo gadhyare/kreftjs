@@ -1,0 +1,502 @@
+<!--
+  Starter Home Page: High-velocity developer aesthetic inspired by Next.js, Nuxt, and AdonisJS.
+  Features: Zero border-radius, zero shadows, technical bento matrix, live reactive demo widget, and terminal quickstart.
+-->
+state counter = 0
+state copied = false
+
+action increment() {
+  counter++
+}
+
+action decrement() {
+  if (counter > 0) counter--
+}
+
+action copyCli() {
+  navigator.clipboard.writeText('npx som new my-app')
+  copied = true
+  setTimeout(() => { copied = false }, 2000)
+}
+
+<view>
+  <div class="landing">
+    <!-- Hero Header -->
+    <header class="hero">
+      <div class="status-pill">
+        <span class="live-indicator" aria-hidden="true"></span>
+        <span class="status-text">Som.js Engine · v{Som.version || '2.0.0'} Ready</span>
+      </div>
+
+      <h1 class="headline">
+        The Full-Stack Framework <br class="br-desktop" />
+        <span class="accent-text">Built for Speed & Precision</span>
+      </h1>
+
+      <p class="subheadline">
+        Zero build step in development, reactive single-file <code>.som</code> components,
+        and an enterprise-grade Active Record ORM for Node.js.
+      </p>
+
+      <!-- Terminal Quickstart Box -->
+      <div class="quickstart-box">
+        <div class="terminal-bar">
+          <span class="terminal-title">Quickstart CLI</span>
+          <span class="terminal-tag">npx</span>
+        </div>
+        <div class="terminal-body">
+          <div class="cmd-line">
+            <span class="prompt">$</span>
+            <span class="cmd-text">npx som new my-app</span>
+          </div>
+          <button class="copy-action-btn" @click={copyCli} aria-label="Copy CLI command">
+            {copied ? '✓ Copied' : 'Copy'}
+          </button>
+        </div>
+      </div>
+
+      <!-- Action Buttons -->
+      <div class="hero-actions">
+        <som-link s-if="$store.auth.user" to="/dashboard" class="btn primary lg">
+          Open Dashboard →
+        </som-link>
+        <som-link s-if="!$store.auth.user" to="/register" class="btn primary lg">
+          Get Started Free →
+        </som-link>
+        <som-link s-if="!$store.auth.user" to="/login" class="btn lg">
+          Sign In
+        </som-link>
+        <som-link to="/docs" class="btn secondary lg">
+          Documentation
+        </som-link>
+      </div>
+    </header>
+
+    <!-- Live Reactive State Widget -->
+    <section class="playground-section">
+      <div class="section-badge">Interactive Runtime</div>
+      <div class="playground-card">
+        <div class="playground-header">
+          <div class="meta-label">Reactive State Demo</div>
+          <div class="file-tag">Home.som</div>
+        </div>
+        <div class="playground-grid">
+          <div class="code-preview">
+            <pre><code>state counter = {counter}
+
+action increment() &#123; counter++ &#125;
+action decrement() &#123; counter-- &#125;</code></pre>
+          </div>
+          <div class="live-controls">
+            <div class="counter-display">
+              <span class="counter-label">Live State Value:</span>
+              <span class="counter-value">{counter}</span>
+            </div>
+            <div class="counter-btns">
+              <button class="btn sm" @click={decrement} disabled={counter === 0}>- Decrease</button>
+              <button class="btn primary sm" @click={increment}>+ Increment</button>
+              <button class="btn ghost sm" @click="counter = 0" s-if="counter > 0">Reset</button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- Bento Architecture Matrix -->
+    <section class="bento-section">
+      <div class="section-badge">Ecosystem Architecture</div>
+      <h2 class="section-title">Engineered from the ground up for production</h2>
+
+      <div class="bento-grid">
+        <div class="bento-card">
+          <div class="bento-top">
+            <span class="bento-tag">COMPILER</span>
+            <span class="bento-num">01</span>
+          </div>
+          <h3>Reactive Single-File Components</h3>
+          <p>
+            Write pure declarative UI in <code>.som</code> files with reactive <code>state</code>,
+            <code>derive</code>, <code>watch</code>, and scoped CSS. Zero bundlers required in dev.
+          </p>
+        </div>
+
+        <div class="bento-card">
+          <div class="bento-top">
+            <span class="bento-tag">BACKEND</span>
+            <span class="bento-num">02</span>
+          </div>
+          <h3>Active Record ORM & DB</h3>
+          <p>
+            Universal drivers for SQLite, PostgreSQL, and MySQL. Complete with migrations,
+            seeders, relationships, soft deletes, query builder, and auto REST endpoints.
+          </p>
+        </div>
+
+        <div class="bento-card">
+          <div class="bento-top">
+            <span class="bento-tag">SECURITY</span>
+            <span class="bento-num">03</span>
+          </div>
+          <h3>Hardened Security Architecture</h3>
+          <p>
+            SameSite HttpOnly sessions, CSRF cookie verification, signed email tokens,
+            timing-safe authentication hashes, and declarative middleware pipelines.
+          </p>
+        </div>
+
+        <div class="bento-card">
+          <div class="bento-top">
+            <span class="bento-tag">RUNTIME</span>
+            <span class="bento-num">04</span>
+          </div>
+          <h3>Background Queues & Jobs</h3>
+          <p>
+            Built-in worker loop for background jobs, scheduled tasks (cron syntax),
+            event dispatchers, transactional mail, notifications, and memory caching.
+          </p>
+        </div>
+      </div>
+    </section>
+
+    <!-- Quick Footer Banner -->
+    <footer class="home-footer">
+      <div class="footer-inner">
+        <div>
+          <strong>Ready to build?</strong> Create an account or dive straight into the docs.
+        </div>
+        <div class="footer-links">
+          <som-link to="/docs" class="btn ghost sm">Documentation</som-link>
+          <som-link to="/tests" class="btn ghost sm">Component Tests</som-link>
+        </div>
+      </div>
+    </footer>
+  </div>
+</view>
+
+<style scoped>
+.landing {
+  max-width: 1040px;
+  margin: 0 auto;
+  padding: 48px 0 80px;
+}
+
+/* Hero Section */
+.hero {
+  padding: 48px 0 64px;
+  text-align: center;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+.status-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 5px 12px;
+  background: var(--accent);
+  border: 1px solid var(--border);
+  font-family: var(--mono);
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  margin-bottom: 28px;
+}
+
+.live-indicator {
+  width: 7px;
+  height: 7px;
+  background: var(--success);
+  display: inline-block;
+  animation: pulse-dot 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+}
+
+@keyframes pulse-dot {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.35; }
+}
+
+.headline {
+  font-size: clamp(38px, 6vw, 68px);
+  font-weight: 800;
+  line-height: 1.05;
+  letter-spacing: -0.05em;
+  margin: 0 0 20px;
+  color: var(--foreground);
+}
+
+.accent-text {
+  color: var(--muted);
+}
+
+.subheadline {
+  font-size: clamp(16px, 2vw, 19px);
+  line-height: 1.55;
+  max-width: 680px;
+  color: var(--muted);
+  margin: 0 0 36px;
+}
+
+/* Quickstart CLI Box */
+.quickstart-box {
+  width: 100%;
+  max-width: 460px;
+  margin: 0 0 32px;
+  border: 1px solid var(--border);
+  background: var(--terminal-bg);
+  color: var(--terminal-fg);
+  text-align: left;
+}
+
+.terminal-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 6px 12px;
+  border-bottom: 1px solid var(--border);
+  background: rgba(255, 255, 255, 0.04);
+  font-family: var(--mono);
+  font-size: 11px;
+  color: var(--muted);
+}
+
+.terminal-tag {
+  color: var(--success);
+}
+
+.terminal-body {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px 14px;
+  font-family: var(--mono);
+  font-size: 13px;
+}
+
+.cmd-line {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.cmd-line .prompt {
+  color: var(--success);
+  font-weight: 700;
+}
+
+.copy-action-btn {
+  height: 28px;
+  padding: 0 10px;
+  font-family: var(--mono);
+  font-size: 11px;
+  background: rgba(255, 255, 255, 0.08);
+  border: 1px solid var(--border);
+  color: var(--terminal-fg);
+  cursor: pointer;
+  transition: all .15s ease;
+}
+
+.copy-action-btn:hover {
+  background: rgba(255, 255, 255, 0.18);
+  border-color: #ffffff;
+}
+
+.hero-actions {
+  display: flex;
+  gap: 12px;
+  flex-wrap: wrap;
+  justify-content: center;
+}
+
+/* Playground Section */
+.playground-section {
+  margin: 24px 0 64px;
+}
+
+.section-badge {
+  display: inline-block;
+  font-family: var(--mono);
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--muted);
+  margin-bottom: 12px;
+}
+
+.playground-card {
+  border: 1px solid var(--border);
+  background: var(--card);
+}
+
+.playground-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 10px 16px;
+  border-bottom: 1px solid var(--border);
+  background: var(--accent);
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.file-tag {
+  font-family: var(--mono);
+  font-size: 11px;
+  color: var(--muted);
+}
+
+.playground-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+}
+
+.code-preview {
+  border-right: 1px solid var(--border);
+  background: var(--terminal-bg);
+}
+
+.code-preview pre {
+  margin: 0;
+  border: none;
+  padding: 20px;
+  height: 100%;
+}
+
+.live-controls {
+  padding: 24px;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 18px;
+  background: var(--card);
+}
+
+.counter-display {
+  display: flex;
+  align-items: baseline;
+  gap: 12px;
+}
+
+.counter-label {
+  font-family: var(--mono);
+  font-size: 12px;
+  color: var(--muted);
+  text-transform: uppercase;
+}
+
+.counter-value {
+  font-size: 38px;
+  font-weight: 800;
+  font-family: var(--mono);
+  line-height: 1;
+  color: var(--foreground);
+}
+
+.counter-btns {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+/* Bento Matrix Section */
+.bento-section {
+  margin-bottom: 64px;
+}
+
+.section-title {
+  font-size: 28px;
+  letter-spacing: -0.03em;
+  margin-bottom: 28px;
+}
+
+.bento-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 16px;
+}
+
+.bento-card {
+  background: var(--card);
+  border: 1px solid var(--border);
+  padding: 24px;
+  transition: border-color .2s ease;
+}
+
+.bento-card:hover {
+  border-color: var(--foreground);
+}
+
+.bento-top {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 14px;
+}
+
+.bento-tag {
+  font-family: var(--mono);
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  color: var(--muted);
+}
+
+.bento-num {
+  font-family: var(--mono);
+  font-size: 11px;
+  color: var(--muted);
+}
+
+.bento-card h3 {
+  font-size: 17px;
+  font-weight: 700;
+  margin: 0 0 10px;
+}
+
+.bento-card p {
+  color: var(--muted);
+  font-size: 13px;
+  line-height: 1.6;
+  margin: 0;
+}
+
+/* Footer Banner */
+.home-footer {
+  border: 1px solid var(--border);
+  background: var(--accent);
+  padding: 20px 24px;
+}
+
+.footer-inner {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 16px;
+  font-size: 14px;
+}
+
+.footer-links {
+  display: flex;
+  gap: 8px;
+}
+
+/* Responsive */
+@media (max-width: 768px) {
+  .playground-grid {
+    grid-template-columns: 1fr;
+  }
+  .code-preview {
+    border-right: none;
+    border-bottom: 1px solid var(--border);
+  }
+  .bento-grid {
+    grid-template-columns: 1fr;
+  }
+  .br-desktop {
+    display: none;
+  }
+}
+</style>

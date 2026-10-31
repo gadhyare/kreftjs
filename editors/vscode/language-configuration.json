@@ -1,0 +1,17 @@
+{
+  "comments": { "lineComment": "//", "blockComment": ["/*", "*/"] },
+  "brackets": [["{", "}"], ["[", "]"], ["(", ")"], ["<", ">"]],
+  "autoClosingPairs": [
+    { "open": "{", "close": "}" }, { "open": "[", "close": "]" }, { "open": "(", "close": ")" },
+    { "open": "'", "close": "'", "notIn": ["string", "comment"] },
+    { "open": "\"", "close": "\"", "notIn": ["string"] },
+    { "open": "`", "close": "`", "notIn": ["string", "comment"] },
+    { "open": "<!--", "close": "-->", "notIn": ["comment", "string"] }
+  ],
+  "surroundingPairs": [["{", "}"], ["[", "]"], ["(", ")"], ["'", "'"], ["\"", "\""], ["`", "`"], ["<", ">"]],
+  "folding": { "markers": { "start": "^\\s*<(view|style)\\b", "end": "^\\s*</(view|style)>" } },
+  "indentationRules": {
+    "increaseIndentPattern": "(\\{[^}\"'`]*$)|(<(?!(?:area|base|br|col|embed|hr|img|input|link|meta|param|source|track|wbr)\\b)[a-zA-Z][\\w-]*(?:\\s[^>]*)?>\\s*$)",
+    "decreaseIndentPattern": "^\\s*(\\}|</[a-zA-Z][\\w-]*>)"
+  }
+}

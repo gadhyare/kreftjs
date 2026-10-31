@@ -1,0 +1,104 @@
+<!-- /profile: name, email, password, two-factor, devices, API tokens, or delete the account
+     (app/Http/Controllers/ProfileController.js and Auth/…) -->
+import TwoFactor from '../components/profile/TwoFactor.som'
+import Sessions from '../components/profile/Sessions.som'
+import ApiTokens from '../components/profile/ApiTokens.som'
+state info = form(
+  { name: $store.auth.user ? $store.auth.user.name : '', email: $store.auth.user ? $store.auth.user.email : '' },
+  { name: 'required|max:255', email: 'required|email|max:255' },
+)
+state pass = form(
+  { current_password: '', password: '', password_confirmation: '' },
+  { current_password: 'required', password: 'required|min:8|confirmed' },
+)
+state saved = ''
+state passSaved = ''
+state problem = ''
+state sure = false
+
+action saveInfo() {
+  saved = ''
+  try {
+    const before = $store.auth.user.email
+    const user = await info.$submit((values) => api.patch('/api/profile', values))
+    if (!user) return
+    $store.auth.user = user
+    saved = user.email !== before ? 'Saved. We sent a link to your new address: open it to verify it.' : 'Saved.'
+  } catch (e) { problem = e.message }
+}
+action savePassword() {
+  passSaved = ''
+  try {
+    const res = await pass.$submit((values) => api.put('/api/password', values))
+    if (!res) return
+    pass.$reset()
+    passSaved = res.message + ' Other devices have been logged out.'
+  } catch (e) { problem = e.message }
+}
+action remove() {
+  problem = ''
+  try {
+    await api.delete('/api/profile')
+    $store.auth.signOut()
+    $router.replace('/')
+  } catch (e) {
+    if (e.status !== 423) problem = e.message // 423: the app asks for the password first (index.html)
+  }
+}
+
+<view>
+  <section class="page">
+    <h1>Profile</h1>
+    <p s-if="problem" class="alert danger" role="alert">{problem}</p>
+
+    <div class="card">
+      <h2>Your details</h2>
+      <p class="muted">Your name and the email address you log in with.</p>
+      <p s-if="$store.auth.user && !$store.auth.user.email_verified_at" class="alert">Your email address is not verified yet. <som-link to="/verify-email">Verify it</som-link></p>
+      <form @submit.prevent={saveInfo} novalidate>
+        <field label="Name" error={info.$error('name')}><input s-model="info.name" autocomplete="name"></field>
+        <field label="Email" error={info.$error('email')}><input type="email" s-model="info.email" autocomplete="username"></field>
+        <div class="row">
+          <button class="primary" disabled={info.$busy}>Save</button>
+          <span s-if="saved" class="ok" role="status">{saved}</span>
+        </div>
+      </form>
+    </div>
+
+    <div class="card">
+      <h2>Password</h2>
+      <p class="muted">Use a long password that you don't use anywhere else.</p>
+      <form @submit.prevent={savePassword} novalidate>
+        <field label="Current password" error={pass.$error('current_password')}><input type="password" s-model="pass.current_password" autocomplete="current-password"></field>
+        <field label="New password" error={pass.$error('password')} hint="At least 8 characters."><input type="password" s-model="pass.password" autocomplete="new-password"></field>
+        <field label="Confirm new password" error={pass.$error('password_confirmation')}><input type="password" s-model="pass.password_confirmation" autocomplete="new-password"></field>
+        <div class="row">
+          <button class="primary" disabled={pass.$busy}>Change password</button>
+          <span s-if="passSaved" class="ok" role="status">{passSaved}</span>
+        </div>
+      </form>
+    </div>
+
+    <two-factor></two-factor>
+    <sessions></sessions>
+    <api-tokens></api-tokens>
+
+    <div class="card danger-zone">
+      <h2>Delete account</h2>
+      <p class="muted">Your account and everything in it are deleted for good. This can't be undone.</p>
+      <button s-if="!sure" class="danger" @click="sure = true">Delete account</button>
+      <div s-else class="row">
+        <button class="danger" @click={remove}>Yes, delete my account</button>
+        <button class="ghost" @click="sure = false">Cancel</button>
+      </div>
+    </div>
+  </section>
+</view>
+
+<style scoped>
+.page { padding: 40px 0; max-width: 640px; }
+form { max-width: 420px; margin-top: 16px; }
+.row { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
+.ok { color: var(--success); font-size: 13px; }
+.danger-zone { border-color: #fecaca; }
+</style>

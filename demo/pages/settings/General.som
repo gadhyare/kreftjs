@@ -1,0 +1,8 @@
+saved name = 'Maxamuud' as 'settings.name'
+<view>
+  <div>
+    <h3>General</h3>
+    <label>Display name <input s-model="name"></label>
+    <p class="muted">Address: <code>{$route.path}</code> · route meta: <code>{JSON.stringify($route.meta)}</code></p>
+  </div>
+</view>

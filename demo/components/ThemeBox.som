@@ -1,0 +1,21 @@
+<!-- Receives "settings" from a parent that shared it, and talks back through the bus -->
+receive settings
+
+action toggle() { settings.theme = settings.theme === 'dark' ? 'light' : 'dark' }
+action ping() { bus.send('ping', 'Hello from the child component') }
+
+<view>
+  <div class="child {settings.theme}">
+    <p>I am a child component. I received <code>settings.theme = '{settings.theme}'</code>.</p>
+    <div class="row">
+      <button @click={toggle}>Change it from here</button>
+      <button @click={ping}>Send a message on the bus</button>
+    </div>
+  </div>
+</view>
+
+<style scoped>
+.child { border: 2px dashed var(--input); padding: 12px; margin-top: 12px; }
+.child.dark { background: #1f1c2c; color: #f4f3f8; }
+.row { display: flex; gap: 8px; flex-wrap: wrap; }
+</style>

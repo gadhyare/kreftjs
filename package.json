@@ -1,0 +1,58 @@
+{
+  "name": "somjs",
+  "version": "2.3.0",
+  "description": "A tiny reactive framework with its own component language (.som files): router with nested routes, stores, saved data, animations, an API client, hot reload, DevTools and a template engine.",
+  "main": "som.js",
+  "browser": "som.js",
+  "bin": {
+    "som": "bin/som.js"
+  },
+  "scripts": {
+    "dev": "node bin/som.js dev --api demo/db.json --db sqlite:demo/database/demo.db --migrations demo/database/migrations --server demo/server --backend demo --seed",
+    "start": "node bin/som.js dev --api demo/db.json --db sqlite:demo/database/demo.db --migrations demo/database/migrations --server demo/server --backend demo --seed",
+    "build": "node bin/som.js build demo --out dist/demo --include docs",
+    "preview": "node bin/som.js dev dist --api demo/db.json --db sqlite:demo/database/demo.db --migrations demo/database/migrations --server demo/server --backend demo --seed"
+  },
+  "files": [
+    "som.js",
+    "som.d.ts",
+    "bin/",
+    "server.js",
+    "server.d.ts",
+    "tools/",
+    "editors/",
+    "templates/",
+    "docs/",
+    "README.md"
+  ],
+  "keywords": [
+    "framework",
+    "reactive",
+    "components",
+    "router",
+    "som"
+  ],
+  "types": "som.d.ts",
+  "exports": {
+    ".": {
+      "types": "./som.d.ts",
+      "default": "./som.js"
+    },
+    "./server": {
+      "types": "./server.d.ts",
+      "default": "./server.js"
+    },
+    "./vite": {
+      "types": "./tools/vite-plugin-som.d.ts",
+      "default": "./tools/vite-plugin-som.js"
+    },
+    "./package.json": "./package.json"
+  },
+  "optionalDependencies": {
+    "esbuild": "^0.28.2",
+    "vite": "^6.2.0"
+  },
+  "allowScripts": {
+    "esbuild@0.28.2": true
+  }
+}

@@ -1,0 +1,18 @@
+<!-- A box with three slots: header, the default one, and a footer that passes data back -->
+prop title = 'Panel'
+state opened = new Date().toLocaleTimeString()
+
+<view>
+  <div class="panel">
+    <header><slot name="header"><strong>{title}</strong></slot></header>
+    <div class="body"><slot>Nothing inside yet.</slot></div>
+    <footer><slot name="footer" time={opened}>Opened at {opened}</slot></footer>
+  </div>
+</view>
+
+<style scoped>
+.panel { border: 1px solid var(--border); overflow: hidden; }
+header, footer { background: var(--accent); padding: 8px 12px; }
+footer { font-size: 13px; color: var(--muted); }
+.body { padding: 12px; }
+</style>

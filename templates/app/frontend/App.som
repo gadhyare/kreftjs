@@ -1,0 +1,4 @@
+<!-- The app: the page for the current route, inside its layout (layouts/app.som) -->
+<view>
+  <som-view s-animate.after="fade"></som-view>
+</view>

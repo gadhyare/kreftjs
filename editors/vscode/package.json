@@ -1,0 +1,33 @@
+{
+  "name": "som",
+  "displayName": "Som.js (.som files)",
+  "description": "Colors, brackets, formatting and snippets for Som.js .som component files.",
+  "version": "2.3.0",
+  "publisher": "somjs",
+  "license": "MIT",
+  "engines": { "vscode": "^1.60.0" },
+  "categories": ["Programming Languages", "Formatters", "Snippets"],
+  "main": "./extension.js",
+  "activationEvents": ["onLanguage:som"],
+  "contributes": {
+    "languages": [{
+      "id": "som",
+      "aliases": ["Som", "som"],
+      "extensions": [".som"],
+      "configuration": "./language-configuration.json"
+    }],
+    "grammars": [{
+      "language": "som",
+      "scopeName": "source.som",
+      "path": "./syntaxes/som.tmLanguage.json",
+      "embeddedLanguages": {
+        "meta.embedded.block.html": "html",
+        "source.css": "css",
+        "meta.embedded.expression.som": "javascript",
+        "meta.embedded.block.javascript": "javascript",
+        "source.js": "javascript"
+      }
+    }],
+    "snippets": [{ "language": "som", "path": "./snippets/som.json" }]
+  }
+}

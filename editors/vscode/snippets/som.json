@@ -1,0 +1,21 @@
+{
+  "Component": {
+    "prefix": "som",
+    "body": ["state ${1:count} = ${2:0}", "", "action ${3:add}() {", "  ${1:count}++", "}", "", "<view>", "  <button @click={${3:add}}>{${1:count}}</button>", "</view>", "", "<style scoped>", "  $0", "</style>"],
+    "description": "A new .som component"
+  },
+  "state": { "prefix": "state", "body": "state ${1:name} = ${2:0}", "description": "A value the view follows" },
+  "saved": { "prefix": "saved", "body": "saved ${1:name} = ${2:[]}", "description": "A value kept after a reload (localStorage)" },
+  "derive": { "prefix": "derive", "body": "derive ${1:name} = ${2:expression}", "description": "A value worked out from others" },
+  "load": { "prefix": "load", "body": "load ${1:posts} = api.get('${2:/api/posts}')", "description": "Load data: .data, .loading, .error" },
+  "action": { "prefix": "action", "body": ["action ${1:name}(${2}) {", "  $0", "}"], "description": "A function the view can call" },
+  "when": { "prefix": "when", "body": ["when ${1:condition} {", "  $0", "}"], "description": "Run when a condition becomes true" },
+  "watch": { "prefix": "watch", "body": ["watch ${1:value} {", "  $0", "}"], "description": "Run when a value changes (value, old)" },
+  "on": { "prefix": "on", "body": ["on ${1|start,ready,update,show,hide,destroy|} {", "  $0", "}"], "description": "Lifecycle" },
+  "layout": { "prefix": "layout", "body": "layout ${1:app}", "description": "This page goes inside layouts/<name>.som (layout none: no layout)" },
+  "section": { "prefix": "som-section", "body": ["<som-section name=\"${1:actions}\">", "  $0", "</som-section>"], "description": "Content for the layout's <som-yield name>" },
+  "yield": { "prefix": "som-yield", "body": "<som-yield name=\"${1:actions}\">${0}</som-yield>", "description": "In a layout: where a page's <som-section> goes" },
+  "for": { "prefix": "for", "body": ["{for ${1:item} in ${2:items} key ${1:item}.id}", "  $0", "{empty}", "  <p>Nothing yet.</p>", "{/for}"], "description": "Loop over a list" },
+  "s-if": { "prefix": "s-if", "body": "s-if={${1:condition}}", "description": "Show only when true" },
+  "som-wait": { "prefix": "som-wait", "body": ["<som-wait>", "  $0", "  <p s-waiting>Loading…</p>", "  <p s-failed=\"error\">Could not load: {error.message}</p>", "</som-wait>"], "description": "Show something until everything inside has loaded" }
+}

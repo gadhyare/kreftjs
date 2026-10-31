@@ -1,0 +1,85 @@
+<!-- The main layout: the bar, the menu with one page per feature, and the page in <slot>.
+     Every route uses it (Som.router({ layout: 'main' })). Moving between pages keeps it: the menu stays as it is. -->
+state menuOpen = false
+state version = Som.version
+state menu = [
+  { title: 'Start', links: [
+    { to: '/', label: 'Start', hint: 'what Som.js is' },
+    { to: '/docs', label: 'Documentation', hint: 'Guides and API reference' },
+  ] },
+  { title: 'Basics', links: [
+    { to: '/basics', label: 'Basics', hint: 'state · derive · action' },
+    { to: '/lifecycle', label: 'Lifecycle', hint: 'when · watch · on' },
+  ] },
+  { title: 'Views', links: [
+    { to: '/loops', label: 'Loops', hint: '{for} · {empty}' },
+    { to: '/forms', label: 'Forms', hint: 's-model' },
+    { to: '/directives', label: 'Directives', hint: 's-if · s-show · s-ref · portal' },
+    { to: '/animations', label: 'Animations', hint: 's-animate · lists that move' },
+    { to: '/fast', label: 'Fast views', hint: 's-once · s-memo · on update' },
+  ] },
+  { title: 'Components', links: [
+    { to: '/components', label: 'Components', hint: 'props · slots · s-model' },
+    { to: '/keep', label: 'Keep and wait', hint: 'keep · som-wait' },
+  ] },
+  { title: 'Data', links: [
+    { to: '/saved', label: 'Saved data', hint: 'localStorage' },
+    { to: '/sharing', label: 'Sharing', hint: 'store · share · bus' },
+    { to: '/shop', label: 'Shop', hint: 'a saved store' },
+    { to: '/posts', label: 'Posts', hint: 'API: GET POST PUT PATCH DELETE' },
+    { to: '/online', label: 'Online API', hint: 'fetch · async/await · try/catch' },
+    { to: '/database', label: 'Database', hint: 'SQLite · MySQL · PostgreSQL' },
+    { to: '/backend', label: 'Backend', hint: 'routes · controllers · models · middleware' },
+    { to: '/server', label: 'Server code', hint: 'server/*.js · any npm package' },
+    { to: '/logic', label: 'Shared logic', hint: 'use x = … · $patch · $reset' },
+  ] },
+  { title: 'Router', links: [
+    { to: '/users', label: 'Users', hint: 'params · props' },
+    { to: '/router', label: 'Router', hint: 'query · guards · go' },
+    { to: '/settings', label: 'Settings', hint: 'nested routes' },
+    { to: '/layouts', label: 'Layouts', hint: 'layouts · sections' },
+  ] },
+  { title: 'Tools', links: [
+    { to: '/render', label: 'Template engine', hint: 'Som.render' },
+    { to: '/tools', label: 'Dev tools', hint: 'hot reload · DevTools · types' },
+  ] },
+]
+
+// close the menu on phones after choosing a page
+watch $route.path { menuOpen = false }
+
+<view>
+  <site-header menu open={menuOpen} @toggle="menuOpen = !menuOpen"></site-header>
+  <div class="frame">
+    <nav class="sidebar {menuOpen ? 'open' : ''}" aria-label="Features">
+      {for group in menu}
+        <p class="group">{group.title}</p>
+        {for link in group.links key link.to}
+          <som-link to={link.to} title={link.hint}>{link.label}</som-link>
+        {/for}
+      {/for}
+      <p class="version">Som.js {version}</p>
+    </nav>
+    <main>
+      <slot></slot>
+    </main>
+  </div>
+</view>
+
+<style scoped>
+.frame { display: grid; grid-template-columns: 240px minmax(0, 1fr); align-items: start; }
+.sidebar { position: sticky; top: 56px; max-height: calc(100vh - 56px); overflow-y: auto; padding: 20px 12px 24px 16px; border-right: 1px solid var(--border); background: var(--background); }
+.group { margin: 20px 8px 4px; font-size: 13px; font-weight: 600; color: var(--foreground); }
+.group:first-child { margin-top: 0; }
+.sidebar a { display: block; padding: 5px 8px; font-size: 14px; color: var(--muted); text-decoration: none; }
+.sidebar a:hover { color: var(--foreground); background: var(--accent); }
+.sidebar a.som-link-exact { color: var(--foreground); font-weight: 500; background: var(--accent); }
+.version { margin: 24px 8px 0; font-size: 12px; color: var(--muted); }
+main { max-width: 860px; width: 100%; margin: 0 auto; padding: 32px 32px 64px; }
+@media (max-width: 760px) {
+  .frame { grid-template-columns: minmax(0, 1fr); }
+  .sidebar { display: none; position: fixed; top: 56px; left: 0; right: 0; bottom: 0; z-index: 9; max-height: none; border-right: none; }
+  .sidebar.open { display: block; }
+  main { padding: 20px 16px 48px; }
+}
+</style>

@@ -1,0 +1,39 @@
+{
+  "name": "@gadhyare/safe-add",
+  "version": "1.0.0",
+  "description": "Enterprise-Grade Security Gatekeeper & Safe Package Installer for Node.js",
+  "main": "index.js",
+  "bin": {
+    "safe-add": "bin/safe-add.js",
+    "sadd": "bin/safe-add.js"
+  },
+  "scripts": {
+    "test": "node bin/safe-add.js --help"
+  },
+  "publishConfig": {
+    "access": "restricted"
+  },
+  "files": [
+    "bin/",
+    "index.js",
+    "README.md"
+  ],
+  "engines": {
+    "node": ">=18.0.0"
+  },
+  "keywords": [
+    "security",
+    "gatekeeper",
+    "npm",
+    "package-manager",
+    "supply-chain-security",
+    "typosquatting",
+    "homoglyph",
+    "rce-scanner",
+    "sandbox",
+    "audit",
+    "safe-add"
+  ],
+  "author": "Maxamuud Xuseen <gadhyare3@gmail.com>",
+  "license": "MIT"
+}
