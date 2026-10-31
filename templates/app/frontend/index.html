@@ -47,7 +47,7 @@
       if (e.status === 401 && auth.user) {
         auth.signOut()
         const current = router.route.fullPath || '/'
-        if (!['/login', '/register', '/forgot-password', '/welcome'].includes(router.route.path)) {
+        if (!['/', '/login', '/register', '/forgot-password', '/welcome'].includes(router.route.path)) {
           router.replace('/login?redirect=' + encodeURIComponent(current))
         }
       }
@@ -61,7 +61,7 @@
         (user) => { auth.user = user },
         () => {
           auth.signOut()
-          if (!['/login', '/register', '/forgot-password', '/welcome'].includes(router.route.path)) {
+          if (!['/', '/login', '/register', '/forgot-password', '/welcome'].includes(router.route.path)) {
             router.replace('/login')
           }
         }

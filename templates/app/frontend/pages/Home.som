@@ -21,6 +21,32 @@ action copyCli() {
 
 <view>
   <div class="landing">
+    <!-- Top Navigation Bar -->
+    <nav class="top-nav">
+      <som-link to="/" class="nav-brand">
+        <span class="nav-mark" aria-hidden="true"></span>
+        <span class="nav-brand-text">{env.PUBLIC_APP_NAME || 'Som.js'}</span>
+      </som-link>
+
+      <div class="nav-center">
+        <som-link to="/docs" class="nav-link">Documentation</som-link>
+        <a href="#features" class="nav-link">Features</a>
+        <a href="#playground" class="nav-link">Playground</a>
+      </div>
+
+      <div class="nav-auth">
+        <som-link s-if="$store.auth.user" to="/dashboard" class="btn primary sm">
+          Dashboard →
+        </som-link>
+        <som-link s-if="!$store.auth.user" to="/login" class="btn ghost sm">
+          Log In
+        </som-link>
+        <som-link s-if="!$store.auth.user" to="/register" class="btn primary sm">
+          Sign Up →
+        </som-link>
+      </div>
+    </nav>
+
     <!-- Hero Header -->
     <header class="hero">
       <div class="status-pill">
@@ -61,10 +87,10 @@ action copyCli() {
           Open Dashboard →
         </som-link>
         <som-link s-if="!$store.auth.user" to="/register" class="btn primary lg">
-          Get Started Free →
+          Sign Up Free →
         </som-link>
         <som-link s-if="!$store.auth.user" to="/login" class="btn lg">
-          Sign In
+          Log In
         </som-link>
         <som-link to="/docs" class="btn secondary lg">
           Documentation
@@ -73,7 +99,7 @@ action copyCli() {
     </header>
 
     <!-- Live Reactive State Widget -->
-    <section class="playground-section">
+    <section id="playground" class="playground-section">
       <div class="section-badge">Interactive Runtime</div>
       <div class="playground-card">
         <div class="playground-header">
@@ -103,7 +129,7 @@ action decrement() &#123; counter-- &#125;</code></pre>
     </section>
 
     <!-- Bento Architecture Matrix -->
-    <section class="bento-section">
+    <section id="features" class="bento-section">
       <div class="section-badge">Ecosystem Architecture</div>
       <h2 class="section-title">Engineered from the ground up for production</h2>
 
@@ -177,12 +203,70 @@ action decrement() &#123; counter-- &#125;</code></pre>
 .landing {
   max-width: 1040px;
   margin: 0 auto;
-  padding: 48px 0 80px;
+  padding: 24px 20px 80px;
+}
+
+/* Top Navigation Bar */
+.top-nav {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 14px 20px;
+  border: 1px solid var(--border);
+  background: var(--card);
+  margin-bottom: 24px;
+}
+
+.nav-brand {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  text-decoration: none;
+  font-weight: 700;
+  font-size: 16px;
+  color: var(--foreground);
+}
+
+.nav-mark {
+  width: 14px;
+  height: 14px;
+  background: var(--primary);
+  display: inline-block;
+}
+
+.nav-center {
+  display: flex;
+  align-items: center;
+  gap: 24px;
+}
+
+.nav-link {
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--muted);
+  text-decoration: none;
+  transition: color 0.15s ease;
+}
+
+.nav-link:hover {
+  color: var(--foreground);
+}
+
+.nav-auth {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+@media (max-width: 640px) {
+  .nav-center {
+    display: none;
+  }
 }
 
 /* Hero Section */
 .hero {
-  padding: 48px 0 64px;
+  padding: 32px 0 56px;
   text-align: center;
   display: flex;
   flex-direction: column;

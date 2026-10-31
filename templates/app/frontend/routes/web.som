@@ -1,17 +1,16 @@
 // Application Web Routes.
-// Every route uses the default dashboard shell (layouts/app.som) unless configured otherwise.
 // Developers can attach custom auth guards directly: .middleware('auth', 'admin') or custom guards.
+
+// Public Welcome & Showcase Page (shows first with links to Sign Up, Log In, Docs)
+Route.view('/', 'pages/Home.som').layout('none').name('home').title('Welcome')
+Route.view('/welcome', 'pages/Home.som').layout('none').name('welcome').title('Welcome')
 
 // Protected Dashboard & management pages (requires signed-in user)
 Route.middleware('auth').group(() => {
-  Route.view('/', 'pages/Dashboard.som').name('dashboard').title('Dashboard')
-  Route.view('/dashboard', 'pages/Dashboard.som').title('Dashboard')
+  Route.view('/dashboard', 'pages/Dashboard.som').name('dashboard').title('Dashboard')
   Route.view('/users', 'pages/Users.som').name('users').title('Users')
   Route.view('/profile', 'pages/Profile.som').name('profile').title('Profile')
 })
-
-// Public showcase page
-Route.view('/welcome', 'pages/Home.som').name('welcome').title('Showcase')
 
 // Authentication routes (pages/auth/), wrapped in guest layout
 Route.layout('guest').group(() => {
