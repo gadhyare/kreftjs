@@ -124,10 +124,16 @@ Log in as **test@example.com** with the password **password**, or register. A ne
 
 ```
 frontend/                     the only folder a browser can reach
-  routes/web.som              the pages and their addresses
-  pages/ components/ layouts/ your app (pages/auth/: login, register, passwords)
-  errors/  docs/  tests/      error pages, the documentation (/docs), test pages (/tests)
-backend/                      never served or built, readable only by you: routes/api.js, app/, database/
+  index.html                  entrypoint, fonts, and client bootstrap
+  routes/web.som              the pages and their addresses (/dashboard, /login, ...)
+  pages/ components/ layouts/ your reactive views (pages/auth/: login, register, 2FA)
+  ui.css                      design system tokens & responsive classes
+backend/                      never served or built, readable only by you
+  config/                     application configuration (app.js, database.js, session.js)
+  app/                        controllers, models, and authentication middleware
+  database/                   schema migrations, seeders, and factories
+  routes/                     routes/api.js, routes/auth.js, routes/console.js
+.env                          environment variables, secrets & APP_KEY
 ```
 
 ## A project with a database

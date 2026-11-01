@@ -102,20 +102,86 @@ To try the demo in the Som.js folder itself: `npm run dev`, then open `http://lo
 
 ### The folders of a new project
 
-```
-frontend/              everything the browser gets: the only folder that is served
-  index.html           who is signed in, the router, app start
-  routes/web.som       the pages and their addresses
-  App.som  layouts/  pages/  pages/auth/  components/  errors/  ui.css
-  docs/                these documentation pages, at /docs
-  tests/               test pages and components, at /tests
-backend/               never served as files, never built: routes/api.js, app/, database/
-.env                   settings and secrets
+A new Som.js application is organized around a clean, zero-leak separation of concerns between your client application (`frontend/`) and your server architecture (`backend/`):
+
+```text
+my-app/
+├── frontend/                     # Public client-side application (the only folder served)
+│   ├── index.html                # Application entrypoint & client bootstrap
+│   ├── App.som                   # Root reactive shell & router container
+│   ├── ui.css                    # Modern design system & utility classes
+│   ├── som.js & som.d.ts         # Reactive engine & TypeScript declarations
+│   ├── routes/
+│   │   └── web.som               # Client-side route declarations (/dashboard, /login, etc.)
+│   ├── layouts/
+│   │   ├── app.som               # Authenticated application layout (sidebar, header, user menu)
+│   │   └── guest.som             # Minimal guest layout for auth flows
+│   ├── pages/
+│   │   ├── Home.som              # Welcome landing page
+│   │   ├── Dashboard.som         # Main user dashboard with reactive analytics
+│   │   ├── Profile.som           # Account settings & session management
+│   │   ├── Users.som             # User administration table
+│   │   └── auth/                 # Complete authentication views
+│   │       ├── Login.som         # Log in form with inactivity protection
+│   │       ├── Register.som      # User registration
+│   │       ├── ForgotPassword.som# Password reset request
+│   │       ├── ResetPassword.som # Password reset submission
+│   │       ├── VerifyEmail.som   # Email verification notice
+│   │       └── ConfirmPassword.som# Sensitive action password confirmation
+│   ├── components/               # Reusable UI widgets
+│   │   ├── Field.som             # Form input wrapper with error states
+│   │   ├── StatCard.som          # Metric summary card
+│   │   └── profile/              # Profile modules (ApiTokens, Sessions, TwoFactor)
+│   └── tests/                    # Frontend test pages & component specs
+│
+├── backend/                      # Isolated server-side application (never exposed to HTTP)
+│   ├── config/                   # Centralized configuration repository
+│   │   ├── app.js                # App name, environment, debug mode, key
+│   │   ├── auth.js               # Authentication guards, providers & token settings
+│   │   ├── database.js           # Database connections (SQLite, MySQL, PostgreSQL)
+│   │   ├── redis.js              # Redis cache & session client config
+│   │   └── session.js            # Lifetime timeout, idle watchdog & driver options
+│   ├── app/
+│   │   ├── Http/
+│   │   │   ├── Controllers/      # HTTP request handlers (Auth, Profile, Admin)
+│   │   │   └── Middleware/       # Request filters (Authenticate, CheckAbilities, EnsureIsAdmin)
+│   │   ├── Models/               # Data models with schema casting & relationships (User, etc.)
+│   │   └── Providers/            # Application service providers & boot hooks
+│   ├── database/
+│   │   ├── migrations/           # Database schema migrations (0001_create_users, etc.)
+│   │   ├── seeders/              # Seed scripts for initial & mock data
+│   │   └── factories/            # Model factories for testing
+│   └── routes/
+│       ├── api.js                # REST API endpoints & route handlers
+│       ├── auth.js               # Authentication API endpoints
+│       └── console.js            # Scheduled background jobs & CLI artisan tasks
+│
+├── .env                          # Local secrets, database credentials & APP_KEY
+├── package.json                  # Project dependencies & npm scripts
+└── som.config.json               # Som.js CLI & tooling options
 ```
 
-Just as modern full-stack architectures keep public assets separated from server code, a browser can only reach `frontend/`. `som dev` serves that folder and `som build` builds only it. The backend has no address at all, so its code, the database file and `.env` can't be downloaded, even by mistake. On macOS and Linux, `som new` also makes `backend/` and `.env` readable only by you, and `som serve` refuses to serve a folder that has the backend inside it.
+#### Detailed Breakdown of Folders:
 
-Your own work goes in `pages/` and `components/`. The documentation (`docs/`) and the test pages (`tests/`) have folders of their own; delete either one (and its routes in `routes/web.som`) when you don't need it. Older projects, with everything in one folder, keep working.
+1. **`frontend/` — The Public Client Application**
+   - **`index.html`**: The HTML foundation that loads fonts, initial styles, and mounts the root reactive Som component into `#app`.
+   - **`routes/web.som`**: Maps browser URLs to page components using declarative route tags (`<route path="/dashboard" component={Dashboard} />`). Supports nested routes and route guards.
+   - **`layouts/`**: Reusable page wrappers. `layouts/app.som` provides responsive side navigation, user profile menus, and active route highlights, while `layouts/guest.som` wraps authentication screens.
+   - **`pages/`**: Full-screen view components. Everything you build as a destination route lives here. Pre-bundled auth pages in `pages/auth/` handle the complete user lifecycle out of the box.
+   - **`components/`**: Isolated, reusable UI building blocks like form fields, modal dialogs, and stat cards that receive props and emit events.
+   - **`ui.css`**: A lightweight, modern design system inspired by minimalist UI patterns with CSS variables, form controls, responsive typography, and utility classes.
+
+2. **`backend/` — The Private Server Engine**
+   - **`config/`**: Houses structured configuration files. Every setting is loaded and cached by Som's configuration repository and accessible anywhere in your backend with `config('database.default')` or `config('session.lifetime')`.
+   - **`app/Http/Controllers/`**: Encapsulates your business logic and handles incoming HTTP requests, input validation, and JSON responses.
+   - **`app/Http/Middleware/`**: Intercepts requests before reaching controllers. Includes `Authenticate` (with automatic session lifetime and inactivity enforcement), role checkers, and token validators.
+   - **`app/Models/`**: Clean database models with property casting, validation rules, and query scopes.
+   - **`database/migrations/`**: Code-defined schema migrations that run with `som db migrate` across SQLite, PostgreSQL, and MySQL.
+   - **`routes/api.js`**: Defines your REST endpoints, HTTP methods (`Route.get`, `Route.post`), rate limits, and middleware bindings.
+
+3. **Security by Isolation**
+   - **Zero Public Leakage**: The dev server (`som dev`) and production static builds (`som build`) strictly expose only the `frontend/` directory. The `backend/` folder, database files, and `.env` have no HTTP routes and cannot be downloaded by browsers under any circumstance.
+   - **Strict Protection**: On macOS and Linux, `som new` initializes `backend/` and `.env` with restrictive file permissions (readable only by the local owner), and internal directory guards actively prevent path traversal attacks.
 
 ### CSS libraries: Tailwind, Bootstrap, Bulma, Pico…
 
