@@ -1,0 +1,130 @@
+<!--
+  ErrorMonitor Page: Interactive Developer Exception & Error Monitoring Showcase
+  Allows developers to test and inspect the runtime error monitor with live examples.
+-->
+import ErrorMonitor from '../../errors/ErrorMonitor.som'
+
+state currentScenario = 'method'
+
+derive sampleError = currentScenario === 'method' ? {
+  name: 'BadMethodCallException',
+  message: 'Call to undefined method App\\Models\\Post::qquery()',
+  frames: [
+    { fn: 'HomeController.__invoke', file: 'app/Http/Controllers/Discovery/HomeController.som', line: 14, col: 5, isApp: true, snippet: [
+      { num: 10, code: 'class HomeController {' },
+      { num: 11, code: '  action index() {' },
+      { num: 12, code: '    // Query active records' },
+      { num: 13, code: '    load posts = Post.qquery()' },
+      { num: 14, code: '    return view("pages/Home.som", { posts })', isTarget: true },
+      { num: 15, code: '  }' },
+      { num: 16, code: '}' }
+    ]},
+    { fn: 'Route.dispatch', file: 'bin/backend/http.js', line: 182, col: 12, isApp: false },
+    { fn: 'Server.handleRequest', file: 'bin/som.js', line: 412, col: 9, isApp: false },
+    { fn: 'processTicksAndRejections', file: 'node:internal/process/task_queues', line: 95, col: 5, isApp: false }
+  ],
+  solution: {
+    title: 'Bad Method Call',
+    message: 'Did you mean to call App\\Models\\Post::query() instead of ::qquery()?'
+  }
+} : currentScenario === 'null' ? {
+  name: 'TypeError',
+  message: "Cannot read properties of undefined (reading 'email')",
+  frames: [
+    { fn: 'ProfileController.update', file: 'app/Http/Controllers/ProfileController.js', line: 32, col: 21, isApp: true, snippet: [
+      { num: 28, code: '  async update(req, res) {' },
+      { num: 29, code: '    const user = req.user;' },
+      { num: 30, code: '    // Attempting direct access without null check' },
+      { num: 31, code: '    const currentEmail = user.account.email;', isTarget: true },
+      { num: 32, code: '    return res.json({ success: true, email: currentEmail });' },
+      { num: 33, code: '  }' }
+    ]},
+    { fn: 'Route.dispatch', file: 'bin/backend/http.js', line: 210, col: 14, isApp: false }
+  ],
+  solution: {
+    title: 'Null Reference Protection',
+    message: 'user.account is undefined. Use optional chaining: user.account?.email or verify req.user before accessing.'
+  }
+} : {
+  name: 'QueryException',
+  message: 'SQLITE_ERROR: no such table: analytics_reports',
+  frames: [
+    { fn: 'DashboardController.metrics', file: 'app/Http/Controllers/Admin/DashboardController.js', line: 45, col: 18, isApp: true, snippet: [
+      { num: 42, code: '  async metrics(req, res) {' },
+      { num: 43, code: '    // Query missing table' },
+      { num: 44, code: "    const data = await DB.table('analytics_reports').get();", isTarget: true },
+      { num: 45, code: '    return res.json(data);' },
+      { num: 46, code: '  }' }
+    ]},
+    { fn: 'DatabaseConnection.query', file: 'bin/backend/db.js', line: 120, col: 9, isApp: false }
+  ],
+  solution: {
+    title: 'Missing Database Migration',
+    message: "Run 'som db migrate' or create a migration for table 'analytics_reports' with 'som make:migration create_analytics_reports_table'."
+  }
+}
+
+<view>
+  <div class="monitor-page-container">
+    <!-- Quick Scenario Switcher Bar for Developers -->
+    <div class="scenario-bar">
+      <span class="scenario-label">Developer Error Scenarios:</span>
+      <button class={'btn-scenario' + (currentScenario === 'method' ? ' active' : '')} @click="currentScenario = 'method'">
+        1. Typo Method Call (qquery)
+      </button>
+      <button class={'btn-scenario' + (currentScenario === 'null' ? ' active' : '')} @click="currentScenario = 'null'">
+        2. Undefined Property (TypeError)
+      </button>
+      <button class={'btn-scenario' + (currentScenario === 'sql' ? ' active' : '')} @click="currentScenario = 'sql'">
+        3. Missing Table (QueryException)
+      </button>
+    </div>
+
+    <!-- Error Monitor Interactive View -->
+    <error-monitor
+      error={sampleError}
+      title={sampleError.name}
+      message={sampleError.message}
+      frames={sampleError.frames}
+      solution={sampleError.solution}>
+    </error-monitor>
+  </div>
+</view>
+
+<style scoped>
+.monitor-page-container {
+  display: flex;
+  flex-direction: column;
+  min-height: 100vh;
+}
+.scenario-bar {
+  background: #0f172a;
+  color: #f8fafc;
+  padding: 8px 24px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  font-size: 12px;
+  border-bottom: 1px solid #334155;
+}
+.scenario-label {
+  font-weight: 700;
+  color: #94a3b8;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+.btn-scenario {
+  background: #1e293b;
+  color: #cbd5e1;
+  border: 1px solid #334155;
+  padding: 4px 10px;
+  font-size: 11px;
+  cursor: pointer;
+  font-weight: 600;
+}
+.btn-scenario.active {
+  background: #ef4444;
+  color: #ffffff;
+  border-color: #ef4444;
+}
+</style>

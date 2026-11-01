@@ -52,6 +52,8 @@ action add() { count++ }
 32. [Configuration System (config/)](#32-configuration-system-config)
 33. [HTML Security, XSS Sanitization & Safe Display](#33-html-security-xss-sanitization--safe-display)
 34. [Session Lifetimes & Frontend Inactivity Watchdog](#34-session-lifetimes--frontend-inactivity-watchdog)
+35. [Interactive Error Monitoring & Debugging (.som)](#35-interactive-error-monitoring--debugging-som)
+
 
 ---
 
@@ -3748,4 +3750,72 @@ export default {
 }
 </script>
 ```
+
+---
+
+## 35. Interactive Error Monitoring & Debugging (`.som`)
+
+When developing Som.js applications, runtime exceptions and server-side errors are caught by an interactive error monitoring system. Inspired by modern developer diagnostic overlays, Som.js provides split-view stack traces, interactive code snippet inspectors, intelligent solution recommendations, and request telemetry.
+
+### 35.1 Key Capabilities
+
+- **Interactive Stack Explorer**: Collapsible vendor frames (`Expand vendor frames`) keep noise hidden, while your application code frames are prominently highlighted. Clicking any frame in the stack trace dynamically updates the source inspector.
+- **Source Code Preview**: Displays code context around the failing line with syntax numbering and error line highlighting.
+- **Smart Solution Engine**: Automatically analyzes error messages and generates actionable recommendations (such as detecting method typos, null pointer exceptions, unmigrated database tables, or undefined variables).
+- **Comprehensive Context Inspection**: Complete visibility into HTTP methods, request URLs, client IPs, route parameters, query strings, headers, request bodies, session state, and system telemetry.
+- **Instant Diagnostic Sharing**: Export formatted error summaries directly to Markdown for GitHub issues or JSON payloads with a single click.
+
+### 35.2 The `.som` Error Monitoring Component
+
+A dedicated reactive component is provided in `templates/errors/ErrorMonitor.som`. You can use it in your error views, error boundaries, or developer testing pages:
+
+```html
+<!-- pages/CustomErrorView.som -->
+import ErrorMonitor from 'errors/ErrorMonitor.som'
+
+state caughtException = null
+
+<view>
+  <error-monitor
+    s-if="caughtException"
+    error={caughtException}
+    status={500}
+    title={caughtException.name}
+    message={caughtException.message}
+    frames={caughtException.frames}
+    solution={caughtException.solution}>
+  </error-monitor>
+</view>
+```
+
+#### Supported Props:
+| Prop | Type | Description |
+|---|---|---|
+| `error` | `Object` | The caught Error instance or error payload |
+| `status` | `Number` | HTTP status code (e.g. `500`, `404`, `403`) |
+| `title` | `String` | Exception name (e.g. `BadMethodCallException`, `TypeError`) |
+| `message` | `String` | Detailed error description |
+| `frames` | `Array` | Parsed stack frames with file, line, and code snippet data |
+| `solution` | `Object` | Optional smart suggestion with `{ title, message }` |
+| `request` | `Object` | HTTP request telemetry with method, URL, headers, and params |
+
+### 35.3 Automatic Backend Developer Error Pages
+
+In development mode (`APP_ENV=local` or `APP_DEBUG=true`), all unhandled API and server errors automatically render the interactive debugger when requested from a browser (`text/html`), or return structured JSON containing the parsed stack trace for API clients.
+
+#### Smart Suggestion Examples:
+1. **Method Typo Detection**:
+   - Error: `Call to undefined method Post.qquery()`
+   - Suggestion: `💡 Bad Method Call: Did you mean to call .query() ?`
+2. **Null / Undefined Property Access**:
+   - Error: `Cannot read properties of undefined (reading 'email')`
+   - Suggestion: `💡 Null Reference: Use optional chaining (?.) or verify that the user record exists.`
+3. **Missing Database Table**:
+   - Error: `SQLITE_ERROR: no such table: posts`
+   - Suggestion: `💡 Database Migration: Run 'som db migrate' to apply pending migrations.`
+
+### 35.4 Live Showcase Route (`/error-monitor`)
+
+To test and preview different exception scenarios locally, a developer showcase is available at `/error-monitor` in your new project. You can switch between method typo exceptions, null reference errors, and database migration issues to inspect how stack frames, context tables, and smart suggestions behave.
+
 
