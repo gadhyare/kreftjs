@@ -992,9 +992,10 @@ async function devServer(args, { production = false } = {}) {
         const forceHttps = process.env.FORCE_HTTPS === 'true' || (process.env.APP_URL && process.env.APP_URL.startsWith('https://'));
         const isPlainHttp = forwardedProto === 'http' || (!isEncrypted && forceHttps);
         if (isPlainHttp) {
-          const host = req.headers.host || 'localhost';
+          const target = require('./backend/http.js').httpsRedirectTarget(req);
+          if (!target) { res.writeHead(400, { 'Content-Type': 'text/plain; charset=utf-8' }); return res.end('Bad request'); }
           res.writeHead(301, {
-            Location: `https://${host}${req.url}`,
+            Location: target,
             'Strict-Transport-Security': 'max-age=31536000; includeSubDomains; preload',
             'Content-Type': 'text/plain; charset=utf-8',
           });

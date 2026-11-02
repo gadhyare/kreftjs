@@ -273,3 +273,20 @@ test('login: after too many wrong passwords the account is locked even for the r
   assert.strictEqual(await attempt('correct horse'), 429, 'locked: the right password is refused too');
   delete process.env.LOGIN_MAX_FAILURES;
 });
+
+test('https redirect: the Host header can not send a visitor to another site', () => {
+  const { httpsRedirectTarget } = require(path.join(ROOT, 'bin/backend/http.js'));
+  const to = (host, url, appUrl) => {
+    const saved = process.env.APP_URL;
+    if (appUrl) process.env.APP_URL = appUrl; else delete process.env.APP_URL;
+    try { return httpsRedirectTarget({ headers: { host }, url }); } finally { if (saved === undefined) delete process.env.APP_URL; else process.env.APP_URL = saved; }
+  };
+  assert.strictEqual(to('example.com', '/a?b=1'), 'https://example.com/a?b=1');
+  assert.strictEqual(to('example.com:8443', '/'), 'https://example.com:8443/');
+  assert.strictEqual(to('evil.example', '/a', 'https://example.com'), 'https://example.com/a', 'APP_URL wins over the header');
+  assert.strictEqual(to('evil.example/x?', '/'), null);
+  assert.strictEqual(to('a.example@evil.example', '/'), null);
+  assert.strictEqual(to('exa mple.com', '/'), null);
+  assert.strictEqual(to('', '/'), null);
+  assert.strictEqual(to('example.com', '//evil.example/x'), 'https://example.com/', 'a path that starts with // is not kept');
+});

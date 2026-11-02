@@ -346,9 +346,10 @@ const SECURITY_HEADERS = {
     if (isProd) {
       const forwardedProto = (req.headers['x-forwarded-proto'] || '').split(',')[0].trim().toLowerCase();
       if (forwardedProto === 'http') {
-        const host = req.headers.host || 'localhost';
+        const target = http.httpsRedirectTarget(req);
+        if (!target) { res.writeHead(400, { 'Content-Type': 'text/plain; charset=utf-8' }); res.end('Bad request'); return true; }
         res.writeHead(301, {
-          Location: `https://${host}${req.url}`,
+          Location: target,
           'Strict-Transport-Security': 'max-age=31536000; includeSubDomains; preload',
           'Content-Type': 'text/plain; charset=utf-8',
         });

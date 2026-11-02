@@ -559,6 +559,19 @@ class VerifyCsrfToken {
   }
 }
 
+// Where to send a plain-HTTP visitor: the same address over https. The Host header is whatever the visitor
+// wrote (and a cache may keep the answer for others), so the app's own APP_URL host is used when there is one;
+// otherwise the header must look like a host name, or null (answer 400).
+function httpsRedirectTarget(req) {
+  let host = '';
+  try { if (process.env.APP_URL) host = new URL(process.env.APP_URL).host; } catch (_) { /* no usable APP_URL */ }
+  if (!host) host = String(req.headers.host || '').trim();
+  if (!/^(?:[a-z0-9]([a-z0-9-]*[a-z0-9])?(?:\.[a-z0-9]([a-z0-9-]*[a-z0-9])?)*|\[[0-9a-f:.]+\])(?::\d{1,5})?$/i.test(host)) return null;
+  const url = String(req.url || '/');
+  if (!url.startsWith('/') || url.startsWith('//')) return `https://${host}/`;
+  return `https://${host}${url}`;
+}
+
 const generateCsrfToken = () => crypto.randomBytes(20).toString('hex');
 const verifyCsrfToken = (token, expected) => same(token, expected);
 
@@ -625,5 +638,5 @@ const builtIn = {
 module.exports = {
   cookieSecure, createRouter, Request, Response, response, noContent, abort, abortIf, abortUnless,
   HttpError, ValidationError, toResponse, builtIn, singularize,
-  VerifyCsrfToken, csrf: builtIn.csrf, generateCsrfToken, verifyCsrfToken, same,
+  VerifyCsrfToken, csrf: builtIn.csrf, httpsRedirectTarget, generateCsrfToken, verifyCsrfToken, same,
 };
