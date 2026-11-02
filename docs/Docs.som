@@ -524,7 +524,7 @@ on ready {
 .dv-results .none { color: var(--dv-muted); cursor: default; }
 .dv-modal-foot { display: flex; gap: 16px; padding: 9px 14px; border-top: 1px solid var(--dv-line); font-size: 12px; color: var(--dv-muted); }
 
-.dv-top { position: fixed; inset-inline-end: 20px; bottom: 20px; z-index: 40; display: grid; place-items: center; width: 40px; height: 40px; background: var(--background, #fff); color: var(--dv-text); border: 1px solid var(--dv-line); border-radius: 50%; cursor: pointer; opacity: 0; pointer-events: none; transform: translateY(8px); transition: opacity .2s, transform .2s; }
+.dv-top { position: fixed; inset-inline-end: 20px; bottom: 76px;   /* above the DevTools button (bottom right, `som dev` only) */ z-index: 40; display: grid; place-items: center; width: 40px; height: 40px; background: var(--background, #fff); color: var(--dv-text); border: 1px solid var(--dv-line); border-radius: 50%; cursor: pointer; opacity: 0; pointer-events: none; transform: translateY(8px); transition: opacity .2s, transform .2s; }
 .dv-top.show { opacity: 1; pointer-events: auto; transform: none; }
 
 /* narrow screens */

@@ -25,8 +25,8 @@ Route.layout('guest').group(() => {
 })
 
 // Documentation (docs/) and test suite (tests/)
-Route.view('/docs/:lang?', 'docs/Docs.som').name('docs').title('Documentation')
-Route.view('/error-monitor', 'pages/ErrorMonitor.som').layout('none').name('error-monitor').title('Error Monitor')
+Route.view('/docs/:lang?', 'docs/Docs.som').name('docs').title('Documentation').layout('docs')   // its own slim bar, not the dashboard sidebar
+Route.view('/error-monitor', 'pages/ErrorMonitor.som').name('error-monitor').title('Error Monitor')
 Route.prefix('/tests').name('tests.').group(() => {
   Route.view('/', 'tests/pages/Test.som').name('index').title('Test Suite')
   Route.view('/about', 'tests/pages/About.som').name('about').title('About · Tests')
