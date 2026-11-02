@@ -1,5 +1,5 @@
 /*!
- * Som.js v2.4.0 — reactive by nature
+ * Som.js v2.5.0 — reactive by nature
  * The .som component language (state · derive · action · when · watch · on),
  * { } views with s-if / s-each / s-model, components, slots, router, stores,
  * share / receive, event bus and a template engine.
@@ -775,10 +775,49 @@
   }
 
   /* ------------------------------------------------------------------ SEO */
-  function applySEO(seo = {}) {
+  // The router replaces the page's SEO on every navigation; Som.seo() / useSeo() from a component adds to it.
+  let seoState = {};
+  function applySEO(seo = {}, replace = true) {
     if (typeof document === 'undefined') return;
-    const data = typeof seo === 'string' ? { title: seo } : (seo || {});
+    const next = typeof seo === 'string' ? { title: seo } : (seo || {});
+    const merged = { ...seoState, ...next };
+    for (const k of ['og', 'openGraph', 'twitter']) if (seoState[k] && next[k]) merged[k] = { ...seoState[k], ...next[k] };
+    const data = seoState = replace ? next : merged;
     if (data.title) document.title = data.title;
+
+    // forget what the previous page set, so a page without a description or canonical does not keep the last one:
+    // tags made here go away, tags that came with index.html (or the prerendered page) get their own content back
+    document.head.querySelectorAll('[data-som-seo]').forEach((el) => {
+      if (el.hasAttribute('data-som-ssr')) { el.removeAttribute('data-som-ssr'); return; } // set by the server for this very page: kept until the next navigation
+      const attr = el.localName === 'link' ? 'href' : 'content';
+      if (el.localName !== 'script' && el.hasAttribute('data-som-orig')) {
+        el.setAttribute(attr, el.getAttribute('data-som-orig'));
+        el.removeAttribute('data-som-orig');
+        el.removeAttribute('data-som-seo');
+      } else {
+        el.remove();
+      }
+    });
+
+    // <html lang dir>: a page can set them (a page in another language); the next page gets the old ones back
+    const root = document.documentElement;
+    for (const a of ['lang', 'dir']) {
+      const mark = `data-som-orig-${a}`;
+      if (root.hasAttribute(mark)) {
+        const was = root.getAttribute(mark);
+        if (was) root.setAttribute(a, was); else root.removeAttribute(a);
+        root.removeAttribute(mark);
+      }
+      if (data[a]) {
+        root.setAttribute(mark, root.getAttribute(a) || '');
+        root.setAttribute(a, String(data[a]));
+      }
+    }
+
+    const claim = (el, attr) => { // marks a tag as set by the current page, remembering the content it had before
+      if (!el.hasAttribute('data-som-seo') && el.hasAttribute(attr)) el.setAttribute('data-som-orig', el.getAttribute(attr));
+      el.setAttribute('data-som-seo', '');
+    };
 
     const setMeta = (attr, name, content) => {
       if (content == null || content === '') return;
@@ -788,6 +827,7 @@
         el.setAttribute(attr, name);
         document.head.appendChild(el);
       }
+      claim(el, 'content');
       el.setAttribute('content', String(content));
     };
 
@@ -799,6 +839,7 @@
         el.setAttribute('rel', rel);
         document.head.appendChild(el);
       }
+      claim(el, 'href');
       el.setAttribute('href', String(href));
     };
 
@@ -808,12 +849,29 @@
     if (data.author) setMeta('name', 'author', data.author);
     if (data.canonical) setLink('canonical', data.canonical);
 
+    // the same page in other languages: alternates: { en: '/en/about', ar: '/ar/about', 'x-default': '/about' }
+    // (or [{ hreflang, href }]); each address should list all the others, itself included
+    const alts = Array.isArray(data.alternates) ? data.alternates : Object.entries(data.alternates || {}).map(([hreflang, href]) => ({ hreflang, href }));
+    for (const { hreflang, href } of alts) {
+      if (!hreflang || !href) continue;
+      const abs = typeof window !== 'undefined' ? new URL(String(href), window.location.href).href : String(href);
+      let el = [...document.head.querySelectorAll('link[rel="alternate"][hreflang]')].find((l) => l.getAttribute('hreflang') === hreflang);
+      if (!el) {
+        el = document.createElement('link');
+        el.setAttribute('rel', 'alternate');
+        el.setAttribute('hreflang', hreflang);
+        document.head.appendChild(el);
+      }
+      claim(el, 'href');
+      el.setAttribute('href', abs);
+    }
+
     // OpenGraph
     const og = data.og || data.openGraph || {};
     const ogTitle = og.title || data.title;
     const ogDesc = og.description || data.description;
     const ogImage = og.image || data.image;
-    const ogUrl = og.url || data.canonical || (typeof window !== 'undefined' ? window.location.href : '');
+    const ogUrl = og.url || data.canonical || (typeof window !== 'undefined' ? window.location.href.split('#')[0] : '');
     const ogType = og.type || 'website';
     const ogSite = og.siteName || og.site_name || data.siteName || data.site_name;
 
@@ -4464,7 +4522,7 @@
       const component = somComponent(`${errorsDir}/${file}.som`);
       route.error = { status, message: message || '' };
       levels.value = [{ component, isError: true, props: { status, message: message || '', title: ERROR_TITLES[status] || 'Error' } }];
-      document.title = `${status} | ${ERROR_TITLES[status] || 'Error'}`;
+      applySEO({ title: `${status} | ${ERROR_TITLES[status] || 'Error'}`, robots: 'noindex' }); // an error page must not be indexed, nor keep the last page's tags
     }
 
     const router = {
@@ -4926,7 +4984,7 @@
     stores, storeLog, busLog,
   };
 
-  const VERSION = '2.4.0';
+  const VERSION = '2.5.0';
   const Som = {
     version: VERSION,
     // PUBLIC_ values from .env (som dev and som build put them here); never secrets
@@ -4966,7 +5024,7 @@
     signal: ref, state, derived: computed, readonly, isSignal: isRef, isState: isReactive,
     read: unref, unwrap: toRaw, raw: markRaw,
     // saving data, talking to servers
-    saved, storage, api, ApiError, resource, table, validate, form, selection, theme, slug, seo: applySEO, useSeo: applySEO,
+    saved, storage, api, ApiError, resource, table, validate, form, selection, theme, slug, seo: (s) => applySEO(s, false), useSeo: (s) => applySEO(s, false),
     cleanHtml, sanitizeHtml: cleanHtml, escapeHtml, e: escapeHtml, stripTags,
     stripTypeScript,
     // localization & i18n

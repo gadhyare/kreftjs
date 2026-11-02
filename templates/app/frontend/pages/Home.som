@@ -51,7 +51,7 @@ action copyCli() {
     <header class="hero">
       <div class="status-pill">
         <span class="live-indicator" aria-hidden="true"></span>
-        <span class="status-text">Som.js Engine · v{Som.version || '2.0.0'} Ready</span>
+        <span class="status-text">Som.js Engine · v{Som.version || '2.5.0'} Ready</span>
       </div>
 
       <h1 class="headline">
@@ -201,9 +201,9 @@ action decrement() &#123; counter-- &#125;</code></pre>
 
 <style scoped>
 .landing {
-  max-width: 1040px;
+  max-width: calc(var(--container, 1240px) + var(--container-pad, 28px) * 2);
   margin: 0 auto;
-  padding: 24px 20px 80px;
+  padding: 24px var(--container-pad, 28px) 80px;
 }
 
 /* Top Navigation Bar */
@@ -437,7 +437,7 @@ action decrement() &#123; counter-- &#125;</code></pre>
 }
 
 .code-preview {
-  border-right: 1px solid var(--border);
+  border-inline-end: 1px solid var(--border);
   background: var(--terminal-bg);
 }
 

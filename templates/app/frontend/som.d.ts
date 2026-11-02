@@ -1,4 +1,4 @@
-// Type definitions for Som.js 2.2
+// Type definitions for Som.js 2.5.0
 // Use from TypeScript or for editor hints in plain JavaScript (// @ts-check).
 
 export interface Signal<T> { value: T }
@@ -414,6 +414,8 @@ export interface SomStatic {
   /** creates a timer that automatically cleans up when the component is unmounted */
   useInterval(fn: () => void, ms?: number): () => void
   useTimeout(fn: () => void, ms?: number): () => void
+  /** inactivity watchdog: tracks user interaction and auto-redirects upon session expiration */
+  useInactivityTimer(options?: number | InactivityTimerOptions): { reset: () => void; stop: () => void; timeoutMs: number }
 
   router(options: RouterOptions): Router
   currentRoute(): Route | null
@@ -422,6 +424,20 @@ export interface SomStatic {
   /** updates <title>, <meta>, <link rel="canonical">, openGraph, twitter cards and JSON-LD */
   seo(options: SeoOptions | string): void
   useSeo(options: SeoOptions | string): void
+
+  /** HTML Security & XSS Sanitization utilities */
+  cleanHtml(rawHtml: any, options?: { allowedTags?: string[]; allowedAttributes?: Record<string, string[]>; allowedSchemes?: string[] }): string
+  sanitizeHtml(rawHtml: any, options?: { allowedTags?: string[]; allowedAttributes?: Record<string, string[]>; allowedSchemes?: string[] }): string
+  stripTags(html: any): string
+  escapeHtml(str: any): string
+  unescapeHtml(str: any): string
+  SafeHtml: {
+    new (html: string): { __som_safe_html: true; toString(): string; toHtml(): string }
+    raw(html: string): { __som_safe_html: true; toString(): string; toHtml(): string }
+    clean(rawHtml: any, options?: any): { __som_safe_html: true; toString(): string; toHtml(): string }
+    isSafe(value: any): boolean
+  }
+  html(strings: TemplateStringsArray, ...values: any[]): { __som_safe_html: true; toString(): string; toHtml(): string }
 }
 
 export interface SeoOptions {
@@ -494,6 +510,15 @@ export interface DesktopBridge {
   showMessageBox(options: any): Promise<any>
   showOpenDialog(options: any): Promise<any>
   showSaveDialog(options: any): Promise<any>
+}
+
+export interface InactivityTimerOptions {
+  timeout?: number
+  warningTime?: number
+  redirect?: string
+  events?: string[]
+  onWarning?: (info: { remainingMs: number; remainingMinutes: number }) => void
+  onTimeout?: () => void
 }
 
 declare const Som: SomStatic

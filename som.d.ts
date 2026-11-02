@@ -1,4 +1,4 @@
-// Type definitions for Som.js 2.2
+// Type definitions for Som.js 2.5.0
 // Use from TypeScript or for editor hints in plain JavaScript (// @ts-check).
 
 export interface Signal<T> { value: T }
@@ -360,6 +360,8 @@ export interface SomStatic {
   lazy(loader: () => Promise<any>): LazyComponent
   load(url: string): Promise<ComponentDef>
   compileSom(source: string, url?: string): Promise<ComponentDef>
+  /** Strips TypeScript type annotations, interfaces, type aliases and enums from source code while preserving line numbers */
+  stripTypeScript(source: string): string
   /** The template engine: a view and data → an HTML string */
   render(view: string, data?: Record<string, any>, options?: { components?: Record<string, Component>; directives?: Record<string, Directive> }): string
 
@@ -424,6 +426,38 @@ export interface SomStatic {
   /** updates <title>, <meta>, <link rel="canonical">, openGraph, twitter cards and JSON-LD */
   seo(options: SeoOptions | string): void
   useSeo(options: SeoOptions | string): void
+
+  /** HTML Security & XSS Sanitization utilities */
+  cleanHtml(rawHtml: any, options?: { allowedTags?: string[]; allowedAttributes?: Record<string, string[]>; allowedSchemes?: string[] }): string
+  sanitizeHtml(rawHtml: any, options?: { allowedTags?: string[]; allowedAttributes?: Record<string, string[]>; allowedSchemes?: string[] }): string
+  stripTags(html: any): string
+  escapeHtml(str: any): string
+  unescapeHtml(str: any): string
+  SafeHtml: {
+    new (html: string): { __som_safe_html: true; toString(): string; toHtml(): string }
+    raw(html: string): { __som_safe_html: true; toString(): string; toHtml(): string }
+    clean(rawHtml: any, options?: any): { __som_safe_html: true; toString(): string; toHtml(): string }
+    isSafe(value: any): boolean
+  }
+
+  // localization & i18n
+  locale(lang?: string): string
+  fallbackLocale(lang?: string): string
+  locales(): string[]
+  translations(localeOrDict: string | Record<string, any>, dict?: Record<string, any>): SomStatic
+  dir(locale?: string): 'rtl' | 'ltr'
+  isRtl(locale?: string): boolean
+  __(key: string, replace?: Record<string, any>, locale?: string): string
+  t(key: string, replace?: Record<string, any>, locale?: string): string
+  trans(key: string, replace?: Record<string, any>, locale?: string): string
+  choice(key: string, count: number, replace?: Record<string, any>, locale?: string): string
+  transChoice(key: string, count: number, replace?: Record<string, any>, locale?: string): string
+  trans_choice(key: string, count: number, replace?: Record<string, any>, locale?: string): string
+  hasTranslation(key: string, locale?: string): boolean
+  formatNumber(value: number, options?: Intl.NumberFormatOptions, locale?: string): string
+  formatCurrency(amount: number, currency?: string, locale?: string): string
+  formatDate(date: Date | string | number, options?: Intl.DateTimeFormatOptions, locale?: string): string
+  html(strings: TemplateStringsArray, ...values: any[]): { __som_safe_html: true; toString(): string; toHtml(): string }
 }
 
 export interface SeoOptions {
