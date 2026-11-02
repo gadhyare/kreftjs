@@ -53,6 +53,9 @@ action add() { count++ }
 33. [HTML Security, XSS Sanitization & Safe Display](#33-html-security-xss-sanitization--safe-display)
 34. [Session Lifetimes & Frontend Inactivity Watchdog](#34-session-lifetimes--frontend-inactivity-watchdog)
 35. [Interactive Error Monitoring & Debugging (.som)](#35-interactive-error-monitoring--debugging-som)
+36. [Redis Integration: Cache, Atomic Locks, Queues & Pub/Sub](#36-redis-integration-cache-atomic-locks-queues--pubsub)
+37. [Som.js vs Other Frameworks (Next.js, Nuxt, NestJS, AdonisJS, Angular, Svelte)](#37-somjs-vs-other-frameworks-nextjs-nuxt-nestjs-adonisjs-angular-svelte)
+38. [Full TypeScript Support (`som new [app-name] --ts`)](#38-full-typescript-support-som-new-app-name---ts)
 
 
 ---
@@ -88,10 +91,13 @@ You need [Node.js](https://nodejs.org) (it includes npm). Inside the Som.js fold
 npm link
 ```
 
-Then create and run a project:
+Then create and run a project (in **JavaScript** or **TypeScript**):
 
 ```bash
+# Interactive language prompt (or pass --js / --ts directly):
 som new my-app
+som new my-app --ts
+
 cd my-app
 npm run dev
 ```
@@ -167,7 +173,7 @@ my-app/
 
 1. **`frontend/` — The Public Client Application**
    - **`index.html`**: The HTML foundation that loads fonts, initial styles, and mounts the root reactive Som component into `#app`.
-   - **`routes/web.som`**: Maps browser URLs to page components using declarative route tags (`<route path="/dashboard" component={Dashboard} />`). Supports nested routes and route guards.
+   - **`routes/web.som`**: Maps browser URLs to page components using fluent route declarations (`Route.view('/dashboard', 'pages/Dashboard.som').name('dashboard')`). Supports nested routes and route guards (`Route.middleware('auth').group(...)`).
    - **`layouts/`**: Reusable page wrappers. `layouts/app.som` provides responsive side navigation, user profile menus, and active route highlights, while `layouts/guest.som` wraps authentication screens.
    - **`pages/`**: Full-screen view components. Everything you build as a destination route lives here. Pre-bundled auth pages in `pages/auth/` handle the complete user lifecycle out of the box.
    - **`components/`**: Isolated, reusable UI building blocks like form fields, modal dialogs, and stat cards that receive props and emit events.
@@ -217,11 +223,11 @@ import './theme.css'                              // your own CSS file, next to 
 
 ### npm packages in the browser
 
-Install a package, then import it in a `.som` file:
+Install a package with `som add` (or `npm i`), then import it in a `.som` file:
 
 ```bash
-npm i dayjs nanoid lodash
-npm i -D esbuild           # once per project: it prepares packages for the browser
+som add dayjs nanoid lodash
+som add -D esbuild          # once per project: it prepares packages for the browser
 ```
 
 ```html
@@ -1253,7 +1259,7 @@ Passwords are hashed with scrypt, wrong logins are slowed down (`throttle:6,1`),
 - `som dev` only answers this computer (`127.0.0.1`). `som dev --host 0.0.0.0` opens it to your network, to try the app on a phone.
 - Every API answer has the `X-Content-Type-Options`, `X-Frame-Options` and `Referrer-Policy` headers, and request bodies over 5 MB are refused (`MAX_BODY_KB` in `.env`).
 - `app/Http/Kernel.js` limits each visitor to 120 requests a minute for each address; the login routes allow 6.
-- The visitor's address comes from the connection. Behind nginx, Cloudflare or a load balancer, put its address in `TRUSTED_PROXIES` in `.env` (or `*`), so `X-Forwarded-For` is believed from it and from nobody else.
+- The visitor's address comes from the connection. Behind nginx, Cloudflare or a load balancer, put its address in `TRUSTED_PROXIES` in `.env` (or `*`), so `X-Forwarded-For` is believed from it and from nobody else. The list is read from the right (each proxy appends the address it saw), and the first address that is not one of your proxies is the visitor; with `*`, set `TRUSTED_PROXY_HOPS` to the number of proxies in front of the app (default 1).
 - A login token nobody used for `AUTH_TOKEN_DAYS` days (30) stops working.
 - JSON bodies can't carry `__proto__` or `constructor` keys, and models never fill `id` from a request.
 
@@ -2077,118 +2083,184 @@ Som.js actively prevents prototype pollution:
    Cross-Origin-Resource-Policy: same-origin
    Cache-Control: no-store
    ```
+   In production (`APP_ENV=production`), Som.js automatically adds **HTTP Strict Transport Security (HSTS)**:
+   ```http
+   Strict-Transport-Security: max-age=31536000; includeSubDomains; preload
+   ```
 2. **HTTP Response Splitting Defense:**
    Calling `res.header(name, value)` or `res.cookie(name, value)` validates that neither the header name nor value contain carriage return (`\r`) or newline (`\n`) characters, preventing HTTP response splitting and header injection vulnerabilities.
+
+### 16.8 Production HTTPS Enforcement vs. Local HTTP
+
+To guarantee top-tier security in production while preserving frictionless local DX:
+
+| Feature | Local (`APP_ENV=local`) | Production (`APP_ENV=production`) |
+| :--- | :--- | :--- |
+| **Protocol** | Plain `http://` permitted on `localhost` & `127.0.0.1` | **HTTPS Strictly Required**. Plain HTTP requests are disallowed and automatically redirected via 301 to `https://`. |
+| **HSTS Header** | Disabled (to prevent locking local ports) | **Enabled** (`max-age=31536000; includeSubDomains; preload`). |
+| **Cookie Security** | `Secure` flag optional for `http://` | **`Secure` flag enforced** on all auth/session cookies (`SameSite=Lax; Secure`). |
+| **Bug & Error Details** | **Interactive Debugger**: Shows code snippets, frames & suggestions | **Hidden**: Generic safe error page / `{ message: "Server error." }`. Internal stack traces and DB queries are never exposed. |
+| **Error Logging** | Terminal & Console | Server-side rotating log files (`storage/logs/som-*.log`). |
 
 ---
 
 ## 17. Database & Models Guide
 
-Som.js features a powerful, lightweight database abstraction and Eloquent/ActiveRecord-style ORM built directly into `somjs/server`. It supports **SQLite** (zero dependencies, built into modern Node.js), **MySQL / MariaDB** (via `mysql2`), and **PostgreSQL** (via `pg`).
+Som.js features a complete, zero-dependency, Laravel Eloquent & Active Record-inspired Object-Relational Mapper (ORM) and fluent SQL Query Builder built directly into `somjs/server`. It allows you to define rich domain models, relationships, accessors/mutators, life-cycle events, and schema-casted attributes without requiring heavy external dependencies like Prisma, TypeORM, or Knex.
 
-### 17.1 Linking & Configuring the Database & Environment
+---
 
-Configure your database connection string and application keys in your `.env` file:
+### 17.1 Supported Database Drivers & Configuration
+
+Som.js supports three primary relational database engines out of the box:
+
+| Database | Driver / Engine | Installation | Best For |
+| :--- | :--- | :--- | :--- |
+| **SQLite** | Built-in Node.js `node:sqlite` | **Zero installation** (included in Node 22+) | Rapid local development, unit tests, desktop apps, embedded services. |
+| **MySQL / MariaDB** | `mysql2` | `som add mysql2` (or `npm i mysql2`) | Production web applications, distributed clouds, high-concurrency workloads. |
+| **PostgreSQL** | `pg` | `som add pg` (or `npm i pg`) | Enterprise workloads, JSON querying, spatial data, strict ACID guarantees. |
+
+#### Database Configuration via `.env`
+
+Define your connection credentials in your project's `.env` file:
 
 ```env
-# Application Encryption Key (generated via som key:generate):
+# Application Encryption & Integrity Key (generate with `som key:generate`):
 APP_KEY="base64:..."
 
-# SQLite (Built-in, zero dependencies, perfect for local dev & smaller apps):
+# 1. SQLite (Default - Built into Node.js, zero npm packages needed):
 DATABASE_URL="sqlite:database/app.db"
 
-# MySQL / MariaDB (requires: npm i mysql2):
+# 2. MySQL / MariaDB Connection String:
 DATABASE_URL="mysql://root:secret@127.0.0.1:3306/my_database"
 
-# PostgreSQL (requires: npm i pg):
-DATABASE_URL="postgres://postgres:secret@127.0.0.1:5432/my_database"
+# 3. PostgreSQL Connection String:
+DATABASE_URL="postgres://postgres:secret@127.0.0.1:5432/my_database?sslmode=prefer"
 ```
 
-To connect via CLI flags during development:
+#### Starting the Dev Server with Database Connections
+
+You can override or supply database connections on the command line:
+
 ```bash
+# Connect to SQLite:
 som dev --db sqlite:database/app.db
-# or
-som dev --db mysql://root:secret@127.0.0.1:3306/my_database
+
+# Connect to MySQL:
+som dev --db mysql://root:secret@127.0.0.1:3306/shop
+
+# Run migrations and seed data on initial startup:
+som dev --db sqlite:database/app.db --migrations database/migrations --seed
 ```
 
 #### Application Key Generation (`som key:generate`)
 
-The `APP_KEY` is a 256-bit encryption key used by `somjs/server` to sign URLs (`Route.signed()`), encrypt cookies, and protect sessions:
+The `APP_KEY` is a 256-bit cryptographic key used by `somjs/server` to sign URLs (`Route.signed()`), encrypt cookies (`som_session`), and secure sessions.
 
 ```bash
-# Generate a new 256-bit key and save it to .env:
+# Generate a new 256-bit key and save it directly to .env:
 som key:generate
 
 # Display the generated key in terminal without modifying .env:
 som key:generate --show
 
-# Force key regeneration in production:
+# Force key regeneration in production (resets active sessions):
 som key:generate --force
 ```
 
-> **Automatic Session Invalidation:** Session cookies (`som_session`) are cryptographically sealed with AES-256-GCM authenticated encryption using `APP_KEY`. Changing `APP_KEY` (whether manually in `.env` or via `som key:generate`) renders existing session cookies undecryptable. Furthermore, `som key:generate` automatically wipes active session tokens from the database (`personal_access_tokens WHERE type = 'session'`) and removes cached session files, instantly forcing all users to re-authenticate.
+> **Security Note:** Session cookies are sealed using authenticated AES-256-GCM encryption. Rotating the `APP_KEY` invalidates all existing session tokens, immediately requiring all active users to re-authenticate.
 
 ---
 
-### 17.2 Defining Models (`app/Models/*.js`)
+### 17.2 Scaffolding Models with the Som CLI
 
-Generate a model with its migration, factory, seeder, controller, page, and route in one line:
+Use `som make:model` to generate database models and their associated scaffolding in one command:
+
 ```bash
-# Generate model, migration, factory, seeder, and controller (classic -mfsc):
+# Basic model in app/Models/Post.js:
+som make:model Post
+
+# Model + Migration:
+som make:model Post -m
+
+# Model + Migration + Factory + Seeder + Controller (-mfsc):
 som make:model Post -mfsc
 
-# Full stack scaffolding: model, migration, factory, seeder, controller, page, and registered routes with auth:
+# Full-stack scaffolding: Model, Migration, Factory, Seeder, Controller, Frontend Page, and Routes:
 som make:model Post -mfscpr --route=api --auth
 
-# Or use the --all flag:
+# All-in-one generator flag (--all):
 som make:model Post --all --auth
 
-# Scaffolding flags:
-#   -m   Generate migration in database/migrations/
-#   -f   Generate factory in database/factories/PostFactory.js
-#   -s   Generate seeder in database/seeders/PostSeeder.js
-#   -c   Generate resource controller in app/Http/Controllers/PostController.js
-#   -p   Generate UI page in frontend/pages/Post.som
-#   -r   Register route automatically in route file
-#   --route=<name> Target route file (e.g. --route=api or --route=shop)
-#   --auth         Attach auth middleware: .middleware('auth')
+# Scaffold inside a namespace / subfolder (e.g. app/Models/Shop/Product.js):
+som make:model Shop/Product -mfsc
+
+# Target a specific folder for controllers and pages while keeping the model flat:
+som make:model Post --all --folder=Admin
 ```
 
-A model represents a database table (by default, the lowercase plural form of the class name, e.g., `Post` maps to `posts`):
+#### Supported Scaffolding Flags
+
+| Flag | Long Flag | Description |
+| :--- | :--- | :--- |
+| `-m` | `--migration` | Creates a schema migration in `database/migrations/`. |
+| `-f` | `--factory` | Creates a model factory in `database/factories/`. |
+| `-s` | `--seeder` | Creates a database seeder in `database/seeders/`. |
+| `-c` | `--controller` | Creates a resource controller in `app/Http/Controllers/`. |
+| `-p` | `--page` | Creates a reactive view in `frontend/pages/`. |
+| `-r` | `--route` | Automatically registers API / web routes. |
+| | `--req`, `--requests` | Generates `Store<Model>Request` and `Update<Model>Request`. |
+| `-a` | `--all` | Generates all components (migration, factory, seeder, controller, requests, page). |
+| | `--auth` | Protects created routes with authentication middleware. |
+
+---
+
+### 17.3 Model Anatomy & Configuration
+
+A Som.js model extends `Model` from `somjs/server`. By default, models automatically map to the snake_case plural of their class name (e.g., `Post` → `posts`, `BlogPost` → `blog_posts`).
 
 ```js
 // app/Models/Post.js
-const { Model, Str } = require('somjs/server')
+const { Model } = require('somjs/server')
 
 class Post extends Model {
-  // static table = 'posts' // Optional override
-  static fillable = ['title', 'slug', 'body', 'user_id', 'published'] // Mass-assignment whitelist
-  static hidden = [] // Fields excluded when serialized to JSON
-  static casts = { published: 'boolean', meta: 'json' } // Automatic type conversion
-  static softDeletes = true // Enables soft deletes via `deleted_at`
+  // 1. Table & Primary Key overrides (optional):
+  static table = 'articles'         // Custom table name (defaults to 'posts')
+  static primaryKey = 'id'          // Custom primary key column (defaults to 'id')
+  static perPage = 15               // Default items per page for .paginate()
 
-  // Relationships:
-  user() {
-    return this.belongsTo(require('./User'))
+  // 2. Mass Assignment Whitelist & Blacklist:
+  static fillable = [               // Columns permitted for create(), update(), and fill()
+    'title',
+    'slug',
+    'body',
+    'user_id',
+    'status',
+    'is_published',
+    'metadata'
+  ]
+  static guarded = ['id']           // Columns blocked from mass assignment
+
+  // 3. Output Serialization Controls:
+  static hidden = ['internal_notes'] // Never exposed in JSON or toJSON()
+  static visible = null             // When set to an array, ONLY these columns are serialized
+  static appends = ['read_time']    // Virtual accessors automatically included in JSON output
+
+  // 4. Automatic Type Casting:
+  static casts = {
+    is_published: 'boolean',
+    metadata: 'json',
+    view_count: 'integer',
+    rating: 'decimal:2',
+    published_at: 'datetime',
   }
 
-  comments() {
-    return this.hasMany(require('./Comment'))
-  }
+  // 5. Timestamps & Soft Deletes:
+  static timestamps = true          // Automatically manages `created_at` and `updated_at`
+  static softDeletes = true         // Deletions set `deleted_at` instead of deleting the row
+  static deletedAtColumn = 'deleted_at'
 
-  tags() {
-    return this.belongsToMany(require('./Tag')) // Uses pivot table `post_tag`
-  }
-
-  // Model Query Scopes:
-  static scopePublished(query) {
-    query.where('published', true)
-  }
-
-  // Model Lifecycle Hooks (creating, created, updating, updated, deleting, deleted):
-  static async creating(post) {
-    if (!post.slug) post.slug = Str.slug(post.title)
-  }
+  // Relationships and Hooks...
 }
 
 module.exports = Post
@@ -2196,79 +2268,931 @@ module.exports = Post
 
 ---
 
-### 17.3 Querying with Models
+### 17.4 Attribute Casting (`static casts`)
+
+Attribute casting automatically transforms database column values when reading from or writing to the database.
 
 ```js
-const Post = require('../../app/Models/Post')
+class Product extends Model {
+  static casts = {
+    is_active: 'boolean',           // 1/0, 'true'/'false' -> true/false
+    stock: 'integer',               // '42' -> 42
+    price: 'float',                 // '19.99' -> 19.99
+    discount: 'decimal:2',          // Formats with 2 decimal places: "19.95"
+    specs: 'json',                  // JSON string <-> JavaScript Object/Array
+    tags: 'collection',             // JSON Array <-> Som.js Collection instance
+    released_at: 'date',            // Date object / 'YYYY-MM-DD'
+    created_at: 'datetime',         // ISO UTC timestamp: '2026-11-02T08:30:00.000Z'
+    description: 'safe_html',       // Sanitizes untrusted HTML using SafeHtml
+    raw_code: 'escape_html',        // Escapes HTML tags (&lt; &gt;)
+    bio: 'strip_html',              // Strips HTML tags before saving
+  }
+}
+```
 
-// Retrieve all records:
-const posts = await Post.all()
+| Cast Type | Output in JavaScript | Database Format |
+| :--- | :--- | :--- |
+| `'boolean'` / `'bool'` | `true` or `false` | `1` or `0` (or `true`/`false` in PostgreSQL) |
+| `'integer'` / `'int'` | Number (integer) | Integer column |
+| `'float'` / `'double'` | Number (float) | Float / Double / Real column |
+| `'decimal:<digits>'` | String with fixed decimals (e.g. `'29.99'`) | Decimal / Numeric |
+| `'json'` / `'array'` / `'object'` | Parsed Object or Array | Stored as JSON text |
+| `'collection'` | Som `Collection` instance | Stored as JSON array |
+| `'date'` | `'YYYY-MM-DD'` string | Date column |
+| `'datetime'` / `'timestamp'` | ISO 8601 UTC string | DateTime / Timestamp column |
+| `'safe_html'` | Sanitized `SafeHtml` object | Text column |
+| `'strip_html'` | Plain text with tags removed | Text column |
 
-// Find by primary key (or throw 404 HttpError):
-const post = await Post.findOrFail(1)
+---
 
-// Query chaining:
-const active = await Post.query()
-  .published()
-  .where('views', '>=', 100)
-  .orderBy('created_at', 'desc')
-  .limit(20)
-  .get()
+### 17.5 Accessors, Mutators & Virtual Attributes
 
-// Eager loading relations:
-const detailedPosts = await Post.with('user', 'comments.author').get()
+Accessors and mutators allow you to format attribute values when retrieving or setting them on model instances.
 
-// Pagination:
-const paginated = await Post.query().latest().paginate(15, req.integer('page', 1))
-// Returns: { data: [...], total, per_page, current_page, last_page }
+#### Accessors (`get<Name>Attribute`)
 
-// Creating records:
-const created = await Post.create({
-  title: 'Understanding Som.js',
-  body: 'Full guide content...',
-  user_id: req.user.id,
-})
+Accessors transform a model's attribute value when accessed. The method name follows the `get{AttributeName}Attribute` convention:
 
-// Updating & Deleting:
-await post.update({ title: 'Updated Title' })
-await post.delete() // Sets deleted_at if softDeletes is enabled
+```js
+class User extends Model {
+  // Virtual computed accessor: user.full_name
+  getFullNameAttribute() {
+    return `${this.first_name} ${this.last_name}`.trim()
+  }
+
+  // Format existing column: user.email
+  getEmailAttribute() {
+    return (this.attributes().email || '').toLowerCase()
+  }
+}
+```
+
+To include an accessor in your model's JSON representations (`toJSON()` / API responses), register it in `static appends`:
+
+```js
+class User extends Model {
+  static appends = ['full_name']
+}
+
+const user = await User.find(1)
+console.log(user.toJSON())
+// Output: { id: 1, first_name: 'Maxamuud', last_name: 'Cali', full_name: 'Maxamuud Cali' }
+```
+
+#### Mutators (`set<Name>Attribute`)
+
+Mutators modify an attribute value before it is assigned to the model or persisted:
+
+```js
+const { Hash } = require('somjs/server')
+
+class User extends Model {
+  // Auto-hash passwords whenever user.password = 'secret' is called:
+  setPasswordAttribute(value) {
+    return Hash.make(value)
+  }
+
+  // Normalize phone numbers on assignment:
+  setPhoneAttribute(value) {
+    return String(value || '').replace(/\D/g, '')
+  }
+}
 ```
 
 ---
 
-### 17.4 Query Builder (`DB`) & Transactions
+### 17.6 CRUD Operations & Model Persistence
 
-When you need raw queries or lower-level table operations without model instances:
+Som.js models provide an intuitive Active Record API for querying, creating, updating, and deleting rows.
+
+#### 1. Creating Records
+
+```js
+// Method A: create() with mass-assignment protection:
+const post = await Post.create({
+  title: 'Introducing Som.js',
+  body: 'Full-stack reactive JavaScript framework.',
+  user_id: req.user.id,
+  is_published: true,
+})
+
+// Method B: Manual instantiation and save():
+const post = new Post()
+post.title = 'Building Scalable APIs'
+post.body = 'Step by step guide.'
+post.user_id = req.user.id
+await post.save()
+
+// Method C: Bulk creation (returns a Collection of saved models):
+const posts = await Post.createMany([
+  { title: 'Post A', user_id: 1 },
+  { title: 'Post B', user_id: 1 },
+])
+
+// Method D: firstOrCreate() and firstOrNew():
+// Retrieves the first record matching attributes, or creates it:
+const tag = await Tag.firstOrCreate(
+  { name: 'JavaScript' },           // Search condition
+  { slug: 'javascript', visits: 0 }  // Additional creation attributes
+)
+
+// Method E: updateOrCreate():
+// Updates existing record or creates a new one:
+const profile = await Profile.updateOrCreate(
+  { user_id: user.id },
+  { bio: 'Updated bio text', avatar: 'avatar.png' }
+)
+```
+
+#### 2. Retrieving Records
+
+```js
+// Retrieve all rows:
+const posts = await Post.all()
+
+// Find by primary key (returns null if not found):
+const post = await Post.find(42)
+
+// Find multiple by IDs:
+const posts = await Post.findMany([1, 2, 3])
+
+// Find or throw a 404 HttpError (ideal for REST API controllers):
+const post = await Post.findOrFail(42)
+
+// Find the first matching record or throw 404:
+const user = await User.where('email', email).firstOrFail()
+```
+
+#### 3. Updating Records
+
+```js
+const post = await Post.findOrFail(1)
+
+// Update via fill + save in one step:
+await post.update({
+  title: 'Revised Title',
+  is_published: true,
+})
+
+// Atomic increments and decrements:
+await post.increment('view_count')         // +1
+await post.increment('view_count', 10)     // +10
+await post.decrement('credits', 5)         // -5
+
+// Update timestamps without changing attributes:
+await post.touch()
+```
+
+#### 4. Deleting Records & Soft Deletes
+
+```js
+const post = await Post.findOrFail(1)
+
+// Standard delete (or soft delete if static softDeletes = true):
+await post.delete()
+
+// Check if a model is soft-deleted:
+if (post.trashed) {
+  console.log('Post is in trash')
+}
+
+// Restore a soft-deleted model:
+await post.restore()
+
+// Permanently delete a soft-deleted row:
+await post.forceDelete()
+
+// Bulk deletion by primary keys:
+await Post.destroy(1)
+await Post.destroy([1, 2, 3])
+```
+
+#### Querying Soft-Deleted Records:
+
+```js
+// Query only active records (default):
+const activePosts = await Post.all()
+
+// Include soft-deleted records:
+const allPosts = await Post.withTrashed().get()
+
+// Query ONLY soft-deleted records:
+const trashPosts = await Post.onlyTrashed().get()
+```
+
+---
+
+### 17.7 Model State & Change Tracking
+
+Som.js models track changes between database reads and local mutations:
+
+```js
+const post = await Post.find(1)
+
+post.title = 'New Title'
+
+// Check if attributes were modified:
+post.isDirty()                // true (any field changed)
+post.isDirty('title')         // true
+post.isDirty('body')          // false
+
+// Check if attributes are untouched:
+post.isClean('body')          // true
+
+// Inspect dirty modifications:
+console.log(post.getDirty())  // { title: 'New Title' }
+
+// Inspect original values from the database:
+console.log(post.getOriginal('title')) // "Old Title"
+
+// Lifecycle flags:
+post.exists                   // true (record exists in database)
+post.wasRecentlyCreated       // true if created during the current lifecycle
+```
+
+---
+
+### 17.8 Complete Relationships Guide
+
+Som.js supports the full suite of relational associations with eager loading, constraint queries, and pivot management.
+
+```
+┌─────────────┐          1 : 1          ┌─────────────┐
+│    User     │ ──────────────────────> │   Profile   │
+└─────────────┘                         └─────────────┘
+       │
+       │ 1 : N
+       ▼
+┌─────────────┐          N : M          ┌─────────────┐
+│    Post     │ <═════════════════════> │     Tag     │
+└─────────────┘       (post_tag)        └─────────────┘
+```
+
+#### 1. One-to-One (`hasOne` / `belongsTo`)
+
+```js
+// app/Models/User.js
+class User extends Model {
+  profile() {
+    return this.hasOne(require('./Profile')) // foreignKey defaults to 'user_id'
+  }
+}
+
+// app/Models/Profile.js
+class Profile extends Model {
+  user() {
+    return this.belongsTo(require('./User')) // foreignKey defaults to 'user_id'
+  }
+}
+```
+
+```js
+// Usage:
+const user = await User.with('profile').findOrFail(1)
+console.log(user.profile.bio)
+
+// Creating related model:
+await user.profile().create({ bio: 'Software Developer', website: 'https://som.dev' })
+
+// Associating and dissociating:
+const profile = await Profile.find(1)
+profile.user().associate(user)
+await profile.save()
+
+profile.user().dissociate()
+await profile.save()
+```
+
+#### 2. One-to-Many (`hasMany` / `belongsTo`)
+
+```js
+// app/Models/Post.js
+class Post extends Model {
+  comments() {
+    return this.hasMany(require('./Comment'))
+  }
+}
+
+// app/Models/Comment.js
+class Comment extends Model {
+  post() {
+    return this.belongsTo(require('./Post'))
+  }
+  author() {
+    return this.belongsTo(require('./User'), 'user_id')
+  }
+}
+```
+
+```js
+// Creating child records through relationship:
+const post = await Post.findOrFail(1)
+
+const comment = await post.comments().create({
+  body: 'Incredible framework performance!',
+  user_id: req.user.id,
+})
+
+// Query child relationship:
+const recentComments = await post.comments()
+  .where('approved', true)
+  .latest()
+  .limit(5)
+  .get()
+```
+
+#### 3. Many-to-Many (`belongsToMany`) & Pivot Tables
+
+Many-to-many relationships connect two models through an intermediate table (the **pivot** table). By default, the pivot table name is the alphabetical concatenation of the two singular model names (e.g. `post` + `tag` → `post_tag`).
+
+```js
+// Migration for pivot table:
+schema.create('post_tag', (table) => {
+  table.foreignId('post_id').constrained().cascadeOnDelete()
+  table.foreignId('tag_id').constrained().cascadeOnDelete()
+  table.string('role').nullable() // Extra pivot column
+  table.timestamps()              // Pivot created_at / updated_at
+  table.primary(['post_id', 'tag_id'])
+})
+```
+
+```js
+// app/Models/Post.js
+class Post extends Model {
+  tags() {
+    return this.belongsToMany(require('./Tag'))
+      .withPivot('role')          // Request extra columns from pivot table
+      .withTimestamps()           // Auto-manage pivot timestamps
+  }
+}
+```
+
+##### Pivot Table Operations (`attach`, `detach`, `sync`, `toggle`):
+
+```js
+const post = await Post.findOrFail(1)
+
+// 1. Attach tags (inserts into post_tag):
+await post.tags().attach(tagId)
+await post.tags().attach([tagId1, tagId2])
+await post.tags().attach({ [tagId]: { role: 'editor' } }) // with pivot attributes
+
+// 2. Detach tags (deletes from post_tag):
+await post.tags().detach(tagId)
+await post.tags().detach([tagId1, tagId2])
+await post.tags().detach() // Detach all tags
+
+// 3. Sync tags (attaches missing, detaches omitted):
+// Given tags: [1, 2] in DB. Syncing [2, 3] -> detaches 1, keeps 2, attaches 3:
+await post.tags().sync([2, 3])
+
+// 4. Sync without detaching:
+await post.tags().syncWithoutDetaching([4, 5])
+
+// 5. Toggle tags (attaches if absent, detaches if present):
+await post.tags().toggle([2, 3])
+
+// 6. Access pivot data on loaded models:
+const postWithTags = await Post.with('tags').find(1)
+for (const tag of postWithTags.tags) {
+  console.log(tag.name, tag.pivot.role, tag.pivot.created_at)
+}
+```
+
+#### 4. Has-Many-Through (`hasManyThrough`)
+
+Connects distant relations via an intermediate table. For example, a `Country` has many `Posts` through its `Users`:
+
+```js
+// app/Models/Country.js
+class Country extends Model {
+  posts() {
+    // hasManyThrough(TargetModel, IntermediateModel)
+    return this.hasManyThrough(require('./Post'), require('./User'))
+  }
+}
+```
+
+```js
+const country = await Country.find(1)
+const countryPosts = await country.posts().where('is_published', true).get()
+```
+
+---
+
+### 17.9 Eager Loading & Solving the N+1 Problem
+
+When querying models and their relationships in a loop, querying each child individually produces **N+1 database queries**. Som.js solves this with high-performance **Eager Loading** that loads all relations in a single, optimized `WHERE IN (...)` query.
+
+#### Basic Eager Loading (`with`)
+
+```js
+// Executes exactly 2 queries instead of 101:
+// 1. SELECT * FROM posts LIMIT 100
+// 2. SELECT * FROM users WHERE id IN (1, 2, 3, ...)
+const posts = await Post.with('user').latest().limit(100).get()
+
+for (const post of posts) {
+  console.log(post.title, post.user.name) // No additional database query!
+}
+```
+
+#### Nested & Multiple Eager Loading
+
+```js
+// Eager load multiple relationships:
+const posts = await Post.with('user', 'tags', 'comments').get()
+
+// Eager load nested relationships (e.g. comments and their author):
+const posts = await Post.with('comments.author', 'user.profile').get()
+```
+
+#### Constrained Eager Loading
+
+Filter or order related records during eager loading:
+
+```js
+const posts = await Post.with({
+  comments: (query) => query.where('approved', true).latest().limit(5),
+  tags: (query) => query.orderBy('name', 'asc'),
+}).get()
+```
+
+#### Eager Loading Counts (`withCount`)
+
+Retrieve the number of related records without loading the full models. Som.js automatically injects `{relation}_count` onto the model instances:
+
+```js
+const posts = await Post.query()
+  .withCount('comments', 'tags')
+  .orderByDesc('comments_count')
+  .get()
+
+for (const post of posts) {
+  console.log(`${post.title} has ${post.comments_count} comments and ${post.tags_count} tags`)
+}
+```
+
+#### Lazy Eager Loading (`load` & `loadCount`)
+
+If you already have a model instance, you can load relationships on demand:
+
+```js
+const post = await Post.find(1)
+
+// Eager load relationships onto existing model:
+await post.load('user', 'comments.author')
+
+// Load count onto existing model:
+await post.loadCount('comments')
+console.log(post.comments_count)
+```
+
+#### Querying Relationship Existence (`has` & `whereHas`)
+
+Filter the parent query based on whether related records exist:
+
+```js
+// Retrieve posts that have at least one comment:
+const commentedPosts = await Post.has('comments').get()
+
+// Retrieve posts that have 5 or more comments:
+const popularPosts = await Post.has('comments', '>=', 5).get()
+
+// Filter parent models based on child relationship conditions:
+const techPosts = await Post.whereHas('tags', (q) => {
+  q.where('name', 'technology')
+}).get()
+
+// Retrieve posts with NO comments:
+const unansweredPosts = await Post.doesntHave('comments').get()
+
+// Retrieve posts without any reported comments:
+const cleanPosts = await Post.whereDoesntHave('comments', (q) => {
+  q.where('is_flagged', true)
+}).get()
+```
+
+---
+
+### 17.10 Model Lifecycle Hooks & Observers
+
+Som.js models emit lifecycle events during creation, updates, and deletion.
+
+#### Supported Lifecycle Events
+
+* `saving` / `saved`: Triggered on both create and update operations.
+* `creating` / `created`: Triggered when inserting a new record.
+* `updating` / `updated`: Triggered when modifying an existing record.
+* `deleting` / `deleted`: Triggered when deleting a record.
+* `restoring` / `restored`: Triggered when recovering a soft-deleted record.
+* `forceDeleted`: Triggered when a record is permanently removed from the database.
+
+> **Canceling Operations:** Returning `false` from `saving`, `creating`, `updating`, or `deleting` aborts the operation and prevents database writes.
+
+#### Defining In-Model Hooks
+
+```js
+const { Model, Str } = require('somjs/server')
+
+class Post extends Model {
+  // Automatically generate slugs before creation:
+  static async creating(post) {
+    if (!post.slug) {
+      post.slug = Str.slug(post.title)
+    }
+  }
+
+  // Abort update if post is archived:
+  static async updating(post) {
+    if (post.getOriginal('status') === 'archived') {
+      return false // Aborts the update!
+    }
+  }
+
+  // Trigger cache invalidation or audit logs after save:
+  static async saved(post) {
+    console.log(`Post #${post.id} was saved.`)
+  }
+}
+```
+
+#### Model Observers (`som make:observer`)
+
+For cleaner separation of concerns, extract lifecycle logic into dedicated Observer classes:
+
+```bash
+som make:observer PostObserver --model Post
+```
+
+```js
+// app/Observers/PostObserver.js
+class PostObserver {
+  async creating(post) {
+    // Generate UUID or slug
+  }
+
+  async created(post) {
+    // Send notifications or dispatch background job
+  }
+
+  async updated(post) {
+    // Log audit trail
+  }
+
+  async deleted(post) {
+    // Clean up associated file assets
+  }
+}
+
+module.exports = PostObserver
+```
+
+Attach the observer to your model:
+
+```js
+// app/Models/Post.js
+const PostObserver = require('../Observers/PostObserver')
+
+class Post extends Model {
+  static observers = [PostObserver] // Or: Post.observe(PostObserver)
+}
+```
+
+---
+
+### 17.11 Local Query Scopes
+
+Scopes allow you to encapsulate common query constraints into readable, reusable methods. Prefix static scope methods with `scope`:
+
+```js
+class Order extends Model {
+  // Scope: .paid()
+  static scopePaid(query) {
+    query.where('status', 'paid')
+  }
+
+  // Parameterized Scope: .forUser(userId)
+  static scopeForUser(query, userId) {
+    query.where('user_id', userId)
+  }
+
+  // Scope: .overAmount(minTotal)
+  static scopeOverAmount(query, minTotal) {
+    query.where('total', '>=', minTotal)
+  }
+}
+```
+
+#### Using Scopes in Queries
+
+```js
+// Smooth, expressive chaining:
+const orders = await Order.query()
+  .paid()
+  .forUser(req.user.id)
+  .overAmount(100)
+  .latest()
+  .get()
+```
+
+---
+
+### 17.12 The Fluent Query Builder (`DB.table`)
+
+When performing raw queries, batch operations, or queries on tables without models, use `DB.table(tableName)`:
 
 ```js
 const { DB } = require('somjs/server')
 
-// Table queries:
-const activeUsers = await DB.table('users')
+// Select queries:
+const users = await DB.table('users')
+  .select('id', 'name', 'email')
+  .where('is_active', true)
+  .orderBy('name', 'asc')
+  .limit(20)
+  .get()
+```
+
+#### Where Clauses
+
+```js
+// Standard equality:
+DB.table('users').where('status', 'active')
+
+// Comparison operators (=, !=, <, <=, >, >=, like):
+DB.table('products').where('price', '>', 50)
+DB.table('articles').where('title', 'like', '%somjs%')
+
+// Multiple conditions (chained AND):
+DB.table('users').where('verified', true).where('role', 'admin')
+
+// OR Conditions:
+DB.table('users').where('role', 'admin').orWhere('role', 'superadmin')
+
+// IN and NOT IN:
+DB.table('orders').whereIn('status', ['paid', 'shipped'])
+DB.table('users').whereNotIn('id', [1, 2, 3])
+
+// NULL checks:
+DB.table('posts').whereNull('deleted_at')
+DB.table('users').whereNotNull('email_verified_at')
+
+// Range checks (BETWEEN):
+DB.table('products').whereBetween('price', [10, 100])
+
+// Date checks:
+DB.table('orders').whereDate('created_at', '2026-11-02')
+
+// Grouped / Nested WHERE conditions:
+DB.table('users')
   .where('status', 'active')
-  .orderBy('id', 'desc')
-  .get()
+  .where((query) => {
+    query.where('points', '>', 100).orWhere('is_vip', true)
+  })
+```
 
-// Joins & Aggregates:
-const orders = await DB.table('orders')
+#### Conditional Querying (`when`)
+
+Apply query conditions only when a given value is present:
+
+```js
+const search = req.string('search')
+const categoryId = req.integer('category_id')
+
+const results = await DB.table('products')
+  .when(search, (q, val) => q.where('title', 'like', `%${val}%`))
+  .when(categoryId, (q, val) => q.where('category_id', val))
+  .latest()
+  .paginate(15)
+```
+
+#### Joins, Aggregates & Grouping
+
+```js
+// Joins:
+const report = await DB.table('orders')
   .join('users', 'users.id', '=', 'orders.user_id')
-  .select('orders.*', 'users.name as customer_name')
-  .where('orders.total', '>', 50)
+  .leftJoin('discounts', 'discounts.id', '=', 'orders.discount_id')
+  .select('orders.*', 'users.name as customer_name', 'discounts.percentage')
   .get()
 
-const count = await DB.table('users').count()
-const maxTotal = await DB.table('orders').max('total')
+// Aggregates:
+const totalUsers = await DB.table('users').count()
+const highestSale = await DB.table('orders').max('total')
+const lowestPrice = await DB.table('products').min('price')
+const averageScore = await DB.table('reviews').avg('rating')
+const revenue = await DB.table('orders').where('status', 'paid').sum('total')
 
-// Direct parameterized SQL (safely escaped):
-const rows = await DB.select('SELECT * FROM users WHERE email = ?', [email])
-await DB.statement('UPDATE users SET verified = ? WHERE id = ?', [true, 1])
+// Check record existence:
+const hasAdmin = await DB.table('users').where('role', 'admin').exists()
+const noBanned = await DB.table('users').where('banned', true).doesntExist()
 
-// Database Transactions:
-await DB.transaction(async () => {
-  await DB.table('accounts').where('id', fromId).decrement('balance', 100)
-  await DB.table('accounts').where('id', toId).increment('balance', 100)
+// Pluck values into an array or map:
+const userEmails = await DB.table('users').pluck('email')
+// Output: ['alice@som.dev', 'bob@som.dev']
+
+const idToNameMap = await DB.table('users').pluck('name', 'id')
+// Output: { '1': 'Alice', '2': 'Bob' }
+
+// Chunk large datasets to preserve server memory:
+await DB.table('logs').orderBy('id').chunk(500, async (logs) => {
+  for (const log of logs) {
+    await processLog(log)
+  }
 })
 ```
+
+---
+
+### 17.13 Raw Queries & Database Transactions
+
+#### Raw Queries & Escaped Statements
+
+```js
+const { DB } = require('somjs/server')
+
+// 1. Parameterized SELECT (safe from SQL injection):
+const users = await DB.select('SELECT * FROM users WHERE status = ? AND age >= ?', ['active', 21])
+
+// 2. Direct Statements (INSERT / UPDATE / DELETE / DDL):
+await DB.statement('UPDATE users SET status = ? WHERE last_login < ?', ['inactive', '2026-01-01'])
+
+// 3. Raw Expressions within queries:
+const stats = await DB.table('orders')
+  .select('status', DB.raw('COUNT(*) as total_orders'), DB.raw('SUM(total) as revenue'))
+  .groupBy('status')
+  .get()
+```
+
+#### Database Transactions
+
+Wrap critical multi-step database writes in `DB.transaction()`. If any error occurs or is thrown within the callback, the transaction automatically rolls back. When the callback finishes successfully, the changes commit:
+
+```js
+// Automatic transaction management:
+await DB.transaction(async () => {
+  // Deduct from sender:
+  await DB.table('wallets').where('id', senderWalletId).decrement('balance', 500)
+
+  // Credit to receiver:
+  await DB.table('wallets').where('id', receiverWalletId).increment('balance', 500)
+
+  // Record audit transaction:
+  await DB.table('transfers').insert({
+    from_wallet: senderWalletId,
+    to_wallet: receiverWalletId,
+    amount: 500,
+    created_at: new Date(),
+  })
+})
+```
+
+#### Manual Transaction Controls
+
+```js
+await DB.beginTransaction()
+
+try {
+  await DB.table('users').where('id', 1).update({ status: 'archived' })
+  await DB.table('teams').where('leader_id', 1).delete()
+
+  await DB.commit()
+} catch (error) {
+  await DB.rollBack()
+  throw error
+}
+```
+
+---
+
+### 17.14 FormRequests & API Resources Integration
+
+Som.js pairs models with dedicated **FormRequests** (for validating incoming data before persistence) and **JsonResources** (for formatting output to clients).
+
+#### 1. Validating with FormRequests (`som make:request`)
+
+```bash
+som make:request StorePostRequest --model Post
+```
+
+The CLI automatically reads `static fillable` and `static casts` from `Post.js` to pre-generate smart validation rules:
+
+```js
+// app/Http/Requests/StorePostRequest.js
+const { FormRequest } = require('somjs/server')
+
+class StorePostRequest extends FormRequest {
+  authorize(req) {
+    return req.user != null // 403 Forbidden if false
+  }
+
+  rules() {
+    return {
+      title: 'required|string|max:200|unique:posts,title',
+      body: 'required|string',
+      is_published: 'boolean',
+    }
+  }
+
+  messages() {
+    return {
+      'title.required': 'Please provide an article title.',
+      'title.unique': 'An article with this title already exists.',
+    }
+  }
+
+  prepareForValidation(data) {
+    return {
+      ...data,
+      title: typeof data.title === 'string' ? data.title.trim() : data.title,
+    }
+  }
+}
+
+module.exports = StorePostRequest
+```
+
+Use inside your controller:
+
+```js
+// app/Http/Controllers/PostController.js
+const Post = require('../../Models/Post')
+const StorePostRequest = require('../Requests/StorePostRequest')
+
+class PostController {
+  async store(req) {
+    // 1. Validates and throws 422 with { errors } if invalid:
+    const data = await StorePostRequest.validate(req)
+
+    // 2. Safely create model with validated data:
+    const post = await Post.create({ ...data, user_id: req.user.id })
+
+    return response(post, 201)
+  }
+}
+```
+
+#### 2. Transforming with JsonResources (`som make:resource`)
+
+```bash
+som make:resource PostResource
+```
+
+```js
+// app/Http/Resources/PostResource.js
+const { JsonResource } = require('somjs/server')
+
+class PostResource extends JsonResource {
+  toArray(req) {
+    return {
+      id: this.id,
+      title: this.title,
+      slug: this.slug,
+      body: this.body,
+      is_published: Boolean(this.is_published),
+      // Conditionally include loaded relationships:
+      user: this.whenLoaded('user'),
+      comments_count: this.when(this.comments_count !== undefined, this.comments_count),
+      created_at: this.created_at,
+    }
+  }
+}
+
+module.exports = PostResource
+```
+
+```js
+// In controller:
+// Single resource -> { data: { id: 1, ... } }
+return new PostResource(post)
+
+// Collection resource with pagination preserved -> { data: [...], meta: { ... } }
+return PostResource.collection(posts)
+```
+
+---
+
+### 17.15 Database CLI Artisan Commands Reference
+
+| Command | Arguments / Flags | Description |
+| :--- | :--- | :--- |
+| `som make:model <Name>` | `-mfscpr`, `--all`, `--folder=<dir>`, `--auth` | Generate a Model and optional components (migration, factory, seeder, controller, request, page, route). |
+| `som make:request <Name>` | `--model <Model>` | Generate a FormRequest class with auto-scaffolded validation rules. |
+| `som make:resource <Name>` | | Generate a JSON API Resource transformer. |
+| `som make:rule <Name>` | | Generate a custom validation rule class. |
+| `som make:migration <name>` | | Generate a new timestamped schema migration file in `database/migrations/`. |
+| `som make:factory <Name>` | `--model <Model>` | Generate a model factory definition with Faker helpers. |
+| `som make:seeder <Name>` | `--model <Model>` | Generate a database seeder class. |
+| `som make:observer <Name>` | `--model <Model>` | Generate an event observer class for model lifecycle hooks. |
+| `som migrate` | `--step <n>`, `<file>`, `--seed` | Run pending migrations (supports running a specific migration file or subfolder). |
+| `som migrate:rollback` | `--step <n>`, `<file>` | Rollback the last batch of migrations (or single file). |
+| `som migrate:fresh` | `--seed` | Drop every table and re-run all migrations from scratch. |
+| `som migrate:status` | | Display tabular status of all executed and pending migrations. |
+| `som db:seed` | `--class <Name>` | Run database seeders (`DatabaseSeeder.js` by default). |
+| `som db:wipe` | | Drop all tables in the configured database. |
+| `som db tables` | | Display all database tables and column schemas in terminal. |
+| `som db sql "<SQL>"` | | Execute an arbitrary SQL query and display the formatted result. |
 
 ---
 
@@ -2740,6 +3664,44 @@ await dispatchSync(new SendWelcomeEmail(user))
   som queue:retry 1     # Retry specific job ID
   som queue:retry all   # Re-queue all failed jobs
   ```
+- **Stopping & Resuming Queues:**
+  You can pause or stop any specific queue, or stop all queues across all running workers:
+  ```bash
+  # Stop / pause all queues:
+  som queue:stop
+  som queue:stop --all
+
+  # Stop / pause a specific queue (e.g. emails, high):
+  som queue:stop emails
+
+  # Resume a specific queue or all queues:
+  som queue:resume emails
+  som queue:resume --all
+
+  # Gracefully restart workers (workers finish their active job and restart):
+  som queue:restart
+
+  # Inspect worker state and job counts:
+  som queue:status
+  ```
+
+- **Programmatic Queue Control (in JavaScript/TypeScript):**
+  ```javascript
+  const { Queue } = require('somjs/server')
+
+  // Stop / pause queues:
+  Queue.stop('emails')   // stops the 'emails' queue
+  Queue.stopAll()        // stops all queues
+
+  // Resume queues:
+  Queue.resume('emails') // resumes the 'emails' queue
+  Queue.resumeAll()      // resumes all queues
+
+  // Check state:
+  Queue.isStopped('emails') // true
+  Queue.status()            // { stoppedAll: false, stoppedQueues: ['emails'], ... }
+  ```
+
 - **Flush / Clear:**
   ```bash
   som queue:flush       # Delete all failed jobs
@@ -3213,7 +4175,100 @@ When specific visual adjustments are necessary (e.g., flipping navigation arrows
 
 ---
 
-### 25.4 Building a Reactive Locale & Direction Store
+### 25.4 Laravel-Style `lang` Folder & Native Localization
+
+Som.js features built-in localization identical to Laravel's `lang/` architecture. Both frontend components and backend routes/controllers read from the exact same language files without configuration.
+
+#### Directory Structure
+
+```
+lang/
+├── en/
+│   ├── auth.json
+│   ├── pagination.json
+│   ├── passwords.json
+│   ├── validation.json
+│   └── messages.json
+├── ar/
+│   ├── auth.json
+│   ├── pagination.json
+│   ├── passwords.json
+│   ├── validation.json
+│   └── messages.json
+├── en.json                  # Root string translations
+└── ar.json
+```
+
+Generate new language packs with the artisan command:
+```bash
+som make:lang ar
+```
+
+#### 1. Group Translation Files (`lang/{locale}/{group}.json`)
+Access group keys using dot notation:
+```js
+// In backend routes or controllers:
+const msg = __('auth.failed');
+const welcome = __('messages.welcome', { name: 'Sarah' });
+
+// In frontend .som views:
+<view>
+  <h1>{ __('auth.failed') }</h1>
+  <p>{ __('messages.welcome', { name: 'Sarah' }) }</p>
+</view>
+```
+
+#### 2. Root Translation Strings (`lang/{locale}.json`)
+Translate full phrases or UI action buttons directly without creating subfiles:
+```json
+// lang/ar.json
+{
+  "Sign In": "تسجيل الدخول",
+  "Dashboard": "لوحة التحكم"
+}
+```
+In your code or views:
+```html
+<button>{ __('Sign In') }</button>
+```
+
+#### 3. Pluralization (`choice` / `trans_choice`)
+Supports pipe `|` separated options, bracket count intervals, and native `Intl.PluralRules`:
+```json
+// lang/en/messages.json
+{
+  "apples": "{0} No apples|{1} One apple|[2,*] :count apples"
+}
+
+// lang/ar/messages.json
+{
+  "items": "{0} لا توجد عناصر|{1} عنصر واحد|{2} عنصران|[3,10] :count عناصر|[11,*] :count عنصراً"
+}
+```
+Usage:
+```js
+// Backend:
+trans_choice('messages.apples', 10); // '10 apples'
+
+// Frontend view:
+<span>{ choice('messages.items', items.length) }</span>
+```
+
+#### 4. Case-Preserving Placeholders
+Placeholders retain the casing used in the translation string (matching Laravel):
+- `:name` with `{ name: 'ali' }` → `'ali'`
+- `:Name` with `{ name: 'ali' }` → `'Ali'`
+- `:NAME` with `{ name: 'ali' }` → `'ALI'`
+
+#### 5. Reactive Switching & Auto RTL
+In any `.som` component or script:
+```js
+Som.locale('ar'); // Automatically updates <html lang="ar" dir="rtl"> and re-renders all views reactively
+```
+
+---
+
+### 25.5 Building a Reactive Locale & Direction Store
 
 Create a reusable store that manages language, text direction, and persistent user preferences:
 
@@ -3306,7 +4361,9 @@ AI agents can directly read contextual resources using URI schemas:
 
 The HTTP MCP endpoint includes enterprise-grade security guards:
 * **Anti-DNS Rebinding / CORS Origin Locking:** Untrusted browser origins (e.g., `https://malicious.com`) are immediately rejected with `403 Forbidden`. Only `localhost`, `127.0.0.1`, and explicit `MCP_ALLOWED_ORIGIN` hosts are permitted.
-* **Bearer Token Authentication:** Set `MCP_TOKEN=your-secret-token` in `.env` to require `Authorization: Bearer your-secret-token` on all incoming requests.
+* **Bearer Token Authentication:** Set `MCP_TOKEN=your-secret-token` in `.env` to require `Authorization: Bearer your-secret-token` on all incoming requests. The `APP_KEY` is never accepted as an MCP token.
+* **Production:** with `NODE_ENV=production` or `APP_ENV=production`, the endpoint is disabled (`403`) until `MCP_TOKEN` is set.
+* **Development without a token:** only a direct local client is accepted (loopback address, `localhost` Host header, no `X-Forwarded-*` headers). Remote addresses, proxies and tunnels need `MCP_TOKEN`.
 
 ---
 
@@ -3337,7 +4394,7 @@ When `--gc` or `AUTO_GC=1` is present, Som.js will automatically respawn the V8 
 
 You can also use the memory manager directly in your custom backend code:
 ```javascript
-const { startAutoGarbageCollector, getMemoryStats } = require('som/server');
+const { startAutoGarbageCollector, getMemoryStats } = require('somjs/server');
 
 // Start with custom threshold:
 startAutoGarbageCollector({ thresholdMB: 300, intervalMs: 15000, log: true });
@@ -3459,22 +4516,27 @@ Soft deleting allows records to be marked as deleted without physically removing
 
 #### 1. Add `deleted_at` to your Migration
 ```javascript
-// database/migrations/2026_01_01_create_posts_table.js
-module.exports = async function (schema) {
-  await schema.create('posts', (table) => {
-    table.id();
-    table.string('title');
-    table.text('content');
-    table.timestamps();
-    table.softDeletes(); // Creates deleted_at DATETIME NULL
-  });
+// backend/database/migrations/2026_01_01_create_posts_table.js
+module.exports = {
+  up(schema) {
+    schema.create('posts', (table) => {
+      table.id();
+      table.string('title');
+      table.text('content');
+      table.timestamps();
+      table.softDeletes(); // Creates deleted_at DATETIME NULL
+    });
+  },
+  down(schema) {
+    schema.dropIfExists('posts');
+  },
 };
 ```
 
 #### 2. Enable in your Model
 ```javascript
-// app/Models/Post.js
-const { Model } = require('som/server');
+// backend/app/Models/Post.js
+const { Model } = require('somjs/server');
 
 class Post extends Model {
   static softDeletes = true;
@@ -3529,9 +4591,9 @@ posts.forEach((post) => {
 Ensure atomic data consistency across multiple operations:
 
 ```javascript
-const { db } = require('som/server');
+const { DB } = require('somjs/server');
 
-await db.transaction(async (tx) => {
+await DB.transaction(async () => {
   const sender = await User.query().where('id', 1).first();
   const receiver = await User.query().where('id', 2).first();
 
@@ -3665,15 +4727,19 @@ class Article extends Model {
 
 ### 33.4 Safe Display in Frontend Views (`.som`)
 
-In `.som` components, `s-html` automatically filters scripts and unsafe event handlers through `cleanHtml`:
+In `.som` components, `s-html` automatically filters scripts, `<svg>`/`<math>` vectors, and unsafe event handlers through `cleanHtml`:
 
 ```html
-<template>
-  <div class="content">
+<!-- pages/ArticleView.som -->
+prop post = { title: '', content: '' }
+
+<view>
+  <article class="content">
+    <h1>{post.title}</h1>
     <!-- Render rich HTML safely with built-in XSS protection -->
     <div s-html="post.content"></div>
-  </div>
-</template>
+  </article>
+</view>
 ```
 
 ---
@@ -3710,45 +4776,44 @@ if (token.type === 'session' && !token.remember && (Date.now() - lastUsed > sess
 
 ### 34.3 Frontend Inactivity Timer (`useInactivityTimer`)
 
-Use `useInactivityTimer` in dashboard layouts or components to detect user idle state and redirect to login:
+Use `Som.useInactivityTimer` in dashboard layouts or components to detect user idle state and redirect to login:
 
 ```html
-<template>
-  <div class="dashboard">
-    <div s-if="warning" class="alert alert-warning">
-      Your session will expire in { remainingMinutes } minutes due to inactivity.
-      <button @click="extend">Stay Signed In</button>
-    </div>
-    <slot />
-  </div>
-</template>
+<!-- layouts/app.som -->
+state warning = false
+state remainingMinutes = 2
+state timer = null
 
-<script>
-import { useInactivityTimer } from 'somjs';
-
-export default {
-  state: {
-    warning: false,
-    remainingMinutes: 2
-  },
-  init() {
-    const timer = useInactivityTimer({
-      timeout: Number(env.PUBLIC_SESSION_TIMEOUT || 15) * 60 * 1000,
-      warningTime: Number(env.PUBLIC_SESSION_WARNING || 2) * 60 * 1000,
-      redirect: '/login?reason=inactive',
-      onWarning: (info) => {
-        this.warning = true;
-        this.remainingMinutes = info.remainingMinutes;
-      }
-    });
-
-    this.extend = () => {
-      timer.reset();
-      this.warning = false;
-    };
-  }
+on start {
+  timer = Som.useInactivityTimer({
+    timeout: Number(env.PUBLIC_SESSION_TIMEOUT || 15) * 60 * 1000,
+    warningTime: Number(env.PUBLIC_SESSION_WARNING || 2) * 60 * 1000,
+    redirect: '/login?reason=inactive',
+    onWarning: (info) => {
+      warning = true
+      remainingMinutes = info.remainingMinutes
+    },
+  })
 }
-</script>
+
+on destroy {
+  if (timer) timer.stop()
+}
+
+action extend() {
+  if (timer) timer.reset()
+  warning = false
+}
+
+<view>
+  <div class="dashboard">
+    <div s-if="warning" class="alert warn">
+      Your session will expire in {remainingMinutes} minutes due to inactivity.
+      <button class="sm" @click={extend}>Stay Signed In</button>
+    </div>
+    <slot></slot>
+  </div>
+</view>
 ```
 
 ---
@@ -3799,9 +4864,14 @@ state caughtException = null
 | `solution` | `Object` | Optional smart suggestion with `{ title, message }` |
 | `request` | `Object` | HTTP request telemetry with method, URL, headers, and params |
 
-### 35.3 Automatic Backend Developer Error Pages
+### 35.3 Automatic Backend Developer Error Pages & Production Security
 
-In development mode (`APP_ENV=local` or `APP_DEBUG=true`), all unhandled API and server errors automatically render the interactive debugger when requested from a browser (`text/html`), or return structured JSON containing the parsed stack trace for API clients.
+In development mode (`APP_ENV=local` or `APP_DEBUG=true`), all unhandled API and server errors automatically render the interactive debugger when requested from a browser (`text/html`), or return structured JSON containing the parsed stack trace, active code snippet, and intelligent fix suggestion.
+
+In **production mode** (`APP_ENV=production` or `APP_DEBUG=false`), detailed error messages, stack traces, and internal source paths are **strictly suppressed** for security:
+- **Web browsers (`text/html`)**: Receive a clean, minimal 500 error page with no stack frames, server paths, or SQL queries.
+- **REST clients (`application/json`)**: Receive `{ "message": "Server error." }` with an HTTP 500 status code.
+- **Diagnostics**: The complete stack trace and request context are securely persisted to server log files (`storage/logs/som-*.log`) and never leaked across the network.
 
 #### Smart Suggestion Examples:
 1. **Method Typo Detection**:
@@ -3817,5 +4887,475 @@ In development mode (`APP_ENV=local` or `APP_DEBUG=true`), all unhandled API and
 ### 35.4 Live Showcase Route (`/error-monitor`)
 
 To test and preview different exception scenarios locally, a developer showcase is available at `/error-monitor` in your new project. You can switch between method typo exceptions, null reference errors, and database migration issues to inspect how stack frames, context tables, and smart suggestions behave.
+
+---
+
+## 36. Redis Integration: Cache, Atomic Locks, Queues & Pub/Sub
+
+Som.js includes a **zero-dependency native RESP2 TCP/TLS Redis client** (`bin/backend/redis.js`) that connects to Redis, Valkey, Upstash, or Dragonfly without installing any external npm packages. If you later install `ioredis` or `redis`, Som.js automatically uses it while keeping the exact same API.
+
+### 36.1 Configuration (`.env` & `backend/config/redis.js`)
+
+```env
+# Enable Redis for Cache and Queues
+CACHE_STORE=redis
+QUEUE_CONNECTION=redis
+
+# Connection settings (or use REDIS_URL=rediss://default:secret@host:6379/0)
+REDIS_HOST=127.0.0.1
+REDIS_PORT=6379
+REDIS_USERNAME=
+REDIS_PASSWORD=
+REDIS_DB=0
+REDIS_PREFIX=som_
+```
+
+Check your connection from the terminal at any time:
+
+```bash
+som redis:ping
+# Output: PONG (1ms) — 127.0.0.1:6379/0
+```
+
+### 36.2 Direct Redis Commands (`Redis` Facade)
+
+Import `Redis` from `somjs/server` to execute strings, hashes, lists, sets, sorted sets, pipelines, and raw commands:
+
+```javascript
+const { Redis } = require('somjs/server');
+
+// Strings & Counters
+await Redis.set('site:banner', 'Welcome to Som.js 2.4', 'EX', 3600);
+const banner = await Redis.get('site:banner');
+const views = await Redis.incr('page:views');
+
+// Hashes & Sets
+await Redis.hset('user:42', { name: 'Amina', role: 'admin' });
+const profile = await Redis.hgetall('user:42');
+await Redis.sadd('online:users', '42', '99');
+
+// Pipelines (single network round-trip)
+const results = await Redis.pipeline((pipe) => {
+  pipe.incr('metrics:requests');
+  pipe.expire('metrics:requests', 86400);
+});
+```
+
+### 36.3 Redis-Backed Cache & Atomic Locks (`Cache`)
+
+When `CACHE_STORE=redis` is set (or via `Cache.store('redis')`), all cache operations and distributed locks run on Redis:
+
+```javascript
+const { Cache } = require('somjs/server');
+
+// Cache-aside pattern with TTL in seconds
+const stats = await Cache.remember('dashboard:stats', 300, async () => {
+  return { users: await User.count(), tasks: await Task.count() };
+});
+
+// Distributed Atomic Lock (safe release via Lua token verification)
+await Cache.lock('reports:monthly-export', 30).block(5, async () => {
+  await generateMonthlyReport();
+});
+```
+
+### 36.4 Redis Queue Driver (`Queue`)
+
+When `QUEUE_CONNECTION=redis` is set, background jobs dispatched with `dispatch()` are stored in Redis lists and delayed sorted sets:
+
+```javascript
+const { Job, dispatch } = require('somjs/server');
+
+class SendInvoiceJob extends Job {
+  static queue = 'billing';
+  static tries = 3;
+
+  async handle({ orderId }) {
+    // Process invoice in the background
+  }
+}
+
+// Dispatch immediately or with a delay (seconds)
+await SendInvoiceJob.dispatch({ orderId: 1024 });
+await SendInvoiceJob.dispatch({ orderId: 1025 }).delay(60);
+```
+
+Run the worker to process jobs:
+
+```bash
+som queue:work --queue=billing,default
+```
+
+### 36.5 Pub/Sub Messaging
+
+```javascript
+const { Redis } = require('somjs/server');
+
+// Subscribe to a channel (uses a dedicated subscriber socket automatically)
+await Redis.subscribe('orders:created', (message, channel) => {
+  const order = JSON.parse(message);
+  console.log(`New order #${order.id} on ${channel}`);
+});
+
+// Publish from any controller or job
+await Redis.publish('orders:created', JSON.stringify({ id: 501, total: 99.0 }));
+```
+
+---
+
+## 37. Som.js vs Other Frameworks (Next.js, Nuxt, NestJS, AdonisJS, Angular, Svelte)
+
+Modern JavaScript development often splits teams across two extremes:
+1. **Frontend Meta-Frameworks** (**Next.js**, **Nuxt**, **SvelteKit**, **Angular**) that excel at UI rendering but leave you to assemble your own ORM, migrations, authentication, authorization policies, queues, Redis locks, rate limiters, and mailers from dozens of third-party npm packages.
+2. **Backend Frameworks** (**NestJS**, **AdonisJS**) that provide structured server architecture but require you to wire up a separate frontend framework, state management library, and build pipeline.
+
+**Som.js** bridges both worlds in a **single, zero-dependency, full-stack framework**—combining a plain-English reactive `.som` component language for the browser with a complete, Laravel-inspired backend (`somjs/server`) for Node.js.
+
+### 37.1 Master Architecture & Feature Matrix
+
+| Capability | **Som.js** | **Next.js (React)** | **Nuxt (Vue)** | **NestJS** | **AdonisJS** | **Angular** | **Svelte / SvelteKit** |
+| :--- | :--- | :--- | :--- | :--- | :--- | :--- | :--- |
+| **Primary Scope** | Unified Full-Stack (UI + MVC Backend) | React Meta-Framework | Vue Meta-Framework | Backend Only (Node.js) | Backend MVC (Node.js) | Frontend SPA / SSR | UI Compiler + Meta-Framework |
+| **Component Syntax** | `.som` (`state`, `derive`, `action`, `<view>`) | JSX / TSX + Hooks (`useState`, `useMemo`) | `.vue` SFC (`<script setup>`, `ref`, `computed`) | N/A (Needs React/Vue/Angular) | Edge Templates / Inertia | TypeScript Classes + Decorators + HTML | `.svelte` (`$state`, `$derived`, HTML) |
+| **TypeScript & JS Choice** | **Yes** (`som new --ts` or `--js`, native in `.som` & `.ts` with zero-dep compiler) | Yes (`.ts` / `.tsx`, requires bundler) | Yes (`<script setup lang="ts">`, requires Vite) | Yes (TypeScript-first, requires `tsc`/SWC) | Yes (TypeScript-only in v6) | Yes (TypeScript-only, requires `ngc`) | Yes (`<script lang="ts">`, requires Vite) |
+| **Zero-Build Browser Mode** | **Yes** (runs directly via `<script src="som.js">`) | No (Requires Webpack / Turbopack) | No (Requires Vite / Nitro build) | No (Requires TS compilation) | No (Requires TS build) | No (Requires Angular CLI compiler) | No (Requires Vite / Svelte compiler) |
+| **Ahead-of-Time (AOT) Build** | **Yes** (`som build` / `som vite:build`, CSP-safe) | Yes | Yes | Yes (`nest build`) | Yes (`node ace build`) | Yes (`ng build`) | Yes (`vite build`) |
+| **Built-in SQL ORM & Query Builder** | **Yes** (SQLite, MySQL, PostgreSQL, Soft Deletes, Relations) | No (Requires Prisma / Drizzle) | No (Requires Prisma / Drizzle) | No (Requires TypeORM / Prisma) | Yes (Lucid ORM) | No (Frontend only) | No (Requires Prisma / Drizzle) |
+| **Migrations, Seeders & Factories** | **Yes** (`som migrate`, `som db:seed`, `Factory`) | No (3rd-party) | No (3rd-party) | No (3rd-party) | Yes | No | No (3rd-party) |
+| **Built-in Auth, CSRF, Gates & Policies** | **Yes** (Session + Bearer Token + RBAC Gates + Rate Limiter) | No (Requires Auth.js / Clerk) | No (Requires external module) | Partial (Passport / Guards boilerplate) | Yes (Bouncer + Shield) | No (Client guards only) | No (Requires Lucia / Auth.js) |
+| **Built-in Redis, Cache, Locks & Queues** | **Yes** (Zero-dep RESP client, Atomic Locks, `Job`, `Queue`) | No (Requires ioredis + BullMQ) | No (Requires Unstorage + BullMQ) | Partial (Requires BullMQ + Redis pkgs) | Yes (Requires `@adonisjs/redis`) | No | No (3rd-party) |
+| **Supply-Chain Package Firewall** | **Yes** (`som add` 4-tier security & tarball scanner) | No (Standard `npm install`) | No (Standard `npm install`) | No (Standard `npm install`) | No (Standard `npm install`) | No (Standard `npm install`) | No (Standard `npm install`) |
+| **Native Desktop App Packaging** | **Yes** (`som electron` & `som electron:build`) | Manual setup | Manual setup | N/A | N/A | Manual setup | Manual Tauri / Electron setup |
+| **Built-in AI Agent MCP Server** | **Yes** (`som mcp` over stdio) | No | No | No | No | No | No |
+| **Core Runtime Dependencies** | **0** (Self-contained) | Hundreds (`node_modules`) | Hundreds (`node_modules`) | Dozens (RxJS, reflect-metadata…) | Dozens | Dozens (RxJS, Zone.js…) | Dozens |
+
+---
+
+### 37.2 Som.js vs Next.js (React)
+
+**Next.js** is the dominant React meta-framework, built around JSX, React Server Components (RSC), and Vercel's deployment model.
+
+#### Why developers choose Som.js over Next.js:
+1. **No Hook Footguns (`useEffect`, Stale Closures, Dependency Arrays)**: In React/Next.js, derived state and side effects require `useState`, `useMemo`, `useCallback`, and `useEffect` with manual dependency arrays. In Som.js, reactivity is automatic and declarative: `state`, `derive`, `watch`, and `when` track dependencies dynamically with zero stale closures.
+2. **True Batteries-Included Backend**: Next.js gives you API routes / Server Actions, but you still have to install, configure, and maintain separate packages for your ORM (Prisma/Drizzle), authentication (NextAuth/Clerk), background jobs (BullMQ), caching (ioredis), and validation (Zod). Som.js includes all of these out of the box with a unified API.
+3. **No Hydration Mismatch Complexity**: Next.js forces developers to constantly reason about `"use client"` vs `"use server"` boundaries and serialization limits. Som.js keeps a clean, predictable architectural boundary between `.som` reactive views and `backend/app/Http/Controllers` (with optional SSR/prerendering via `som build --prerender` or `View.render()`).
+4. **Native Two-Way Form Binding & Scoped CSS**: Som.js provides `s-model="email"` with automatic type coercion and built-in `<style scoped>` out of the box—no `onChange={(e) => setEmail(e.target.value)}` boilerplate or CSS-in-JS runtime overhead.
+
+---
+
+### 37.3 Som.js vs Nuxt (Vue)
+
+**Nuxt** is a powerful full-stack framework built on Vue 3 and the Nitro server engine.
+
+#### Why developers choose Som.js over Nuxt:
+1. **Even Cleaner Single-File Component Syntax**: Vue 3's `<script setup>` requires importing or relying on compiler macros (`ref()`, `.value` unwrapping in JS, `computed()`, `defineProps()`, `defineEmits()`). In `.som` files, there is no `<script>` wrapper and no `.value` tax—you write `state count = 0`, `derive double = count * 2`, `prop title = ''`, and `event save` directly.
+2. **Built-in First-Party Primitives for Storage & Async Data**: Som.js bakes `saved theme = 'dark'` (automatic `localStorage` persistence + cross-tab sync) and `load users = '/api/users'` (with automatic `.loading`, `.error`, `.data`, and `.reload()`) directly into the language keywords.
+3. **Complete MVC Backend Included**: While Nuxt's Nitro server provides low-level `defineEventHandler` endpoints, Som.js provides full Active-Record/Query-Builder models (`Model`, `Schema`), migrations (`som migrate`), FormRequests, RBAC `Gate` policies, `Mail`, `Queue`, and `Redis` without third-party plugins.
+
+---
+
+### 37.4 Som.js vs NestJS
+
+**NestJS** is an enterprise Node.js backend framework heavily inspired by Angular, relying on TypeScript decorators (`@Module()`, `@Controller()`, `@Injectable()`), `reflect-metadata`, and RxJS.
+
+#### Why developers choose Som.js over NestJS:
+1. **Zero Decorator & Module Ceremony**: In NestJS, adding a single endpoint often requires creating a Module, Controller, Service, DTO class with `class-validator` decorators, and registering providers in dependency injection containers. In Som.js, controllers and models are clean, standard JavaScript classes that work immediately without `reflect-metadata` or decorator transpilation.
+2. **Unified Frontend + Backend in One Repo & CLI**: NestJS is strictly a backend framework—you must set up a separate React, Angular, or Vue project for your UI. Som.js provides both the enterprise backend (`backend/`) and the reactive `.som` frontend (`frontend/`) under one CLI (`som dev`, `som make:model Post --all`).
+3. **Built-in ORM, Migrations, Redis & Queues without External Glue**: NestJS delegates database access to TypeORM/Prisma and queues to `@nestjs/bullmq`. Som.js ships its own hardened SQL engine (SQLite, MySQL, PostgreSQL), migration runner, zero-dependency RESP Redis client, and job queue worker in core.
+
+---
+
+### 37.5 Som.js vs AdonisJS
+
+**AdonisJS** is a respected Node.js MVC framework also inspired by Laravel.
+
+#### Why developers choose Som.js over AdonisJS:
+1. **Native Reactive Frontend Framework Included**: AdonisJS relies on server-rendered Edge templates or requires bridging to React/Vue via Inertia.js. Som.js includes its own reactive component language (`.som`), client router (`<som-router>`, `<som-link>`), global stores (`store`, `use`), FLIP animations (`s-animate`), and DevTools natively.
+2. **Zero-Build Instant Development + Optional Vite/Electron**: Som.js can run directly in the browser with zero bundling step during prototyping, or scale up to Vite HMR (`som vite`), AOT CSP-safe production bundles (`som build`), and native desktop apps (`som electron`).
+3. **Unique Security & AI Tooling**: Som.js ships with `som add` (a 4-tier npm supply-chain security gatekeeper that scans tarballs before installation), an interactive browser Error Monitor with `.som` source frames, an automatic Memory Watchdog (`som dev --gc`), and a built-in Model Context Protocol server (`som mcp`) for AI coding assistants.
+
+---
+
+### 37.6 Som.js vs Angular
+
+**Angular** is a heavyweight frontend framework designed for large enterprise SPAs using TypeScript classes, decorators, Zone.js/Signals, and RxJS observables.
+
+#### Why developers choose Som.js over Angular:
+1. **10x Less Boilerplate & Instant Learning Curve**: Angular requires understanding Decorators, Dependency Injection hierarchies, RxJS streams (`pipe`, `switchMap`, `takeUntil`), and complex CLI configuration (`angular.json`). A complete Som.js component is written in plain words (`state`, `derive`, `action`, `<view>`, `<style scoped>`) that any developer can master in 15 minutes.
+2. **Lightweight Runtime Footprint**: Som.js's entire browser runtime (`som.js`) is a single self-contained file with zero external dependencies, whereas Angular bundles require a heavy compiler and runtime toolchain.
+3. **Full-Stack Server Capabilities**: Angular is strictly a client-side (and SSR) UI framework; Som.js includes the complete backend database, authentication, and API layer.
+
+---
+
+### 37.7 Som.js vs Svelte & SvelteKit
+
+**Svelte** pioneered compiler-driven reactive single-file components, and **SvelteKit** adds full-stack routing.
+
+#### Why developers choose Som.js over Svelte / SvelteKit:
+1. **Plain-Word Keywords vs Sigil Syntax**: Svelte 5 uses runes (`let count = $state(0)`, `let double = $derived(count * 2)`, `$effect(...)`, `$props()`). Som.js uses clean, sigil-free declarations at the top level:
+   - `state count = 0`
+   - `derive double = count * 2`
+   - `watch count { ... }`
+   - `prop title = 'Hello'`
+   - `saved theme = 'light'`
+   - `load posts = '/api/posts'`
+2. **Works With OR Without a Build Step**: Svelte components *cannot* run in a browser without a bundler/compiler step. Som.js components work **both ways**: drop `<script src="som.js">` into any HTML file for instant zero-build execution, or run `som build` / `som vite:build` to pre-compile `.som` files into ultra-fast, CSP-compliant production bundles.
+3. **Complete Backend Ecosystem Out of the Box**: SvelteKit provides routing and form actions, leaving database ORM, migrations, queues, Redis, mail, and authorization policies up to third-party packages. Som.js provides the entire backend stack natively.
+
+---
+
+### 37.8 Code-by-Code Comparison: Reactive State, Persistence & API Loading
+
+Below is the exact same feature—a persistent counter + live API data loader—written in **Som.js**, **Next.js (React)**, **Nuxt (Vue)**, **Svelte 5**, and **Angular**:
+
+#### 1. Som.js (`CounterUsers.som`) — 18 lines, zero imports
+
+```html
+state count = 0
+saved theme = 'dark'
+derive double = count * 2
+load users = '/api/users'
+
+action increment() { count++ }
+
+<view>
+  <button @click={increment}>{count} × 2 = {double}</button>
+  <p s-if="users.loading">Loading…</p>
+  <ul>
+    {for u in (users.data || []) key u.id}
+      <li>{u.name}</li>
+    {/for}
+  </ul>
+</view>
+```
+
+#### 2. Next.js / React (`CounterUsers.tsx`) — Requires hooks, manual `localStorage` effect, and fetch state
+
+```tsx
+"use client";
+import { useState, useEffect, useMemo } from "react";
+
+export default function CounterUsers() {
+  const [count, setCount] = useState(0);
+  const [theme, setTheme] = useState("dark");
+  const [users, setUsers] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
+  const double = useMemo(() => count * 2, [count]);
+
+  useEffect(() => {
+    const saved = localStorage.getItem("theme");
+    if (saved) setTheme(JSON.parse(saved));
+  }, []);
+
+  useEffect(() => {
+    localStorage.setItem("theme", JSON.stringify(theme));
+  }, [theme]);
+
+  useEffect(() => {
+    fetch("/api/users")
+      .then((r) => r.json())
+      .then((data) => { setUsers(data); setLoading(false); });
+  }, []);
+
+  return (
+    <div>
+      <button onClick={() => setCount((c) => c + 1)}>{count} × 2 = {double}</button>
+      {loading && <p>Loading…</p>}
+      <ul>{users.map((u) => <li key={u.id}>{u.name}</li>)}</ul>
+    </div>
+  );
+}
+```
+
+#### 3. Nuxt / Vue 3 (`CounterUsers.vue`) — Requires `<script setup>`, `.value`, and composables
+
+```html
+<script setup>
+import { ref, computed, watch, onMounted } from 'vue'
+
+const count = ref(0)
+const double = computed(() => count.value * 2)
+const theme = ref('dark')
+const { data: users, pending: loading } = await useFetch('/api/users')
+
+onMounted(() => {
+  const s = localStorage.getItem('theme')
+  if (s) theme.value = JSON.parse(s)
+})
+watch(theme, (val) => localStorage.setItem('theme', JSON.stringify(val)))
+</script>
+
+<template>
+  <button @click="count++">{{ count }} × 2 = {{ double }}</button>
+  <p v-if="loading">Loading…</p>
+  <ul>
+    <li v-for="u in (users || [])" :key="u.id">{{ u.name }}</li>
+  </ul>
+</template>
+```
+
+#### 4. Svelte 5 (`CounterUsers.svelte`) — Requires `$state`/`$derived` runes and manual `onMount` fetch
+
+```html
+<script>
+  import { onMount } from 'svelte';
+  let count = $state(0);
+  let double = $derived(count * 2);
+  let users = $state([]);
+  let loading = $state(true);
+
+  onMount(async () => {
+    const res = await fetch('/api/users');
+    users = await res.json();
+    loading = false;
+  });
+</script>
+
+<button onclick={() => count++}>{count} × 2 = {double}</button>
+{#if loading}<p>Loading…</p>{/if}
+<ul>
+  {#each users as u (u.id)}
+    <li>{u.name}</li>
+  {/each}
+</ul>
+```
+
+---
+
+### 37.9 When to Choose Som.js
+
+- **Choose Som.js when:**
+  - You want **one cohesive full-stack framework** where the reactive UI, router, database ORM, migrations, authentication, Redis cache/queues, and CLI scaffolding (`som make:model Name --all`) are designed to work together out of the box.
+  - You value **minimalism, speed, and zero dependency bloat**—no `node_modules` tree of 1,200 transitive packages just to render a form and save to a database.
+  - You want **security by default**: automatic HTML/XSS sanitization (`s-html`), timing-safe CSRF tokens, SQL identifier/parameter protection, strict Content-Security-Policy (CSP) compatibility (`som build`), and supply-chain package verification (`som add`).
+  - You are building **SaaS web apps, internal enterprise tools, dashboards, REST APIs, or cross-platform Electron desktop apps** and want maximum developer velocity.
+- **Consider Next.js / Nuxt / Angular when:**
+  - Your organization mandates a strict corporate React-only or Angular-only hiring pipeline, or your project heavily depends on a specific React-only component library (such as Radix UI or React Three Fiber).
+
+---
+
+## 38. Full TypeScript Support (`som new [app-name] --ts`)
+
+Som.js provides first-class **TypeScript** support across both the **frontend** (`.som` single-file components and `.ts` modules) and the **backend** (`routes/*.ts`, `app/Models/*.ts`, `app/Http/Controllers/*.ts`, `config/*.ts`, `database/**/*.ts`, and `server/*.ts`).
+
+When creating a new project, you can choose between **JavaScript** and **TypeScript**:
+
+```bash
+# Pass --ts to scaffold a full TypeScript project:
+som new my-app --ts
+
+# Or pass --js to scaffold a JavaScript project without prompting:
+som new my-app --js
+
+# Running `som new my-app` in an interactive terminal asks you to choose:
+#   1) JavaScript (default)
+#   2) TypeScript (--ts)
+```
+
+### 38.1 Zero-Dependency TypeScript Execution
+
+Som.js includes a 3-tier TypeScript transpiler (`bin/backend/typescript.js` and `Som.stripTypeScript` in `som.js`):
+1. **`esbuild`** (when installed via `npm install`, providing instant source maps).
+2. **Node.js built-in `Module.stripTypeScriptTypes`** (on Node 22.6+).
+3. **`Som.stripTypeScript`** (Som.js's built-in zero-dependency TypeScript stripper and ESM-to-CJS compiler).
+
+Because of this 3-tier architecture, `som dev`, `som build`, `som route:list`, `som migrate`, and `.som` components in the browser run TypeScript **immediately out of the box**—even before `npm install` is run!
+
+### 38.2 TypeScript in `.som` Components
+
+Inside any `.som` component, you can write TypeScript `interface`, `type`, `enum`, `import type`, typed `prop`, `state`, `derive`, `saved`, `load`, and typed `action` functions, as well as `as Type` and non-null `!` assertions in `<view>` templates:
+
+```html
+<!-- frontend/pages/Todos.som -->
+import type { User } from '../types.ts'
+import { money } from '../logic/format.ts'
+
+interface Todo {
+  id: number
+  title: string
+  done: boolean
+  cost?: number
+}
+
+type Filter = 'all' | 'open' | 'done'
+
+prop initialFilter: Filter = 'all'
+prop currentUser?: User
+
+state filter: Filter = initialFilter
+saved currency: 'USD' | 'EUR' = 'USD'
+load todos: Todo[] = api.get<Todo[]>('/api/todos')
+
+derive visibleTodos: Todo[] = (todos.data || []).filter((t: Todo): boolean => {
+  if (filter === 'open') return !t.done
+  if (filter === 'done') return t.done
+  return true
+})
+
+action toggle(todo: Todo): Promise<void> {
+  const updated = await api.patch<Todo>(`/api/todos/${todo.id}`, { done: !todo.done })
+  Object.assign(todo, updated)
+}
+
+<view>
+  <section class="page">
+    <h1>Todos ({visibleTodos.length})</h1>
+    <ul>
+      {for item of (visibleTodos as Todo[]); key item.id}
+        <li @click={toggle(item)}>
+          <span>{item.title!}</span>
+          <span s-if="item.cost">{money(item.cost, currency)}</span>
+        </li>
+      {/for}
+    </ul>
+  </section>
+</view>
+```
+
+### 38.3 TypeScript in Backend Models, Controllers & Routes
+
+When a project has a `tsconfig.json` (created automatically by `som new [app-name] --ts`), every `som make:*` generator automatically scaffolds `.ts` files using ES module `import` / `export default` syntax and typed `.som` pages:
+
+```bash
+som make:model Article --all
+# Creates:
+#   backend/app/Models/Article.ts
+#   backend/database/migrations/..._create_articles_table.ts
+#   backend/database/factories/ArticleFactory.ts
+#   backend/database/seeders/ArticleSeeder.ts
+#   backend/app/Http/Controllers/ArticleController.ts
+#   frontend/pages/Article.som (with `interface ArticleItem` and typed state)
+```
+
+```ts
+// backend/app/Http/Controllers/ArticleController.ts
+import { response, Request, Response } from 'somjs/server'
+import Article from '../../Models/Article'
+
+export default class ArticleController {
+  async index(req: Request) {
+    return Article.latest('id').get()
+  }
+
+  async store(req: Request): Promise<Response> {
+    const data = await req.validate<{ title: string; body?: string }>({
+      title: 'required|max:200',
+      body: 'nullable|string',
+    })
+    return response(await Article.create(data), 201)
+  }
+}
+```
+
+### 38.4 Type Checking (`npm run typecheck`)
+
+TypeScript projects include `frontend/som.d.ts`, `backend/server.d.ts`, `frontend/types.ts`, and a preconfigured `tsconfig.json` with path aliases for `'somjs'` and `'somjs/server'`. Run full static type-checking across your project at any time with:
+
+```bash
+npm run typecheck
+```
+
+
+
 
 

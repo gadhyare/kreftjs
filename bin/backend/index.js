@@ -87,13 +87,17 @@ const loadModuleAsync = async (file) => {
 
 // the HTTP side: answers /api/... from routes/api.js
 function createBackend(baseDir, { db = null, production = false, log = console, prefix = '/api' } = {}) {
+  const isProd = Boolean(production || process.env.APP_ENV === 'production' || process.env.NODE_ENV === 'production');
+  const isDebug = process.env.APP_DEBUG !== undefined ? (process.env.APP_DEBUG === 'true' || process.env.APP_DEBUG === '1') : !isProd;
   const { startAutoGarbageCollector } = require('./gc.js');
-  startAutoGarbageCollector({ thresholdMB: Number(process.env.AUTO_GC_THRESHOLD_MB) || 200, log: !production && process.env.VERBOSE_GC === '1' });
+  startAutoGarbageCollector({ thresholdMB: Number(process.env.AUTO_GC_THRESHOLD_MB) || 200, log: !isProd && process.env.VERBOSE_GC === '1' });
   installAlias();
   setBaseDir(baseDir);
   if (db) setConnection(db);
   const routesFile = findFile(path.join(baseDir, 'routes', 'api'));
   if (!routesFile) return null;
+  // production with no (or a weak) APP_KEY stops here, at start-up, instead of failing on the first login
+  if (process.env.APP_ENV === 'production' || process.env.NODE_ENV === 'production') require('./support.js').appKey();
   const watchDirs = ['app', 'routes'].map((d) => path.join(baseDir, d));
   let signature = '', loadError = null, checkedAt = 0, kernel = { middleware: [], aliases: {} };
 
@@ -136,6 +140,11 @@ function createBackend(baseDir, { db = null, production = false, log = console, 
     }
   }
 
+  const isInsideDir = (target, dir) => {
+    const t = path.resolve(target), d = path.resolve(dir);
+    return t === d || t.startsWith(d + path.sep);
+  };
+
   // 'auth' → app/Http/Middleware/Authenticate.js or Auth.js; 'role:admin' → handle(req, next, 'admin')
   async function resolveMiddleware(m) {
     if (typeof m !== 'string') return { fn: m, args: [] };
@@ -145,9 +154,12 @@ function createBackend(baseDir, { db = null, production = false, log = console, 
     const alias = kernel.aliases && kernel.aliases[name];
     if (alias) {
       if (typeof alias === 'string') {
-        const target = path.resolve(baseDir, 'app', 'Http', alias.replace(/\.(c?js|[mc]?ts)$/, ''));
-        if (!target.startsWith(path.resolve(baseDir, 'app', 'Http'))) throw new Error(`Forbidden middleware path traversal in alias "${name}".`);
-        return { fn: await loadModuleAsync(findFile(target) || path.resolve(baseDir, 'app', 'Http', alias)), args };
+        const httpDir = path.resolve(baseDir, 'app', 'Http');
+        const target = path.resolve(httpDir, alias.replace(/\.(c?js|[mc]?ts)$/, ''));
+        if (!isInsideDir(target, httpDir)) throw new Error(`Forbidden middleware path traversal in alias "${name}".`);
+        const resolved = findFile(target) || path.resolve(httpDir, alias);
+        if (!isInsideDir(resolved, httpDir)) throw new Error(`Forbidden middleware path traversal in alias "${name}".`);
+        return { fn: await loadModuleAsync(resolved), args };
       }
       return { fn: alias, args };
     }
@@ -159,7 +171,7 @@ function createBackend(baseDir, { db = null, production = false, log = console, 
     const names = [name, p, p + 'Middleware', known].filter(Boolean);
     const file = names.map((n) => findFile(path.join(dir, n))).find(Boolean);
     if (!file) throw new Error(`No middleware "${name}". Make it with:  som make:middleware ${p}`);
-    if (!path.resolve(file).startsWith(path.resolve(baseDir, 'app'))) throw new Error(`Forbidden middleware path.`);
+    if (!isInsideDir(file, path.resolve(baseDir, 'app'))) throw new Error(`Forbidden middleware path.`);
     return { fn: await loadModuleAsync(file), args };
   }
   async function callMiddleware(mw, req, next) {
@@ -185,9 +197,9 @@ function createBackend(baseDir, { db = null, production = false, log = console, 
     }
     const resolvedPath = path.resolve(baseDir, 'app', 'Http', 'Controllers', rel);
     const appHttpDir = path.resolve(baseDir, 'app');
-    if (!resolvedPath.startsWith(appHttpDir)) throw new Error(`Forbidden controller path for "${cname}".`);
+    if (!isInsideDir(resolvedPath, appHttpDir)) throw new Error(`Forbidden controller path for "${cname}".`);
     const file = findFile(resolvedPath) || findFile(path.resolve(baseDir, 'app', rel));
-    if (!file || !path.resolve(file).startsWith(appHttpDir)) throw new Error(`No controller "${cname}". Looked for ${rel} in app/Http/Controllers/.`);
+    if (!file || !isInsideDir(file, appHttpDir)) throw new Error(`No controller "${cname}". Looked for ${rel} in app/Http/Controllers/.`);
     return await loadModuleAsync(file);
   }
 
@@ -206,6 +218,9 @@ function createBackend(baseDir, { db = null, production = false, log = console, 
       Controller = action;
       method = '__invoke';
     }
+    if (method === 'constructor' || Object.prototype.hasOwnProperty.call(Object.prototype, method)) {
+      throw new Error(`Invalid controller method "${method}".`);
+    }
     const self = typeof Controller === 'function' && /^class\s/.test(Function.prototype.toString.call(Controller))
       ? new Controller()
       : (typeof Controller === 'function' ? Controller : Controller);
@@ -218,8 +233,15 @@ function createBackend(baseDir, { db = null, production = false, log = console, 
 
   const MAX_BODY = (Number(process.env.MAX_BODY_KB) || 5120) * 1024; // MAX_BODY_KB in .env (default 5 MB)
 // every API answer: not to be guessed as another file type, framed by other sites, or cached with someone's data
-const SECURITY_HEADERS = { 'X-Content-Type-Options': 'nosniff', 'X-Frame-Options': 'DENY', 'Referrer-Policy': 'same-origin', 'Cross-Origin-Resource-Policy': 'same-origin' };
+const SECURITY_HEADERS = {
+  'X-Content-Type-Options': 'nosniff',
+  'X-Frame-Options': 'DENY',
+  'Referrer-Policy': 'same-origin',
+  'Cross-Origin-Resource-Policy': 'same-origin',
+  ...(isProd ? { 'Strict-Transport-Security': 'max-age=31536000; includeSubDomains; preload' } : {})
+};
   const { safeObjectFromEntries, parseJson } = require('../safe-json.js');
+  const FILES_SYM = Symbol('som.files');
   const readBody = (req) => new Promise((resolve, reject) => {
     if (['GET', 'HEAD', 'OPTIONS'].includes(req.method)) return resolve({});
     const chunks = [];
@@ -229,8 +251,12 @@ const SECURITY_HEADERS = { 'X-Content-Type-Options': 'nosniff', 'X-Frame-Options
       const buf = Buffer.concat(chunks);
       const type = req.headers['content-type'] || '';
       if (/multipart\/form-data/i.test(type)) { // uploads: fields go in the body, files in req.files
-        try { const { fields, files } = require('./storage.js').parseMultipart(buf, type); return resolve({ __files: files, ...fields }); }
-        catch (e) { return reject(new http.HttpError(400, e.message)); }
+        try {
+          const { fields, files } = require('./storage.js').parseMultipart(buf, type);
+          const out = { ...fields };
+          Object.defineProperty(out, FILES_SYM, { value: files, enumerable: false, configurable: true });
+          return resolve(out);
+        } catch (e) { return reject(new http.HttpError(400, e.message)); }
       }
       const raw = buf.toString('utf8');
       if (!raw) return resolve({});
@@ -269,12 +295,13 @@ const SECURITY_HEADERS = { 'X-Content-Type-Options': 'nosniff', 'X-Frame-Options
     const status = e && e.status >= 400 && e.status < 600 ? e.status : 500;
     const wantsHtml = req && req.headers && req.headers.accept && req.headers.accept.includes('text/html');
 
-    if (!production && wantsHtml) {
+    // In local / development with debug enabled: show rich error bugs, stack traces, and code snippets
+    if (!isProd && isDebug && wantsHtml) {
       const { renderErrorPage } = require('./error-page.js');
       return http.response(renderErrorPage(e, req, { status }), status, { 'Content-Type': 'text/html; charset=utf-8' });
     }
 
-    if (!production) {
+    if (!isProd && isDebug) {
       const { parseStack } = require('./error-page.js');
       const frames = parseStack(e && e.stack);
       return http.response({
@@ -286,11 +313,49 @@ const SECURITY_HEADERS = { 'X-Content-Type-Options': 'nosniff', 'X-Frame-Options
       }, status);
     }
 
-    return http.response({ message: 'Server error.' }, status);
+    // In production: hide error bugs, stack traces, and internal server details for security
+    if (wantsHtml) {
+      const safeHtml = `<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>${status} | ${status === 404 ? 'Not Found' : 'Server Error'}</title>
+  <style>
+    body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; display: flex; align-items: center; justify-content: center; min-height: 100vh; margin: 0; background: #fafafa; color: #18181b; }
+    .box { text-align: center; max-width: 480px; padding: 32px 24px; }
+    h1 { font-size: 24px; font-weight: 600; margin: 0 0 12px; }
+    p { font-size: 15px; color: #71717a; margin: 0; line-height: 1.5; }
+  </style>
+</head>
+<body>
+  <div class="box">
+    <h1>${status} · ${status === 404 ? 'Not Found' : 'Server Error'}</h1>
+    <p>${status === 404 ? 'The requested resource was not found.' : 'Something went wrong on our side. Please try again later.'}</p>
+  </div>
+</body>
+</html>`;
+      return http.response(safeHtml, status, { 'Content-Type': 'text/html; charset=utf-8' });
+    }
+
+    return http.response({ message: status === 404 ? 'Not found.' : 'Server error.' }, status);
   };
 
   // answers the request and returns true, or returns false when no route matches (so other handlers can try)
   async function handler(req, res, urlPath) {
+    if (isProd) {
+      const forwardedProto = (req.headers['x-forwarded-proto'] || '').split(',')[0].trim().toLowerCase();
+      if (forwardedProto === 'http') {
+        const host = req.headers.host || 'localhost';
+        res.writeHead(301, {
+          Location: `https://${host}${req.url}`,
+          'Strict-Transport-Security': 'max-age=31536000; includeSubDomains; preload',
+          'Content-Type': 'text/plain; charset=utf-8',
+        });
+        res.end('Redirecting to HTTPS');
+        return true;
+      }
+    }
     await fresh();
     if (!(urlPath === prefix || urlPath.startsWith(prefix + '/'))) return false;
     const sub = urlPath.slice(prefix.length) || '/';
@@ -312,7 +377,8 @@ const SECURITY_HEADERS = { 'X-Content-Type-Options': 'nosniff', 'X-Frame-Options
     let request;
     try {
       const body = await readBody(req);
-      const files = body && body.__files; if (files) delete body.__files;
+      const files = body && typeof body === 'object' ? body[FILES_SYM] : null;
+      if (files) delete body[FILES_SYM];
       request = new http.Request(req, res, { path: urlPath, query: safeObjectFromEntries(url.searchParams), body, params });
       request.files = files || {};
       request.routeEntry = match;
@@ -324,11 +390,12 @@ const SECURITY_HEADERS = { 'X-Content-Type-Options': 'nosniff', 'X-Frame-Options
       };
       send(res, await run(0, request));
     } catch (e) {
-      send(res, errorResponse(e));
+      send(res, errorResponse(e, request || req));
     }
     return true;
   }
   handler.routes = () => Route.list();
+  handler.ready = () => fresh();
   // may this request have a protected file (the admin panel)? Runs the middleware named in app/Http/Kernel.js
   // (`admin: ['auth', 'admin']` by default) the same way a route would. → { ok: true } or { status: 401 | 403 … }
   handler.allows = async (req, names) => {
@@ -354,16 +421,17 @@ const SECURITY_HEADERS = { 'X-Content-Type-Options': 'nosniff', 'X-Frame-Options
 module.exports = {
   Route, Model, ModelBuilder, DB, Builder, raw, Collection, collect, Factory, fake, Seeder: migrator.Seeder,
   Request: http.Request, Response: http.Response, response: http.response, noContent: http.noContent,
+  cookieSecure: http.cookieSecure,
   abort: http.abort, abortIf: http.abortIf, abortUnless: http.abortUnless, HttpError: http.HttpError, ValidationError: http.ValidationError,
   slug: require('./support.js').slug, uniqueSlug: require('./support.js').uniqueSlug,
   ModelNotFoundError, createSchema, setConnection,
   castIn: require('./model.js').castIn, castOut: require('./model.js').castOut,
-  VerifyCsrfToken: http.VerifyCsrfToken, csrf: http.builtIn.csrf, generateCsrfToken: http.generateCsrfToken, verifyCsrfToken: http.verifyCsrfToken,
+  VerifyCsrfToken: http.VerifyCsrfToken, csrf: http.builtIn.csrf, generateCsrfToken: http.generateCsrfToken, verifyCsrfToken: http.verifyCsrfToken, same: http.same,
   ...require('./namespace.js'), // use, namespace
   ...require('./support.js'), // Hash, Str, slug, uniqueSlug, Url, Crypt, Log, Lang, __, Http, env, now
   ...require('./mail.js'),    // Mail (Mail.to(…).send(new WelcomeMail(user))), Mailable
   ...require('./events.js'),  // Event, event
-  Job: require('./queue.js').Job, dispatch: require('./queue.js').dispatch, dispatchSync: require('./queue.js').dispatchSync,
+  Job: require('./queue.js').Job, Queue: require('./queue.js'), dispatch: require('./queue.js').dispatch, dispatchSync: require('./queue.js').dispatchSync,
   ...require('./notifications.js'), // Notification
   ...require('./cache.js'),   // Cache
   ...require('./redis.js'),   // Redis

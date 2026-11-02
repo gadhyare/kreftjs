@@ -47,30 +47,71 @@ class McpServer {
         required: ['sql'],
       },
     }, async ({ sql, limit = 20 }) => {
-      const cleanSql = String(sql || '').trim();
+      const cleanSql = String(sql || '').trim().replace(/;+\s*$/, '');
       if (!/^select\s/i.test(cleanSql)) {
         throw new Error('Only read-only SELECT queries are permitted via MCP.');
       }
-      // Block dangerous commands, file access, attachment, and subshell executions
-      const DANGEROUS_SQL_RE = /\b(attach|detach|load_extension|writefile|readfile|pg_read|pg_write|sys_eval|xp_cmdshell|into\s+outfile|into\s+dumpfile)\b/i;
-      if (DANGEROUS_SQL_RE.test(cleanSql)) {
-        throw new Error('Access denied: Dangerous SQL functions or file operations are prohibited in MCP.');
+      // Reject multi-statement queries and SQL comment injections
+      if (cleanSql.includes(';') || /--|\/\*/.test(cleanSql)) {
+        throw new Error('Access denied: Multiple SQL statements or SQL comments are prohibited in MCP.');
+      }
+      // What is checked below is the SQL without its 'string literals', so a value can't hide or fake a name
+      const code = cleanSql.replace(/'(?:[^']|'')*'/g, "''");
+      // Mutations, files, sleeping, locks, and statements that make something new (SELECT … INTO)
+      const DANGEROUS_SQL_RE = /\b(insert|update|delete|drop|alter|create|truncate|replace|grant|revoke|pragma|attach|detach|vacuum|reindex|analyze|copy|call|exec|execute|into|set_config|set|load_file|load_extension|writefile|readfile|edit|fts3_tokenizer|lo_\w+|dblink\w*|pg_(?:read|write|ls|sleep|terminate|cancel|reload|stat)\w*|sys_eval|xp_cmdshell|sleep|benchmark|randomblob|zeroblob|generate_series|for\s+(?:update|share|no\s+key\s+update|key\s+share)|lock|outfile|dumpfile)\b/i;
+      if (DANGEROUS_SQL_RE.test(code)) {
+        throw new Error('Access denied: Dangerous SQL functions, mutations, or file operations are prohibited in MCP.');
+      }
+      // Credentials stay out of reach whatever they are renamed to (SELECT password AS p …)
+      const SECRET_NAME_RE = /(password|passwd|secret|token|api_?key|private_?key|recovery_?code|credential|salt|hash)/i;
+      const SECRET_TABLE_RE = /\b(personal_access_tokens|password_reset_tokens|password_resets|sessions|failed_jobs|jobs)\b/i;
+      if (SECRET_TABLE_RE.test(code)) {
+        throw new Error('Access denied: this table holds credentials or queued payloads and is not readable via MCP.');
+      }
+      if (SECRET_NAME_RE.test(code)) {
+        throw new Error('Access denied: columns holding credentials cannot be named in MCP queries (SELECT * hides them).');
+      }
+      // Whole rows packed into one value (to_json(users), row(…)) would carry hidden columns along
+      if (/\b(to_jsonb?|row_to_json|array_to_json|json_agg|jsonb_agg|json_build\w*|jsonb_build\w*|json_object\w*|jsonb_object\w*|json_group\w*|json_array\w*|row|xmlelement|xmlforest|query_to_xml|table_to_xml)\s*\(/i.test(code)) {
+        throw new Error('Access denied: building JSON or XML from whole rows is not allowed in MCP.');
       }
       const cappedLimit = Math.max(1, Math.min(100, parseInt(limit, 10) || 20));
-      const results = await DB.select(cleanSql.replace(/;+\s*$/, '') + ` LIMIT ${cappedLimit}`);
-      
-      // Automatically sanitize sensitive credentials before returning to AI assistants
-      const SENSITIVE_KEYS = new Set(['password', 'password_hash', 'remember_token', 'token', 'secret', 'two_factor_secret', 'two_factor_recovery_codes', 'api_key']);
-      const sanitized = results.map((row) => {
-        if (!row || typeof row !== 'object') return row;
-        const copy = { ...row };
-        for (const k in copy) {
-          if (SENSITIVE_KEYS.has(k.toLowerCase()) || /(_hash|_secret|_token)$/i.test(k)) {
-            copy[k] = '******** [REDACTED]';
+
+      // Run it inside a transaction that is always undone, with a time limit: even a statement the checks
+      // above did not foresee can't leave a change behind or keep the database busy for long.
+      const UNDO = new Error('undo');
+      const limitMs = Math.max(500, Number(process.env.MCP_QUERY_TIMEOUT_MS) || 5000);
+      let results = [];
+      let timer;
+      const guarded = DB.transaction(async () => {
+        results = await DB.select(cleanSql + ` LIMIT ${cappedLimit}`);
+        throw UNDO;
+      }).catch((e) => { if (e !== UNDO) throw e; });
+      const timedOut = new Promise((_, reject) => { timer = setTimeout(() => reject(new Error(`Query stopped: it took longer than ${limitMs} ms.`)), limitMs); });
+      try { await Promise.race([guarded, timedOut]); } finally { clearTimeout(timer); }
+
+      // Credentials are masked by column name, and also by what the value looks like (a hash, a token, a JSON text)
+      const SENSITIVE_KEY_RE = /(password|passwd|secret|token|api_?key|private_?key|recovery_?code|hash|salt|credential)/i;
+      const HASH_RE = /\$(?:scrypt|2[abxy]|argon2\w*|pbkdf2\S*)\$[^\s"']+/gi;
+      const MASK = '******** [REDACTED]';
+      const mask = (v, key) => {
+        if (key != null && SENSITIVE_KEY_RE.test(String(key))) return MASK;
+        if (typeof v === 'string') {
+          const t = v.trim();
+          if ((t[0] === '{' || t[0] === '[') && t.length < 1000000) {
+            try { return JSON.stringify(mask(JSON.parse(t))); } catch (_) { /* not JSON: treated as text */ }
           }
+          return v.replace(HASH_RE, MASK);
         }
-        return copy;
-      });
+        if (Array.isArray(v)) return v.map((x) => mask(x));
+        if (v && typeof v === 'object' && !Buffer.isBuffer(v) && !(v instanceof Date)) {
+          const out = {};
+          for (const k of Object.keys(v)) out[k] = mask(v[k], k);
+          return out;
+        }
+        return v;
+      };
+      const sanitized = results.map((row) => mask(row));
 
       return {
         content: [{ type: 'text', text: JSON.stringify(sanitized, null, 2) }],
@@ -82,7 +123,8 @@ class McpServer {
       description: 'List all registered backend HTTP routes, methods, paths, and middlewares.',
       inputSchema: { type: 'object', properties: {} },
     }, async () => {
-      const routes = http.createRouter().list().map((r) => ({
+      const { Route } = require('./index.js');
+      const routes = Route.list().map((r) => ({
         methods: r.methods,
         uri: r.uri,
         name: r.routeName || null,
@@ -113,7 +155,8 @@ class McpServer {
 
     // 4. Resource: som://routes
     this.registerResource('som://routes', 'Active Som.js Routes', 'application/json', async () => {
-      const routes = http.createRouter().list();
+      const { Route } = require('./index.js');
+      const routes = Route.list();
       return JSON.stringify(routes, null, 2);
     });
 
@@ -245,7 +288,7 @@ class McpServer {
 
     if (isOriginAllowed && origin) {
       res.setHeader('Access-Control-Allow-Origin', origin);
-      res.setHeader('Access-Control-Allow-Credentials', 'true');
+      res.setHeader('Vary', 'Origin');
     }
     res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
     res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
@@ -260,16 +303,32 @@ class McpServer {
       return res.end(JSON.stringify({ jsonrpc: '2.0', id: null, error: { code: -32000, message: 'Forbidden: Origin not allowed' } }));
     }
 
-    // Optional MCP Token authentication (via Bearer token or SOM_MCP_TOKEN / MCP_TOKEN)
-    const requiredToken = process.env.MCP_TOKEN || process.env.SOM_MCP_TOKEN;
+    // MCP Token authentication. The endpoint can read the whole database, so:
+    //  - with MCP_TOKEN set, every request must carry it (never the APP_KEY: that is the master secret);
+    //  - in production, no MCP_TOKEN means the endpoint is off;
+    //  - in development without a token, only a direct local client is let in (not a remote address,
+    //    not a request that came through a proxy or tunnel, not a foreign Host name).
+    const remoteAddr = String(req.socket && req.socket.remoteAddress || '');
+    const isLoopback = remoteAddr === '127.0.0.1' || remoteAddr === '::1' || remoteAddr === '::ffff:127.0.0.1';
+    const viaProxy = ['x-forwarded-for', 'x-forwarded-host', 'forwarded', 'x-real-ip'].some((h) => req.headers[h] !== undefined);
+    const hostName = String(req.headers.host || '').replace(/:\d+$/, '').replace(/^\[|\]$/g, '').toLowerCase();
+    const isLocalHost = hostName === 'localhost' || hostName === '127.0.0.1' || hostName === '::1';
+    const isProd = process.env.NODE_ENV === 'production' || process.env.APP_ENV === 'production';
+    const requiredToken = process.env.MCP_TOKEN || process.env.SOM_MCP_TOKEN || null;
+    const deny = (status, message) => {
+      res.writeHead(status, { 'Content-Type': 'application/json' });
+      return res.end(JSON.stringify({ jsonrpc: '2.0', id: null, error: { code: -32000, message } }));
+    };
+
+    if (isProd && !requiredToken) return deny(403, 'Forbidden: MCP endpoint disabled in production without MCP_TOKEN');
+
     if (requiredToken) {
       const authHeader = req.headers.authorization || '';
       const tokenMatch = authHeader.match(/^Bearer\s+(.+)$/i);
-      const providedToken = tokenMatch ? tokenMatch[1] : null;
-      if (providedToken !== requiredToken) {
-        res.writeHead(401, { 'Content-Type': 'application/json' });
-        return res.end(JSON.stringify({ jsonrpc: '2.0', id: null, error: { code: -32000, message: 'Unauthorized: Invalid or missing MCP_TOKEN' } }));
-      }
+      const providedToken = tokenMatch ? tokenMatch[1].trim() : null;
+      if (!providedToken || !http.same(providedToken, requiredToken)) return deny(401, 'Unauthorized: Invalid or missing MCP_TOKEN');
+    } else if (!isLoopback || viaProxy || !isLocalHost) {
+      return deny(403, 'Forbidden: set MCP_TOKEN in .env to use MCP from a remote address, a proxy or a tunnel');
     }
 
     if (req.method === 'GET') {
@@ -286,11 +345,26 @@ class McpServer {
     }
 
     if (req.method === 'POST') {
+      const MAX_MCP_BODY = 1024 * 1024; // 1 MB max payload
       const chunks = [];
-      req.on('data', (c) => chunks.push(c));
+      let size = 0;
+      let aborted = false;
+      req.on('data', (c) => {
+        size += c.length;
+        if (size > MAX_MCP_BODY) {
+          aborted = true;
+          res.writeHead(413, { 'Content-Type': 'application/json; charset=utf-8' });
+          res.end(JSON.stringify({ jsonrpc: '2.0', id: null, error: { code: -32000, message: 'Payload too large (max 1 MB)' } }));
+          req.destroy();
+          return;
+        }
+        chunks.push(c);
+      });
       req.on('end', async () => {
+        if (aborted) return;
         try {
-          const body = JSON.parse(Buffer.concat(chunks).toString('utf8'));
+          const { parseJson } = require('../safe-json.js');
+          const body = parseJson(Buffer.concat(chunks).toString('utf8'));
           const response = await this.handleMessage(body);
           if (response === null) {
             res.writeHead(204);

@@ -22,6 +22,7 @@ const MAX_BODY = 1024 * 1024;
 const MAX_ROWS = 1000;
 
 function createDbApi(db, { tables: allow = null, production = false, prefix = '/api', log = console } = {}) {
+  const isProd = Boolean(production || process.env.APP_ENV === 'production' || process.env.NODE_ENV === 'production');
   let schema = null; // tables, read once (and again after a schema change)
   const load = async () => {
     const all = await db.tables();
@@ -57,7 +58,7 @@ function createDbApi(db, { tables: allow = null, production = false, prefix = '/
   };
 
   const send = (res, status, data, headers = {}) => {
-    res.writeHead(status, { 'Content-Type': 'application/json; charset=utf-8', 'Cache-Control': 'no-store', ...headers });
+    res.writeHead(status, { 'Content-Type': 'application/json; charset=utf-8', 'Cache-Control': 'no-store', 'X-Content-Type-Options': 'nosniff', 'X-Frame-Options': 'DENY', 'Referrer-Policy': 'same-origin', ...headers });
     res.end(data === undefined ? '' : JSON.stringify(data));
   };
   const readBody = (req) => new Promise((resolve, reject) => {
@@ -75,7 +76,7 @@ function createDbApi(db, { tables: allow = null, production = false, prefix = '/
       const c = t.cols.get(k);
       let v = row[k];
       if (c && c.bool && (v === 0 || v === 1)) v = !!v;
-      if (typeof v === 'bigint') v = Number(v);
+      if (typeof v === 'bigint') v = Number.isSafeInteger(Number(v)) ? Number(v) : String(v);
       out[k] = v;
     }
     return out;
@@ -146,9 +147,10 @@ function createDbApi(db, { tables: allow = null, production = false, prefix = '/
           if (k === 'q') {
             const textCols = t.columns.filter((c) => c.text && !t.hidden.has(c.name));
             if (!textCols.length) continue;
+            const safeV = String(v).replace(/[%_]/g, '');
             const like = db.kind === 'postgres' ? (c) => `CAST(${db.q(c.name)} AS TEXT) ILIKE ?` : (c) => `${db.q(c.name)} LIKE ?`;
             where.push('(' + textCols.map(like).join(' OR ') + ')');
-            textCols.forEach(() => params.push('%' + v + '%'));
+            textCols.forEach(() => params.push('%' + safeV + '%'));
             continue;
           }
           const m = k.match(/^(.+?)(?:_(gte|lte|gt|lt|ne|like))?$/);
@@ -162,13 +164,14 @@ function createDbApi(db, { tables: allow = null, production = false, prefix = '/
             const many = url.searchParams.getAll(k);
             if (many.length > 1) { if (many.indexOf(v) === 0) { where.push(`${c} IN (${many.map(() => '?').join(', ')})`); params.push(...many); } }
             else { where.push(`${c} = ?`); params.push(bval); }
-          } else if (op === 'like') { where.push(db.kind === 'postgres' ? `CAST(${c} AS TEXT) ILIKE ?` : `${c} LIKE ?`); params.push('%' + v + '%'); }
+          } else if (op === 'like') { where.push(db.kind === 'postgres' ? `CAST(${c} AS TEXT) ILIKE ?` : `${c} LIKE ?`); params.push('%' + String(v).replace(/[%_]/g, '') + '%'); }
           else { where.push(`${c} ${{ gte: '>=', lte: '<=', gt: '>', lt: '<', ne: '<>' }[op]} ?`); params.push(bval); }
         }
         const order = sort.map((s) => {
           const desc = s[0] === '-';
           const col = desc ? s.slice(1) : s;
-          return t.cols.has(col) ? `${db.q(col)} ${desc ? 'DESC' : 'ASC'}` : null;
+          // a hidden column can't be read, so it can't be sorted by either (the order would give its values away)
+          return t.cols.has(col) && !t.hidden.has(col) ? `${db.q(col)} ${desc ? 'DESC' : 'ASC'}` : null;
         }).filter(Boolean);
         if (!order.length && t.key) order.push(`${db.q(t.key)} ASC`);
         const w = where.length ? ' WHERE ' + where.join(' AND ') : '';
@@ -235,7 +238,7 @@ function createDbApi(db, { tables: allow = null, production = false, prefix = '/
       const refused = dbError(e);
       if (refused) return send(res, 422, refused);
       log.error(`  Database error on ${method} ${urlPath}: ${e.message}`);
-      return send(res, 500, { message: production ? 'Server error.' : e.message });
+      return send(res, 500, { message: isProd ? 'Server error.' : e.message });
     }
   }
   handler.refresh = () => { schema = null; };

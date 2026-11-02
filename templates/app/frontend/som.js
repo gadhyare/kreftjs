@@ -1,5 +1,5 @@
 /*!
- * Som.js v1.7.0 — reactive by nature
+ * Som.js v2.4.0 — reactive by nature
  * The .som component language (state · derive · action · when · watch · on),
  * { } views with s-if / s-each / s-model, components, slots, router, stores,
  * share / receive, event bus and a template engine.
@@ -31,7 +31,8 @@
   // `som dev` turns this on: live components are tracked for hot reload and the DevTools panel
   const devMode = () => !!global.__SOM_DEV__;
   const liveInstances = new Set();
-  const getPath = (obj, path) => path.split('.').reduce((o, k) => (o == null ? o : o[k]), obj);
+  const BAD_PATH_KEYS = new Set(['__proto__', 'constructor', 'prototype']);
+  const getPath = (obj, path) => String(path).split('.').reduce((o, k) => (o == null || BAD_PATH_KEYS.has(k) ? undefined : o[k]), obj);
   const looseEqual = (a, b) => {
     if (Object.is(a, b)) return true;
     if (isObject(a) && isObject(b)) {
@@ -471,6 +472,197 @@
   const watchEffect = (fn, options) => doWatch(fn, null, options);
 
   /* ================================================================
+   * Localization (i18n & l10n)
+   * ================================================================ */
+  const RTL_LOCALES = new Set(['ar', 'fa', 'ur', 'he', 'yi', 'ps', 'sd', 'ug', 'ckb', 'ku', 'dv', 'arc', 'syr']);
+  const BAD_I18N_KEYS = new Set(['__proto__', 'constructor', 'prototype']);
+
+  function isRtlLocale(loc) {
+    if (!loc) return false;
+    const lang = String(loc).toLowerCase().split(/[-_]/)[0];
+    return RTL_LOCALES.has(lang);
+  }
+
+  function parseChoice(text, count, locale = 'en') {
+    if (!text || typeof text !== 'string') return '';
+    const n = Number(count) || 0;
+    const segments = text.split('|').map((s) => s.trim());
+
+    for (const seg of segments) {
+      const exactMatch = seg.match(/^\{(\d+)\}\s*(.*)$/s);
+      if (exactMatch) {
+        if (Number(exactMatch[1]) === n) return exactMatch[2];
+        continue;
+      }
+      const rangeMatch = seg.match(/^\[(\d+|\*)\s*,\s*(\d+|\*)\]\s*(.*)$/s);
+      if (rangeMatch) {
+        const min = rangeMatch[1] === '*' ? -Infinity : Number(rangeMatch[1]);
+        const max = rangeMatch[2] === '*' ? Infinity : Number(rangeMatch[2]);
+        if (n >= min && n <= max) return rangeMatch[3];
+        continue;
+      }
+      const categoryMatch = seg.match(/^\{(zero|one|two|few|many|other)\}\s*(.*)$/is);
+      if (categoryMatch) {
+        let pr;
+        try { pr = new Intl.PluralRules(locale).select(n); } catch (_) { pr = n === 1 ? 'one' : 'other'; }
+        if (categoryMatch[1].toLowerCase() === pr) return categoryMatch[2];
+        continue;
+      }
+    }
+
+    if (segments.length === 2) {
+      return n === 1 ? segments[0] : segments[1];
+    }
+
+    if (segments.length > 2) {
+      let pr = 'other';
+      try { pr = new Intl.PluralRules(locale).select(n); } catch (_) { pr = n === 1 ? 'one' : 'other'; }
+      const cats = ['zero', 'one', 'two', 'few', 'many', 'other'];
+      const idx = cats.indexOf(pr);
+      if (idx !== -1 && idx < segments.length) return segments[idx];
+      return segments[segments.length - 1];
+    }
+
+    return segments[0] || text;
+  }
+
+  function deepMergeDict(target, source) {
+    if (!source || typeof source !== 'object') return target;
+    for (const [k, v] of Object.entries(source)) {
+      if (BAD_I18N_KEYS.has(k)) continue;
+      if (v && typeof v === 'object' && !Array.isArray(v)) {
+        if (!target[k] || typeof target[k] !== 'object' || Array.isArray(target[k])) target[k] = {};
+        deepMergeDict(target[k], v);
+      } else {
+        target[k] = v;
+      }
+    }
+    return target;
+  }
+
+  const initialDocLang = (typeof document !== 'undefined' && document.documentElement && document.documentElement.lang) || 'en';
+  const currentLocaleRef = ref(initialDocLang.toLowerCase());
+  const fallbackLocaleRef = ref('en');
+  const translationsStore = reactive({});
+
+  function setDocAttributes(l) {
+    if (typeof document !== 'undefined' && document.documentElement) {
+      document.documentElement.lang = l;
+      const d = isRtlLocale(l) ? 'rtl' : 'ltr';
+      document.documentElement.dir = d;
+      document.documentElement.setAttribute('dir', d);
+    }
+  }
+
+  function getLocale(lang) {
+    if (lang === undefined) return currentLocaleRef.value;
+    const clean = String(lang).toLowerCase().trim();
+    if (clean && currentLocaleRef.value !== clean) {
+      currentLocaleRef.value = clean;
+      setDocAttributes(clean);
+    }
+    return clean;
+  }
+
+  function getFallbackLocale(lang) {
+    if (lang === undefined) return fallbackLocaleRef.value;
+    const clean = String(lang).toLowerCase().trim();
+    if (clean) fallbackLocaleRef.value = clean;
+    return clean;
+  }
+
+  function registerTranslations(localeOrDict, dict) {
+    if (!dict && typeof localeOrDict === 'object') {
+      for (const [l, d] of Object.entries(localeOrDict)) registerTranslations(l, d);
+      return Som;
+    }
+    if (!localeOrDict) return Som;
+    const loc = String(localeOrDict).toLowerCase().trim();
+    if (!translationsStore[loc]) translationsStore[loc] = {};
+    deepMergeDict(translationsStore[loc], dict);
+    return Som;
+  }
+
+  function listLocales() {
+    return Object.keys(translationsStore);
+  }
+
+  function replacePlaceholders(line, replace = {}) {
+    if (typeof line !== 'string') return line;
+    if (!replace || typeof replace !== 'object') return line;
+    let out = line;
+    for (const [key, value] of Object.entries(replace)) {
+      if (value == null) continue;
+      const strVal = String(value);
+      const upperKey = key.toUpperCase();
+      const upperVal = strVal.toUpperCase();
+      const ucfirstKey = key.charAt(0).toUpperCase() + key.slice(1);
+      const ucfirstVal = strVal.charAt(0).toUpperCase() + strVal.slice(1);
+
+      out = out
+        .split(':' + key).join(strVal)
+        .split(':' + upperKey).join(upperVal)
+        .split(':' + ucfirstKey).join(ucfirstVal);
+    }
+    return out;
+  }
+
+  function getTranslation(key, replace = {}, locale = currentLocaleRef.value) {
+    const loc = String(locale || currentLocaleRef.value).toLowerCase();
+    const fallback = String(fallbackLocaleRef.value).toLowerCase();
+    const strKey = String(key || '');
+
+    const lookup = (storeLoc, k) => {
+      const dict = translationsStore[storeLoc];
+      if (!dict || typeof dict !== 'object') return undefined;
+      // 1. Direct exact key match (JSON translation strings, e.g. __('Sign In') or __('auth.failed'))
+      if (dict[k] !== undefined && !BAD_I18N_KEYS.has(k)) return dict[k];
+      // 2. Group and nested dot path match: 'auth.failed' -> dict['auth']['failed']
+      const parts = k.split('.');
+      let cur = dict;
+      for (const p of parts) {
+        if (!p || BAD_I18N_KEYS.has(p) || cur == null || typeof cur !== 'object') return undefined;
+        cur = cur[p];
+      }
+      return cur;
+    };
+
+    let text = lookup(loc, strKey);
+    if (text === undefined && loc !== fallback) text = lookup(fallback, strKey);
+    if (text === undefined) return key;
+    if (typeof text !== 'string') return text;
+
+    return replacePlaceholders(text, replace);
+  }
+
+  function hasTranslation(key, locale = currentLocaleRef.value) {
+    return getTranslation(key, {}, locale) !== key;
+  }
+
+  function choiceTranslation(key, number, replace = {}, locale = currentLocaleRef.value) {
+    const raw = getTranslation(key, {}, locale);
+    const chosen = parseChoice(raw, number, locale);
+    const fullReplace = { count: number, ...replace };
+    return replacePlaceholders(chosen, fullReplace);
+  }
+
+  if (typeof window !== 'undefined' && window.__SOM_LANG__) {
+    registerTranslations(window.__SOM_LANG__);
+  }
+
+  function formatNumber(n, options, locale = currentLocaleRef.value) {
+    return new Intl.NumberFormat(locale, options).format(n);
+  }
+
+  function formatCurrency(amount, currency = 'USD', locale = currentLocaleRef.value) {
+    return new Intl.NumberFormat(locale, { style: 'currency', currency }).format(amount);
+  }
+
+  function formatDate(date, options, locale = currentLocaleRef.value) {
+    return new Intl.DateTimeFormat(locale, options).format(date instanceof Date ? date : new Date(date));
+  }
+
+  /* ================================================================
    * Expressions
    * ================================================================ */
   // compiled expressions, kept for reuse; the oldest are dropped past FN_CACHE_MAX, so apps that
@@ -480,14 +672,23 @@
   // `som build` fills this with ready-made functions, so built apps never need eval (strict CSP)
   const precompiled = Object.create(null);
   const FORBIDDEN_EXP_RE = /(?:^|[^$\w])(?:constructor|__proto__|prototype)(?:[^$\w]|$)/;
-  function compileFn(code, params) {
+  function compileFn(code, params = '__s') {
     if (FORBIDDEN_EXP_RE.test(code)) {
       throw new Error(`Forbidden expression access: prototype or constructor poisoning attempt blocked.`);
     }
     const key = params + '\u0000' + code;
     let fn = fnCache.get(key);
     if (fn) return fn;
-    fn = precompiled[key] || new Function(...params.split(','), code);
+    fn = precompiled[key];
+    if (!fn) {
+      try {
+        fn = new Function(...params.split(','), code);
+      } catch (e) {
+        const stripped = stripTypeScript(code);
+        if (stripped !== code) fn = new Function(...params.split(','), stripped);
+        else throw e;
+      }
+    }
     fnCache.set(key, fn);
     if (fnCache.size > FN_CACHE_MAX) fnCache.delete(fnCache.keys().next().value);
     return fn;
@@ -786,6 +987,89 @@
     });
   }
 
+  const ESC_MAP = { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' };
+  const UNESC_MAP = { '&amp;': '&', '&lt;': '<', '&gt;': '>', '&quot;': '"', '&#39;': "'", '&#039;': "'", '&apos;': "'", '&nbsp;': ' ', '&colon;': ':', '&tab;': '\t', '&newline;': '\n' };
+  function escapeHtml(s) {
+    return s == null ? '' : String(s).replace(/[&<>"']/g, (c) => ESC_MAP[c]);
+  }
+  function decodeEntities(s) {
+    return String(s == null ? '' : s)
+      .replace(/&#x([0-9a-fA-F]+);?/g, (_, h) => { const c = parseInt(h, 16); return Number.isNaN(c) ? '' : String.fromCodePoint(Math.min(c, 0x10ffff)); })
+      .replace(/&#(\d+);?/g, (_, d) => { const c = parseInt(d, 10); return Number.isNaN(c) ? '' : String.fromCodePoint(Math.min(c, 0x10ffff)); })
+      .replace(/&(?:amp|lt|gt|quot|#39|#039|apos|nbsp|colon|tab|newline);/gi, (m) => UNESC_MAP[m.toLowerCase()] || m);
+  }
+  function stripTags(html) {
+    if (html == null) return '';
+    return String(html)
+      .replace(/<script[\s\S]*?<\/script>/gi, '')
+      .replace(/<style[\s\S]*?<\/style>/gi, '')
+      .replace(/<!--[\s\S]*?-->/g, '')
+      .replace(/<[^>]*>/g, ' ')
+      .replace(/\s+/g, ' ')
+      .trim();
+  }
+  function isUnsafeAttrUrl(val) {
+    const clean = decodeEntities(val).trim().replace(/[\x00-\x20\s]/g, '');
+    if (/^(?:javascript|vbscript|data|file|blob):/i.test(clean)) {
+      return !/^data:image\/(?:png|jpeg|jpg|gif|webp);base64,[A-Za-z0-9+/=]+$/i.test(clean);
+    }
+    return false;
+  }
+  // Elements that are removed with everything inside them, and the attributes checked as addresses.
+  const DROP_TAGS = new Set(['script', 'style', 'iframe', 'frame', 'frameset', 'object', 'embed', 'applet', 'form', 'base', 'meta', 'link', 'svg', 'math', 'noscript', 'template', 'portal', 'param']);
+  const URL_ATTRS = new Set(['href', 'src', 'action', 'formaction', 'xlink:href', 'poster', 'data', 'background', 'ping', 'cite', 'longdesc', 'manifest', 'codebase']);
+  function sanitizeNode(parent) {
+    for (const child of [...parent.childNodes]) {
+      if (child.nodeType === 8) { parent.removeChild(child); continue; } // comment
+      if (child.nodeType !== 1) continue;
+      if (DROP_TAGS.has(child.localName)) { parent.removeChild(child); continue; }
+      for (const attr of [...child.attributes]) {
+        const n = attr.name.toLowerCase();
+        if (n.startsWith('on') || n === 'srcdoc' || n === 'is') { child.removeAttribute(attr.name); continue; }
+        if (URL_ATTRS.has(n)) { if (isUnsafeAttrUrl(attr.value)) child.setAttribute(attr.name, '#'); continue; }
+        if (n === 'srcset' && /(?:^|[\s,])(?:javascript|vbscript|data|file|blob):/i.test(decodeEntities(attr.value).replace(/[\x00-\x20]/g, ' '))) { child.removeAttribute(attr.name); continue; }
+        if (n === 'style' && /url\s*\(|expression|javascript|@import|behavior|binding/i.test(decodeEntities(attr.value))) child.removeAttribute(attr.name);
+      }
+      sanitizeNode(child);
+    }
+  }
+  // The browser itself parses the HTML in an inert document (nothing loads or runs there), so the
+  // result is judged on what the browser sees, not on what a pattern thinks the text looks like.
+  function cleanHtmlDom(html) {
+    const doc = document.implementation.createHTMLDocument('');
+    const box = doc.createElement('div');
+    box.innerHTML = html;
+    sanitizeNode(box);
+    return box.innerHTML;
+  }
+
+  function cleanHtml(raw) {
+    if (raw == null) return '';
+    let html = String(raw);
+    if (typeof document !== 'undefined' && document.implementation && document.implementation.createHTMLDocument) {
+      try { return cleanHtmlDom(html); } catch (_) { /* fall through to the text-based cleaner below */ }
+    }
+    let prev;
+    const blockRegex = /<(script|style|iframe|object|embed|applet|form|svg|math|noscript|template)[\s\S]*?<\/\1>/gi;
+    const dangerousTagRegex = /<\/?(?:script|style|iframe|object|embed|applet|form|base|meta|link|svg|math|noscript|template)\b[^>]*>/gi;
+    do {
+      prev = html;
+      html = html
+        .replace(blockRegex, '')
+        .replace(dangerousTagRegex, '')
+        .replace(/<!--[\s\S]*?-->/g, '');
+    } while (html !== prev);
+
+    return html
+      // an attribute can follow a closing quote with no space (<img src="x"onerror=…>): keep that character, drop the handler
+      .replace(/([\s/"'`])on[a-z0-9_-]+\s*=\s*(['"])[\s\S]*?\2/gi, '$1')
+      .replace(/([\s/"'`])on[a-z0-9_-]+\s*=\s*[^>\s]+/gi, '$1')
+      .replace(/\b(href|src|action|formaction|xlink:href|poster)\s*=\s*(?:"([^"]*)"|'([^']*)'|([^\s>"']+))/gi, (m, attr, q1, q2, uq) => {
+        const val = q1 !== undefined ? q1 : (q2 !== undefined ? q2 : (uq || ''));
+        return isUnsafeAttrUrl(val) ? `${attr}="#"` : m;
+      });
+  }
+
   function compileElement(el, scope, inst) {
     let model = null, textExpr = null, htmlExpr = null, shown = false;
     const anim = readAnimate(el);
@@ -820,7 +1104,7 @@
       }
     }
     if (textExpr != null) renderEffect(() => { el.textContent = toDisplayString(evaluate(scope, textExpr, el)); });
-    else if (htmlExpr != null) renderEffect(() => { const h = evaluate(scope, htmlExpr, el); el.innerHTML = h == null ? '' : h; });
+    else if (htmlExpr != null) renderEffect(() => { const h = evaluate(scope, htmlExpr, el); el.innerHTML = h == null ? '' : cleanHtml(h); });
     else if (el.tagName !== 'SCRIPT' && el.tagName !== 'STYLE') compileNodes(el, [...el.childNodes], scope, inst);
     if (model) bindModel(el, model.expr, model.mods, scope); // after children, so <option>s exist
     if (anim && !shown) queuePostJob(() => animate(el, anim.name, 'in'), el); // plays when the element appears
@@ -883,7 +1167,10 @@
   }
   const VALUE_TAGS = ['INPUT', 'TEXTAREA', 'SELECT', 'OPTION'];
   const svgCase = { viewbox: 'viewBox', preserveaspectratio: 'preserveAspectRatio' };
+  const DANGEROUS_URI_ATTRS = new Set(['href', 'src', 'action', 'formaction', 'xlink:href', 'poster', 'data', 'background']);
+  const BLOCKED_DYNAMIC_TAGS = new Set(['script', 'iframe', 'object', 'embed', 'applet', 'style', 'base', 'meta', 'link']);
   function setAttr(el, key, val) {
+    if (BAD_PATH_KEYS.has(key) || /^on[a-z]/i.test(String(key))) return;
     if (key === 'class') return setClassPart(el, 'spread', val);
     if (key === 'style') return setStylePart(el, 'spread', val);
     if (key === 'value' && VALUE_TAGS.includes(el.tagName)) {
@@ -892,7 +1179,24 @@
       if (el.value !== s) el.value = s;
       return;
     }
-    if (key === 'innerHTML' || key === 'textContent') { el[key] = val == null ? '' : val; return; }
+    if (key === 'innerHTML') { el.innerHTML = val == null ? '' : cleanHtml(val); return; }
+    if (key === 'textContent') { el.textContent = val == null ? '' : val; return; }
+    const lowerKey = String(key).toLowerCase();
+    if (lowerKey === 'srcdoc') {
+      if (val == null || val === false) el.removeAttribute(key);
+      else el.setAttribute('srcdoc', cleanHtml(val));
+      return;
+    }
+    if (DANGEROUS_URI_ATTRS.has(lowerKey)) {
+      const s = String(val == null ? '' : val).trim();
+      if (isUnsafeAttrUrl(s)) {
+        if (typeof console !== 'undefined' && console.warn) {
+          console.warn(`[Som.js Security Warning] Blocked dangerous URI in attribute "${key}".`);
+        }
+        el.removeAttribute(key);
+        return;
+      }
+    }
     if (typeof val === 'boolean' && key in el && !key.startsWith('aria-') && !key.startsWith('data-')) {
       el[key] = val;
       if (!val) el.removeAttribute(key);
@@ -1516,9 +1820,15 @@
       const def = typeof is === 'string' ? (isSomUrl(is) ? somComponent(is) : resolveComponent(is, inst)) : is;
       sw.show(def || is, () => {
         if (def) return mountBlock(anchor.parentNode, anchor, el, scope, inst, (node) => mountComponent(node, def, scope, inst));
-        const t = document.createElement('template'); // a plain element name like "h2"
-        t.innerHTML = el.outerHTML.replace(/^<som-component/i, '<' + is).replace(/<\/som-component>$/i, '</' + is + '>');
-        return mountBlock(anchor.parentNode, anchor, t.content.firstChild, scope, inst);
+        const tag = String(is || '').trim();
+        if (!/^[a-zA-Z][a-zA-Z0-9-]*$/.test(tag) || BLOCKED_DYNAMIC_TAGS.has(tag.toLowerCase())) {
+          warn(`Blocked invalid or unsafe dynamic tag "<${tag}>" in <som-component>.`);
+          return null;
+        }
+        const clone = document.createElement(tag);
+        for (const { name, value } of [...el.attributes]) clone.setAttribute(name, value);
+        for (const child of [...el.childNodes]) clone.appendChild(child.cloneNode(true));
+        return mountBlock(anchor.parentNode, anchor, clone, scope, inst);
       });
     });
   }
@@ -1893,6 +2203,13 @@
     $env: () => Som.env,
     $watch: (i) => (src, cb, o) =>
       i.scope.run(() => doWatch(typeof src === 'string' ? () => getPath(i.ctx, src) : src.bind(i.ctx), cb.bind(i.ctx), o)),
+    $t: () => getTranslation,
+    $trans: () => getTranslation,
+    $__: () => getTranslation,
+    $choice: () => choiceTranslation,
+    $trans_choice: () => choiceTranslation,
+    $locale: () => getLocale,
+    $dir: () => (loc) => (isRtlLocale(loc || currentLocaleRef.value) ? 'rtl' : 'ltr'),
   };
 
   // The object templates (and `this` in Options API) read from
@@ -2259,6 +2576,61 @@
     return () => clearTimeout(id);
   }
 
+  // Inactivity watchdog for dashboards: tracks user interaction (mouse, touch, keyboard)
+  // and auto-redirects to login upon session expiration
+  function useInactivityTimer(options = {}) {
+    const cfg = typeof options === 'number' ? { timeout: options } : (options || {});
+    const envVal = typeof env !== 'undefined' && env && (env.PUBLIC_SESSION_TIMEOUT || env.SESSION_TIMEOUT);
+    const timeoutMs = (cfg.timeout != null ? cfg.timeout : (envVal ? Number(envVal) * 60000 : 15 * 60000));
+    const warningMs = cfg.warningTime != null ? cfg.warningTime : ((typeof env !== 'undefined' && env && env.PUBLIC_SESSION_WARNING) ? Number(env.PUBLIC_SESSION_WARNING) * 60000 : 0);
+    const rawRedirect = String(cfg.redirect || '/login?reason=inactive');
+    const redirectUrl = /^\/(?!\/)/.test(rawRedirect) ? rawRedirect : '/login?reason=inactive';
+    const events = cfg.events || ['mousemove', 'mousedown', 'keydown', 'touchstart', 'scroll', 'click'];
+
+    let timer = null;
+    let warningTimer = null;
+
+    function reset() {
+      if (timer) clearTimeout(timer);
+      if (warningTimer) clearTimeout(warningTimer);
+
+      if (warningMs > 0 && warningMs < timeoutMs && typeof cfg.onWarning === 'function') {
+        warningTimer = setTimeout(() => {
+          cfg.onWarning({ remainingMs: warningMs, remainingMinutes: Math.round(warningMs / 60000) });
+        }, timeoutMs - warningMs);
+      }
+
+      timer = setTimeout(() => {
+        if (typeof cfg.onTimeout === 'function') {
+          cfg.onTimeout();
+        } else if (typeof window !== 'undefined') {
+          if (typeof Som !== 'undefined' && Som.currentRouter && Som.currentRouter()) {
+            Som.currentRouter().go(redirectUrl);
+          } else {
+            window.location.href = redirectUrl;
+          }
+        }
+      }, timeoutMs);
+    }
+
+    function stop() {
+      if (timer) clearTimeout(timer);
+      if (warningTimer) clearTimeout(warningTimer);
+      if (typeof window !== 'undefined') {
+        events.forEach((evt) => window.removeEventListener(evt, reset, { passive: true }));
+      }
+    }
+
+    if (typeof window !== 'undefined') {
+      events.forEach((evt) => window.addEventListener(evt, reset, { passive: true }));
+    }
+    reset();
+
+    if (activeScope) activeScope.cleanups.push(stop);
+
+    return { reset, stop, timeoutMs };
+  }
+
   /* ================================================================
    * Som.app — create an application
    * ================================================================ */
@@ -2499,9 +2871,16 @@
       }
       // Auth headers and your token only go to your own site (or to this client's own `base`),
       // never to someone else's API: that would leak the token and trigger extra CORS checks
-      let sameOrigin = true;
-      try { sameOrigin = typeof location === 'undefined' || new URL(full, document.baseURI).origin === location.origin; } catch (_) { /* keep true */ }
-      const trusted = sameOrigin || (/^https?:\/\//i.test(o.base || '') && full.startsWith(o.base));
+      let sameOrigin = true, baseOrigin = false;
+      try {
+        const baseURI = (typeof document !== 'undefined' && document.baseURI) || (typeof location !== 'undefined' && location.href) || 'http://localhost/';
+        const targetOrigin = new URL(full, baseURI).origin;
+        sameOrigin = typeof location === 'undefined' || targetOrigin === location.origin;
+        if (o.base && /^https?:\/\//i.test(o.base)) {
+          baseOrigin = targetOrigin === new URL(o.base, baseURI).origin;
+        }
+      } catch (_) { sameOrigin = false; }
+      const trusted = sameOrigin || baseOrigin;
       const headers = { Accept: 'application/json' };
       if (sameOrigin) headers['X-Requested-With'] = 'XMLHttpRequest';
       if (sameOrigin && method !== 'GET' && method !== 'HEAD' && typeof document !== 'undefined') {
@@ -2821,6 +3200,334 @@
   const lineOf = (src, i) => src.slice(0, i).split('\n').length;
   const IDENT = /^[A-Za-z_$][\w$]*$/;
 
+  /* ---------- TypeScript Support: Zero-Dependency Type Stripper ---------- */
+  // Finds the top-level assignment `=` in a declaration (outside brackets and `<...>` type generics after `:`)
+  function findTopLevelEq(text) {
+    let depth = 0, angle = 0, seenColon = false;
+    for (let i = 0; i < text.length; i++) {
+      const k = skipLiteral(text, i);
+      if (k >= 0) { i = k - 1; continue; }
+      const c = text[i], prev = text[i - 1], next = text[i + 1];
+      if (c === '(' || c === '[' || c === '{') depth++;
+      else if (c === ')' || c === ']' || c === '}') { if (depth > 0) depth--; }
+      else if (c === ':' && depth === 0 && angle === 0) seenColon = true;
+      else if (seenColon && depth === 0 && c === '<' && prev !== '<' && next !== '=') angle++;
+      else if (seenColon && depth === 0 && c === '>' && prev !== '=' && prev !== '-' && angle > 0) angle--;
+      else if (c === '=' && depth === 0 && angle === 0 && prev !== '=' && prev !== '!' && prev !== '<' && prev !== '>' && next !== '=' && next !== '>') {
+        return i;
+      }
+    }
+    return -1;
+  }
+
+  // Splits a parameter list by top-level `,` and removes TypeScript parameter modifiers & type annotations
+  function stripTsParams(paramsInner) {
+    if (!paramsInner || !paramsInner.trim()) return paramsInner;
+    const parts = [];
+    let start = 0, depth = 0, angle = 0, seenColon = false;
+    for (let i = 0; i < paramsInner.length; i++) {
+      const k = skipLiteral(paramsInner, i);
+      if (k >= 0) { i = k - 1; continue; }
+      const c = paramsInner[i], prev = paramsInner[i - 1], next = paramsInner[i + 1];
+      if (c === '(' || c === '[' || c === '{') depth++;
+      else if (c === ')' || c === ']' || c === '}') { if (depth > 0) depth--; }
+      else if (c === ':' && depth === 0 && angle === 0) seenColon = true;
+      else if (seenColon && depth === 0 && c === '<' && prev !== '<' && next !== '=') angle++;
+      else if (seenColon && depth === 0 && c === '>' && prev !== '=' && prev !== '-' && angle > 0) angle--;
+      else if (c === ',' && depth === 0 && angle === 0) {
+        parts.push(paramsInner.slice(start, i));
+        start = i + 1;
+        seenColon = false;
+      }
+    }
+    parts.push(paramsInner.slice(start));
+
+    const cleaned = [];
+    for (const rawParam of parts) {
+      if (!rawParam.trim()) continue;
+      const lead = (rawParam.match(/^\s*/) || [''])[0];
+      let p = rawParam.trim().replace(/^(?:(?:public|private|protected|readonly|override)\s+)+/, '');
+      if (/^this\s*:/.test(p)) continue; // TypeScript fake `this` parameter
+      const eq = findTopLevelEq(p);
+      const lhs = eq < 0 ? p : p.slice(0, eq).trim();
+      const rhs = eq < 0 ? null : stripTypeScript(p.slice(eq + 1).trim());
+      // Find first `:` at depth 0 on `lhs` (outside `{...}` and `[...]` destructuring)
+      let colonIdx = -1, d = 0;
+      for (let i = 0; i < lhs.length; i++) {
+        const k = skipLiteral(lhs, i);
+        if (k >= 0) { i = k - 1; continue; }
+        const c = lhs[i];
+        if (c === '(' || c === '[' || c === '{') d++;
+        else if (c === ')' || c === ']' || c === '}') { if (d > 0) d--; }
+        else if (c === ':' && d === 0) { colonIdx = i; break; }
+      }
+      const binding = (colonIdx < 0 ? lhs : lhs.slice(0, colonIdx)).replace(/\?\s*$/, '').trim();
+      cleaned.push(lead + (rhs != null ? `${binding} = ${rhs}` : binding));
+    }
+    return cleaned.join(',');
+  }
+
+  // Strips TypeScript types, interfaces, type aliases, enums, generics, and `as` assertions from JS/TS code
+  function stripTypeScript(src) {
+    if (!src || typeof src !== 'string') return src;
+    // Fast bail-out if no TypeScript constructs can possibly be present
+    if (!/[:<>!]|interface\b|type\b|enum\b|\bas\b|\bsatisfies\b|\bdeclare\b|\bpublic\b|\bprivate\b|\bprotected\b|\breadonly\b/.test(src)) {
+      return src;
+    }
+    const prevScan = scanScript;
+    scanScript = true;
+    try {
+      const lits = [];
+      const mask = (str) => {
+        let out = '', i = 0;
+        while (i < str.length) {
+          const c = str[i], n = str[i + 1];
+          if (c === '/' && (n === '/' || n === '*')) {
+            const end = skipLiteral(str, i);
+            out += str.slice(i, end).replace(/[^\n]/g, ' ');
+            i = end;
+            continue;
+          }
+          if (c === '`') {
+            let tpl = '`', j = i + 1;
+            while (j < str.length && str[j] !== '`') {
+              if (str[j] === '\\') { tpl += str.slice(j, j + 2); j += 2; }
+              else if (str[j] === '$' && str[j + 1] === '{') {
+                const close = matchBrace(str, j + 1);
+                tpl += '${' + stripTypeScript(str.slice(j + 2, close - 1)) + '}';
+                j = close;
+              } else { tpl += str[j++]; }
+            }
+            if (j < str.length) { tpl += '`'; j++; }
+            const id = lits.length;
+            lits.push(tpl);
+            out += `__SOM_LIT_${id}__`;
+            i = j;
+            continue;
+          }
+          const k = skipLiteral(str, i);
+          if (k >= 0) {
+            const id = lits.length;
+            lits.push(str.slice(i, k));
+            out += `__SOM_LIT_${id}__`;
+            i = k;
+            continue;
+          }
+          out += str[i++];
+        }
+        return out;
+      };
+
+      let code = mask(src);
+
+      // 1. Remove `import type ...` and inline `type` specifiers in `import { type X, Y }`
+      code = code.replace(/^[ \t]*import\s+type\s+[^\n;]+(?:;|$)/gm, (m) => m.replace(/[^\n]/g, ' '));
+      code = code.replace(/\bimport\s*\{([^}]*)\}\s*from\s*(__SOM_LIT_\d+__)/g, (m, specs, fromLit) => {
+        const items = specs.split(',').map((s) => s.trim()).filter(Boolean);
+        const kept = items.filter((s) => !/^type\s+[A-Za-z_$*]/.test(s));
+        if (kept.length === items.length) return m;
+        if (kept.length === 0) return m.replace(/[^\n]/g, ' ');
+        return `import { ${kept.join(', ')} } from ${fromLit}`;
+      });
+      code = code.replace(/\bexport\s+type\s*\{[^}]*\}(?:\s*from\s*__SOM_LIT_\d+__)?[ \t]*;?/g, (m) => m.replace(/[^\n]/g, ' '));
+
+      // 2. Remove `declare ...` statements
+      code = code.replace(/^[ \t]*(?:export\s+)?declare\s+(?:const|let|var|function|class|abstract|global|module|namespace)\b[\s\S]*?(?:;|\n|$)/gm, (m) => m.replace(/[^\n]/g, ' '));
+
+      // 3. Remove `(export)? interface Name ... { ... }`
+      const ifaceRe = /(?:^|[;\n{])[ \t]*(?:export\s+)?(?:declare\s+)?interface\s+[A-Za-z_$][\w$]*/g;
+      let im;
+      while ((im = ifaceRe.exec(code)) !== null) {
+        const startOffset = /^[;\n{]/.test(im[0]) ? im.index + 1 : im.index;
+        let open = -1, angle = 0;
+        for (let k = im.index + im[0].length; k < code.length; k++) {
+          if (code[k] === '<') angle++;
+          else if (code[k] === '>' && angle > 0) angle--;
+          else if (code[k] === '{' && angle === 0) { open = k; break; }
+        }
+        if (open < 0) break;
+        let close;
+        try { close = matchBrace(code, open); } catch (_) { break; }
+        const blank = code.slice(startOffset, close).replace(/[^\n]/g, ' ');
+        code = code.slice(0, startOffset) + blank + code.slice(close);
+        ifaceRe.lastIndex = startOffset + blank.length;
+      }
+
+      // 4. Remove `(export)? type Name<...> = ...`
+      const typeRe = /(?:^|[;\n{])[ \t]*(?:export\s+)?(?:declare\s+)?type\s+[A-Za-z_$][\w$]*\s*(?:<[\s\S]*?>)?\s*=(?!=)/g;
+      let tm;
+      while ((tm = typeRe.exec(code)) !== null) {
+        const startOffset = /^[;\n{]/.test(tm[0]) ? tm.index + 1 : tm.index;
+        let k = tm.index + tm[0].length, depth = 0, angle = 0;
+        while (k < code.length) {
+          const c = code[k], next = code[k + 1], prev = code[k - 1];
+          if (c === '(' || c === '[' || c === '{') depth++;
+          else if (c === ')' || c === ']' || c === '}') { if (depth > 0) depth--; }
+          else if (c === '<' && prev !== '<' && next !== '=') angle++;
+          else if (c === '>' && prev !== '=' && prev !== '-' && angle > 0) angle--;
+          else if (depth === 0 && angle === 0) {
+            if (c === ';') { k++; break; }
+            if (c === '\n') {
+              const rest = code.slice(k + 1).match(/^[ \t]*([|&?:])/);
+              if (!rest) break;
+            }
+          }
+          k++;
+        }
+        const blank = code.slice(startOffset, k).replace(/[^\n]/g, ' ');
+        code = code.slice(0, startOffset) + blank + code.slice(k);
+        typeRe.lastIndex = startOffset + blank.length;
+      }
+
+      // 5. Transform `(export)? (const)? enum Name { ... }` into a runtime object
+      code = code.replace(/\b(export\s+)?(?:const\s+)?enum\s+([A-Za-z_$][\w$]*)\s*\{([^{}]*)\}/g, (_, exp, name, body) => {
+        const members = body.split(',').map((s) => s.trim()).filter(Boolean);
+        let nextVal = 0;
+        const assigns = members.map((m) => {
+          const eq = m.indexOf('=');
+          if (eq < 0) {
+            const k = m.trim();
+            const v = nextVal++;
+            return `$e[$e[${JSON.stringify(k)}] = ${v}] = ${JSON.stringify(k)};`;
+          }
+          const k = m.slice(0, eq).trim();
+          const v = m.slice(eq + 1).trim();
+          if (/^-?\d+$/.test(v)) {
+            nextVal = Number(v) + 1;
+            return `$e[$e[${JSON.stringify(k)}] = ${v}] = ${JSON.stringify(k)};`;
+          }
+          return `$e[${JSON.stringify(k)}] = ${v};`;
+        });
+        return `${exp || ''}const ${name} = (function () { const $e = {}; ${assigns.join(' ')} return $e; })()`;
+      });
+
+      // 6. Strip class generics & `implements ...`
+      code = code.replace(/\b(class\s+[A-Za-z_$][\w$]*)\s*<[^{>;]+>/g, '$1');
+      code = code.replace(/\b(extends\s+[A-Za-z_$][\w$.]*)\s*<[^{>;]+>/g, '$1');
+      code = code.replace(/\bimplements\s+[A-Za-z_$][\w$.,\s<>]*?(?=\{)/g, '');
+
+      // 7. Strip function generics `function name<T>(...)` and arrow generics `async <T>(...) =>`
+      code = code.replace(/\b(function(?:\s*\*)?(?:\s+[A-Za-z_$][\w$]*)?)\s*<[^()>;]+>\s*\(/g, '$1(');
+      code = code.replace(/(\basync\s+)<([A-Za-z_$][\w$]*(?:\s+extends\s+[^>()]+)?(?:\s*,\s*[A-Za-z_$][\w$]*(?:\s+extends\s+[^>()]+)?)*\s*,?)>\s*\(/g, '$1(');
+
+      // 8. Strip generic call type arguments `fn<Type>(...)` or `new Map<K, V>(...)`
+      // Only when `<` immediately follows an identifier and `>` is immediately followed by `(`
+      const genCallRe = /([A-Za-z_$][\w$]*)<([A-Za-z_$[\]{}\w$.,\s|&?:<>()-]+)>\(/g;
+      code = code.replace(genCallRe, (m, fnName, typeInner) => {
+        if (fnName === 'if' || fnName === 'for' || fnName === 'while' || fnName === 'switch' || fnName === 'return') return m;
+        if (/&&|\|\||===|!==|[+*/]/.test(typeInner)) return m;
+        let bal = 0;
+        for (let k = 0; k < typeInner.length; k++) {
+          if (typeInner[k] === '<') bal++;
+          else if (typeInner[k] === '>') { bal--; if (bal < 0) return m; }
+        }
+        return bal === 0 ? `${fnName}(` : m;
+      });
+
+      // 9. Strip parameter types and return types on functions, methods, and arrow functions
+      const NON_FN_KW = new Set(['if', 'for', 'while', 'switch', 'with', 'return', 'typeof', 'instanceof', 'delete', 'void', 'throw', 'await', 'yield', 'case', 'new', 'super']);
+      let pIdx = 0;
+      while (pIdx < code.length) {
+        const open = code.indexOf('(', pIdx);
+        if (open < 0) break;
+        let close;
+        try { close = matchBrace(code, open); } catch (_) { pIdx = open + 1; continue; }
+        const before = code.slice(Math.max(0, open - 80), open);
+        const prevWordMatch = before.match(/([A-Za-z_$][\w$]*)\s*$/);
+        const prevWord = prevWordMatch ? prevWordMatch[1] : '';
+        const afterParen = code.slice(close);
+
+        // Check if followed by `=>` or `: ReturnType =>`
+        let isArrow = false, isFnBody = false, retEnd = close;
+        const directArrow = afterParen.match(/^\s*=>/);
+        const directBrace = afterParen.match(/^\s*\{/);
+        if (directArrow) {
+          isArrow = true;
+        } else if (directBrace && !NON_FN_KW.has(prevWord) && (/\bfunction\b/.test(before) || prevWord === 'catch' || /^[A-Za-z_$][\w$]*$/.test(prevWord))) {
+          isFnBody = true;
+        } else if (/^\s*:/.test(afterParen) && !NON_FN_KW.has(prevWord)) {
+          // Scan potential `: ReturnType` up to `=>` or `{`
+          let k = close + afterParen.indexOf(':') + 1, d = 0, a = 0;
+          while (k < code.length) {
+            const ch = code[k], nx = code[k + 1], pr = code[k - 1];
+            if (ch === '(' || ch === '[' || ch === '{') {
+              if (ch === '{' && d === 0 && a === 0 && (/\bfunction\b/.test(before) || /^[A-Za-z_$][\w$]*$/.test(prevWord))) {
+                const typeSlice = code.slice(close + afterParen.indexOf(':') + 1, k).trim();
+                if (typeSlice && !/[;=\n]/.test(typeSlice)) { isFnBody = true; retEnd = k; break; }
+              }
+              d++;
+            } else if (ch === ')' || ch === ']' || ch === '}') {
+              if (d === 0) break;
+              d--;
+            } else if (ch === '<' && pr !== '<' && nx !== '=') a++;
+            else if (ch === '>' && pr !== '=' && pr !== '-' && a > 0) a--;
+            else if (d === 0 && a === 0) {
+              if (ch === '=' && nx === '>') { isArrow = true; retEnd = k; break; }
+              if (ch === ';' || ch === '\n' || (ch === '=' && nx !== '>')) break;
+            }
+            k++;
+          }
+        }
+
+        if (isArrow || isFnBody) {
+          const inner = code.slice(open + 1, close - 1);
+          const strippedInner = (/:|\b(?:public|private|protected|readonly|override|this)\b|\?\s*(?:,|$|=)/.test(inner))
+            ? stripTsParams(inner)
+            : inner;
+          const retBlank = retEnd > close ? code.slice(close, retEnd).replace(/[^\n]/g, '') : '';
+          const replacement = '(' + strippedInner + ')' + retBlank;
+          code = code.slice(0, open) + replacement + code.slice(retEnd);
+          pIdx = open + replacement.length;
+        } else {
+          pIdx = open + 1;
+        }
+      }
+
+      // 10. Strip variable type annotations: `const x: Type = ...`, `let count: number;`
+      const varRe = /\b(const|let|var)\s+([A-Za-z_$][\w$]*|\{[^{}]*\}|\[[^[\]]*\])\s*!?\s*:\s*/g;
+      let vm;
+      while ((vm = varRe.exec(code)) !== null) {
+        const cPos = code.indexOf(':', vm.index + vm[1].length + vm[2].length);
+        if (cPos < 0) continue;
+        let k = cPos + 1, d = 0, a = 0;
+        while (k < code.length) {
+          const ch = code[k], nx = code[k + 1], pr = code[k - 1];
+          if (ch === '(' || ch === '[' || ch === '{') d++;
+          else if (ch === ')' || ch === ']' || ch === '}') { if (d === 0) break; d--; }
+          else if (ch === '<' && pr !== '<' && nx !== '=') a++;
+          else if (ch === '>' && pr !== '=' && pr !== '-' && a > 0) a--;
+          else if (d === 0 && a === 0) {
+            if ((ch === '=' && nx !== '>' && nx !== '=') || ch === ';' || ch === ',' || ch === '\n') break;
+            if ((ch === 'o' && nx === 'f' || ch === 'i' && nx === 'n') && /\s/.test(pr) && /\s/.test(code[k + 2] || '')) break;
+          }
+          k++;
+        }
+        const bangPos = code[cPos - 1] === '!' ? cPos - 1 : cPos;
+        const blank = code.slice(bangPos, k).replace(/[^\n]/g, '');
+        code = code.slice(0, bangPos) + blank + code.slice(k);
+        varRe.lastIndex = bangPos + blank.length;
+      }
+
+      // 11. Strip class member access modifiers (`public`, `private`, `protected`, `readonly`, `override`)
+      code = code.replace(/(^[ \t]*)(?:(?:public|private|protected|readonly|override)\s+)+(?=(?:static\s+|async\s+)?[A-Za-z_$][\w$]*\s*[(<:;=])/gm, '$1');
+      // Strip class field type annotations: `  propName?: Type = val` or `  propName: Type;` (never object literal `key: val,` or `key: () =>`)
+      code = code.replace(/(^[ \t]*(?:static\s+)?[A-Za-z_$][\w$]*)\s*(?:[?!]\s*:\s*[A-Za-z_$[][^=,;\n{}]*(?=\s*(?:=(?![>=])|;|\n))|:\s*[A-Za-z_$[][^=,;\n{}]*(?=\s*(?:=(?![>=])|;)))/gm, '$1');
+
+      // 12. Strip `as Type` and `satisfies Type` assertions (outside `import { a as b }` / `export { a as b }`)
+      for (let pass = 0; pass < 2; pass++) {
+        code = code.replace(/([A-Za-z0-9_$)\]}])\s+\b(?:as|satisfies)\s+(?:const\b|unknown\b|any\b|never\b|[A-Za-z_$][\w$.]*(?:\s*<[^>;\n]*>)?(?:\[\])*(?:\s*[|&]\s*[A-Za-z_$][\w$.]*(?:\s*<[^>;\n]*>)?(?:\[\])*)*)/g, '$1');
+      }
+
+      // 13. Strip non-null assertions `expr!.prop`, `expr![i]`, `expr!)` (but never `!=` or `!==`)
+      code = code.replace(/([A-Za-z0-9_$)\]])!(?!=)(\s*(?:\.|\[|\(|,|;|\)|\}|:|\?|\+|-|\*|\/|%|&|\||\n|$))/g, '$1$2');
+
+      // Restore masked literals
+      return code.replace(/__SOM_LIT_(\d+)__/g, (_, id) => lits[Number(id)]);
+    } finally {
+      scanScript = prevScan;
+    }
+  }
+
   /* ---------- the compiler: .som source → component definition ---------- */
   function parseSomScript(src, url) {
     scanScript = true;
@@ -2828,17 +3535,26 @@
   }
   function parseSomScriptInner(src, url) {
     const out = [], imports = [], props = {}, events = [];
-    const kw = /(prop|state|derive|derived|action|when|watch|on|use|share|receive|event|import|saved|load|layout)(?![\w$])/y;
+    const kw = /(prop|state|derive|derived|action|when|watch|on|use|share|receive|event|import|saved|load|layout|interface|type)(?![\w$])/y;
     let layout;
-    // `saved` and `load` are only keywords when a name and "=" follow, so `load(…)` stays a normal call
-    const declares = (at, word) => new RegExp('^' + word + '\\s+[A-Za-z_$][\\w$]*\\s*=(?!=)').test(src.slice(at, at + 200));
+    // `saved` and `load` are keywords when followed by `name =` or `name: Type =`, so `load(…)` stays a normal call
+    const declares = (at, word) => {
+      const rest = src.slice(at + word.length, at + 300);
+      const m = rest.match(/^\s+([A-Za-z_$][\w$]*)\s*([:=])/);
+      if (!m) return false;
+      if (m[2] === '=') return rest[m.index + m[0].length] !== '=';
+      return findTopLevelEq(rest.slice(m.index)) > 0;
+    };
     const fail = (i, msg) => { throw new SyntaxError(`${msg} (${url.split('/').pop()}, line ${lineOf(src, i)})`); };
     const nameValue = (i, end, keyword) => {
       const text = src.slice(i, end).trim();
-      const eq = text.search(/=(?!=)/);
-      const name = (eq < 0 ? text : text.slice(0, eq)).trim();
+      const eq = findTopLevelEq(text);
+      const lhs = (eq < 0 ? text : text.slice(0, eq)).trim();
+      const colon = lhs.indexOf(':');
+      const name = (colon < 0 ? lhs : lhs.slice(0, colon)).replace(/\?\s*$/, '').trim();
       if (!IDENT.test(name)) fail(i, `"${keyword}" needs a name, like: ${keyword} count = 0`);
-      return { name, value: eq < 0 ? null : text.slice(eq + 1).trim() };
+      const rawVal = eq < 0 ? null : text.slice(eq + 1).trim();
+      return { name, value: rawVal == null ? null : stripTypeScript(rawVal) };
     };
     // move past a statement's end: skip its ";" or newline, but not a "//" comment that follows it
     const after = (end) => (src[end] === ';' || src[end] === '\n' ? end + 1 : end);
@@ -2853,31 +3569,86 @@
       let m = kw.exec(src);
       if (m && (m[1] === 'saved' || m[1] === 'load') && !declares(i, m[1])) m = null;
       if (m && (m[1] === 'watch' || m[1] === 'when') && /^\w+\s*\(/.test(src.slice(i))) m = null;
+      if (m && m[1] === 'interface' && !/^interface\s+[A-Za-z_$][\w$]*/.test(src.slice(i, i + 120))) m = null;
+      if (m && m[1] === 'type' && !/^type\s+[A-Za-z_$][\w$]*(?:\s*<[^>]*>)?\s*=(?!=)/.test(src.slice(i, i + 160))) m = null;
       // `layout admin` / `layout 'layouts/admin.som'` / `layout none`: only like that, so `layout = …` stays code
       const lm = m && m[1] === 'layout' && src.slice(i).match(/^layout[ \t]+(?:(['"])([^'"\n]+)\1|([\w./-]+))[ \t]*;?[ \t]*(?=\n|$|\/\/)/);
       if (m && m[1] === 'layout' && !lm) m = null;
       if (lm) { layout = lm[2] || lm[3]; if (layout === 'none' || layout === 'false') layout = false; i += lm[0].length; continue; }
-      if (!m) { const end = readExpr(src, i); out.push(src.slice(i, end) + ';'); i = after(end); continue; }
+      if (!m) {
+        const end = readExpr(src, i);
+        const stmt = stripTypeScript(src.slice(i, end)).trim();
+        if (stmt) out.push(stmt + ';');
+        i = after(end);
+        continue;
+      }
       const word = m[1];
       let j = i + word.length;
       try {
+        if (word === 'interface') {
+          const open = findBlock(src, j);
+          const close = matchBrace(src, open);
+          i = after(close);
+          continue;
+        }
+        if (word === 'type') {
+          let k = j + src.slice(j).indexOf('=') + 1, depth = 0, angle = 0;
+          while (k < src.length) {
+            const lit = skipLiteral(src, k);
+            if (lit >= 0) { k = lit; continue; }
+            const c = src[k], nx = src[k + 1], pr = src[k - 1];
+            if (c === '(' || c === '[' || c === '{') depth++;
+            else if (c === ')' || c === ']' || c === '}') { if (depth > 0) depth--; }
+            else if (c === '<' && pr !== '<' && nx !== '=') angle++;
+            else if (c === '>' && pr !== '=' && pr !== '-' && angle > 0) angle--;
+            else if (depth === 0 && angle === 0) {
+              if (c === ';') { k++; break; }
+              if (c === '\n') {
+                const cont = src.slice(k + 1).match(/^[ \t]*([|&?:])/);
+                if (!cont) break;
+              }
+            }
+            k++;
+          }
+          i = after(k);
+          continue;
+        }
         if (word === 'import') {
-          const end = readExpr(src, i); imports.push(src.slice(i, end).trim()); i = after(end); continue;
+          const end = readExpr(src, i);
+          const rawImport = src.slice(i, end).trim();
+          if (!/^import\s+type\b/.test(rawImport)) {
+            const cleanedImport = stripTypeScript(rawImport).trim();
+            if (cleanedImport) imports.push(cleanedImport);
+          }
+          i = after(end);
+          continue;
         }
         if (word === 'prop' || word === 'event' || word === 'use') {
           const end = readExpr(src, j);
           const text = src.slice(j, end).trim();
-          if (word === 'prop' && /=/.test(text)) { const { name, value } = nameValue(j, end, 'prop'); props[name] = value; }
-          else if (word === 'use' && /^[A-Za-z_$][\w$]*\s*=(?!=)/.test(text)) { // use mouse = trackMouse()
+          const eq = findTopLevelEq(text);
+          if (word === 'prop' && eq > 0) {
+            const { name, value } = nameValue(j, end, 'prop');
+            props[name] = value;
+          } else if (word === 'use' && eq > 0) { // use mouse = trackMouse() or use mouse: MousePos = trackMouse()
             const { name, value } = nameValue(j, end, 'use');
             out.push(`$h.use(${JSON.stringify(name)}, () => (${value}));`);
+          } else if ((word === 'prop' || word === 'event') && text.includes(':')) {
+            // Typed prop or event without default: `prop user: User | null` or `event save: (u: User) => void`
+            const colon = text.indexOf(':');
+            const name = text.slice(0, colon).replace(/\?\s*$/, '').trim();
+            if (!IDENT.test(name) && word !== 'event') fail(j, `Invalid name "${name}"`);
+            if (word === 'prop') props[name] = null;
+            else events.push(name);
+          } else {
+            text.split(',').map((s) => s.trim()).filter(Boolean).forEach((rawN) => {
+              const n = rawN.split(':')[0].replace(/\?\s*$/, '').trim();
+              if (!IDENT.test(n) && word !== 'event') fail(j, `Invalid name "${n}"`);
+              if (word === 'prop') props[n] = null;
+              else if (word === 'event') events.push(n);
+              else out.push(`$h.use(${JSON.stringify(n)});`);
+            });
           }
-          else text.split(',').map((s) => s.trim()).filter(Boolean).forEach((n) => {
-            if (!IDENT.test(n) && word !== 'event') fail(j, `Invalid name "${n}"`);
-            if (word === 'prop') props[n] = null;
-            else if (word === 'event') events.push(n);
-            else out.push(`$h.use(${JSON.stringify(n)});`);
-          });
           i = after(end); continue;
         }
         if (word === 'state' || word === 'derive' || word === 'derived' || word === 'share' || word === 'receive') {
@@ -2893,10 +3664,17 @@
         }
         if (word === 'saved') {
           const end = readExpr(src, j);
-          const { name, value } = nameValue(j, end, 'saved');
-          if (value == null) fail(j, `"saved ${name}" needs a value, like: saved ${name} = []`);
-          const km = value.match(/^([\s\S]*?)\s+as\s+(['"])([^'"]+)\2\s*$/);
-          out.push(`$h.saved(${JSON.stringify(name)}, () => (${km ? km[1] : value}), ${km ? JSON.stringify(km[3]) : 'null'});`);
+          const rawText = src.slice(j, end).trim();
+          const eq = findTopLevelEq(rawText);
+          const lhs = (eq < 0 ? rawText : rawText.slice(0, eq)).trim();
+          const colon = lhs.indexOf(':');
+          const name = (colon < 0 ? lhs : lhs.slice(0, colon)).replace(/\?\s*$/, '').trim();
+          if (!IDENT.test(name)) fail(j, `"saved" needs a name, like: saved count = 0`);
+          const rawVal = eq < 0 ? null : rawText.slice(eq + 1).trim();
+          if (rawVal == null) fail(j, `"saved ${name}" needs a value, like: saved ${name} = []`);
+          const km = rawVal.match(/^([\s\S]*?)\s+as\s+(['"])([^'"]+)\2\s*$/);
+          const cleanVal = stripTypeScript(km ? km[1] : rawVal);
+          out.push(`$h.saved(${JSON.stringify(name)}, () => (${cleanVal}), ${km ? JSON.stringify(km[3]) : 'null'});`);
           i = after(end); continue;
         }
         if (word === 'load') {
@@ -2909,23 +3687,47 @@
         if (word === 'action') {
           const { head, body, end } = block(j);
           const cleanHead = head.replace(/^(async\s+)?(function\s+)?/, '').trim();
-          const am = cleanHead.match(/^([A-Za-z_$][\w$]*)\s*(\([\s\S]*\))?$/);
-          if (!am) fail(j, 'Write an action like: action save(item) { … }');
-          const isAsync = /\basync\b/.test(head) || /\bawait\b/.test(body) ? 'async ' : '';
-          out.push(`$h.action(${JSON.stringify(am[1])}, ${isAsync}function ${am[1]}${am[2] || '()'} {${body}\n});`);
+          const nameMatch = cleanHead.match(/^([A-Za-z_$][\w$]*)/);
+          if (!nameMatch) fail(j, 'Write an action like: action save(item) { … }');
+          const actName = nameMatch[1];
+          let restHead = cleanHead.slice(actName.length).trim();
+          // Skip optional generic `<T, U>` before `(`
+          if (restHead.startsWith('<')) {
+            let a = 0, k = 0;
+            while (k < restHead.length) {
+              if (restHead[k] === '<') a++;
+              else if (restHead[k] === '>') { a--; if (a === 0) { k++; break; } }
+              k++;
+            }
+            restHead = restHead.slice(k).trim();
+          }
+          let paramsCode = '()';
+          if (restHead.startsWith('(')) {
+            const pClose = matchBrace(restHead, 0);
+            const inner = restHead.slice(1, pClose - 1);
+            paramsCode = '(' + stripTsParams(inner) + ')';
+          } else if (restHead) {
+            fail(j, 'Write an action like: action save(item) { … }');
+          }
+          const cleanBody = stripTypeScript(body);
+          const isAsync = /\basync\b/.test(head) || /\bawait\b/.test(cleanBody) ? 'async ' : '';
+          out.push(`$h.action(${JSON.stringify(actName)}, ${isAsync}function ${actName}${paramsCode} {${cleanBody}\n});`);
           i = end; continue;
         }
         if (word === 'when' || word === 'watch') {
           const { head, body, end } = block(j);
           if (!head) fail(j, `"${word}" needs something to check, like: ${word} count > 5 { … }`);
-          const isAsync = /\bawait\b/.test(body) ? 'async ' : '';
-          out.push(`$h.${word}(() => (${head}), ${isAsync}function (value, old) {${body}\n});`);
+          const cleanHead = stripTypeScript(head);
+          const cleanBody = stripTypeScript(body);
+          const isAsync = /\bawait\b/.test(cleanBody) ? 'async ' : '';
+          out.push(`$h.${word}(() => (${cleanHead}), ${isAsync}function (value, old) {${cleanBody}\n});`);
           i = end; continue;
         }
         if (word === 'on') {
           const { head, body, end } = block(j);
-          const isAsync = /\bawait\b/.test(body) ? 'async ' : '';
-          out.push(`$h.on(${JSON.stringify(head)}, ${isAsync}function () {${body}\n});`);
+          const cleanBody = stripTypeScript(body);
+          const isAsync = /\bawait\b/.test(cleanBody) ? 'async ' : '';
+          out.push(`$h.on(${JSON.stringify(head)}, ${isAsync}function () {${cleanBody}\n});`);
           i = end; continue;
         }
       } catch (e) {
@@ -3341,7 +4143,8 @@
   function parseQuery(qs) {
     const q = {};
     new URLSearchParams(qs).forEach((v, k) => {
-      if (k in q) q[k] = [].concat(q[k], v); else q[k] = v;
+      if (BAD_PATH_KEYS.has(k)) return;
+      if (hasOwn(q, k)) q[k] = [].concat(q[k], v); else q[k] = v;
     });
     return q;
   }
@@ -3561,7 +4364,7 @@
           path = to.path || '/';
         }
       }
-      if (path[0] !== '/') path = '/' + path;
+      path = '/' + String(path || '').replace(/^\/+/, '');
       let matched = null, params = {};
       for (const rec of records) {
         const m = path.match(rec.regex);
@@ -3807,7 +4610,7 @@
       if (only && !only.has(field)) continue;
       const list = parseRules(rules[field]);
       const value = getPath(data, field);
-      const attribute = names[field] || field.replace(/[_.]/g, ' ');
+      const attribute = names[field] || (hasTranslation(`validation.attributes.${field}`) ? getTranslation(`validation.attributes.${field}`) : field.replace(/[_.]/g, ' '));
       const numericField = list.some((r) => r.name === 'numeric' || r.name === 'integer') || typeof value === 'number';
       const kind = isArray(value) ? 'array' : numericField ? 'numeric' : 'string';
       const sizeOf = (v) => (isArray(v) ? v.length : numericField ? Number(v) : String(v == null ? '' : v).length);
@@ -3874,8 +4677,11 @@
           default: warn(`Unknown validation rule "${r.name}" for ${field}.`);
         }
         if (!failed) continue;
-        let text = msgs[`${field}.${r.name}`] || msgs[r.name] || validationMessages[r.name] || 'The :attribute field is invalid.';
-        if (isObject(text)) text = text[kind];
+        let text = msgs[`${field}.${r.name}`] || msgs[r.name];
+        if (!text && hasTranslation(`validation.${field}.${r.name}`)) text = getTranslation(`validation.${field}.${r.name}`);
+        if (!text && hasTranslation(`validation.${r.name}`)) text = getTranslation(`validation.${r.name}`);
+        if (!text) text = validationMessages[r.name] || 'The :attribute field is invalid.';
+        if (isObject(text)) text = text[kind] || text.string || text;
         text = text.replace(/:attribute/g, attribute).replace(/:(\w+)/g, (m, k) => (hasOwn(extra, k) ? extra[k] : m));
         (errors[field] || (errors[field] = [])).push(text);
         if (r.name === 'required' || r.name === 'required_if') break; // nothing else matters when it's missing
@@ -3927,7 +4733,11 @@
     });
     // after the first submit, or once a field has been changed, its errors follow your typing
     Object.keys(raw).forEach((k) => {
-      doWatch(() => { const v = f[k]; return isObject(v) ? JSON.stringify(v) : v; }, () => {
+      doWatch(() => {
+        const v = f[k];
+        if (!isObject(v)) return v;
+        try { return JSON.stringify(v); } catch (_) { return v; }
+      }, () => {
         meta.touched[k] = true;
         if (meta.submitted || meta.errors[k] || options.live) recheck(k);
       });
@@ -4116,7 +4926,7 @@
     stores, storeLog, busLog,
   };
 
-  const VERSION = '2.3.0';
+  const VERSION = '2.4.0';
   const Som = {
     version: VERSION,
     // PUBLIC_ values from .env (som dev and som build put them here); never secrets
@@ -4157,6 +4967,17 @@
     read: unref, unwrap: toRaw, raw: markRaw,
     // saving data, talking to servers
     saved, storage, api, ApiError, resource, table, validate, form, selection, theme, slug, seo: applySEO, useSeo: applySEO,
+    cleanHtml, sanitizeHtml: cleanHtml, escapeHtml, e: escapeHtml, stripTags,
+    stripTypeScript,
+    // localization & i18n
+    locale: getLocale, fallbackLocale: getFallbackLocale, locales: listLocales,
+    translations: registerTranslations,
+    dir: (loc) => (isRtlLocale(loc || currentLocaleRef.value) ? 'rtl' : 'ltr'),
+    isRtl: (loc) => isRtlLocale(loc || currentLocaleRef.value),
+    __: getTranslation, t: getTranslation, trans: getTranslation,
+    choice: choiceTranslation, transChoice: choiceTranslation, trans_choice: choiceTranslation,
+    hasTranslation,
+    formatNumber, formatCurrency, formatDate,
     // reacting to changes
     watch, effect: watchEffect, tick: nextTick, onCleanup: onScopeDispose,
     // sharing data
@@ -4164,14 +4985,14 @@
     // lifecycle (inside init)
     onReady, onDestroy, onDestroyed, onUpdate, onShow, onHide,
     onMounted, onUnmounted, onBeforeUnmount, onUpdated,
-    useInterval, useTimeout,
+    useInterval, useTimeout, useInactivityTimer,
     // router
     router: createRouter, currentRoute, currentRouter,
   };
 
   // the text-only helpers the build tool reuses, so built code matches the browser exactly
   Object.defineProperty(Som, '__internal', {
-    value: { expandBlocks, splitSom, splitInterp, exactBrace, stripBrace, interpToExpr, quoteBraceAttrs, expandSelfClosing, scopeCss, hashString, propType, simplePathRE, fnExpRE, forAliasRE, makeSomDef },
+    value: { expandBlocks, splitSom, splitInterp, exactBrace, stripBrace, interpToExpr, quoteBraceAttrs, expandSelfClosing, scopeCss, hashString, propType, simplePathRE, fnExpRE, forAliasRE, makeSomDef, compileFn, evaluate, stripTypeScript, stripTsParams },
   });
 
   if (typeof module !== 'undefined' && module.exports) module.exports = Som;

@@ -14,20 +14,35 @@ const crypto = require('crypto');
 
 /* ------------------------------------------------------------------ Hash */
 // scrypt, built into Node.js: slow on purpose, with its own salt per password
-const N = 16384, R = 8, P = 1, LEN = 64;
+const N = 16384, R = 8, P = 1, LEN = 64, MAX_PASSWORD_BYTES = 1024;
+let dummyHashCache = null;
 const Hash = {
   make(value) {
+    const str = String(value);
+    if (Buffer.byteLength(str, 'utf8') > MAX_PASSWORD_BYTES) {
+      throw Object.assign(new Error('Password is too long (maximum 1024 bytes).'), { status: 422 });
+    }
     const salt = crypto.randomBytes(16);
-    const key = crypto.scryptSync(String(value), salt, LEN, { N, r: R, p: P });
+    const key = crypto.scryptSync(str, salt, LEN, { N, r: R, p: P });
     return `$scrypt$N=${N},r=${R},p=${P}$${salt.toString('base64')}$${key.toString('base64')}`;
   },
   check(value, hashed) {
     if (typeof hashed !== 'string') return false;
+    const str = String(value);
+    if (Buffer.byteLength(str, 'utf8') > MAX_PASSWORD_BYTES) return false;
     const m = hashed.match(/^\$scrypt\$N=(\d+),r=(\d+),p=(\d+)\$([^$]+)\$([^$]+)$/);
     if (!m) return false;
+    const nVal = +m[1], rVal = +m[2], pVal = +m[3];
+    if (nVal < 1024 || nVal > 1048576 || (nVal & (nVal - 1)) !== 0 || rVal < 1 || rVal > 32 || pVal < 1 || pVal > 16) return false;
     const want = Buffer.from(m[5], 'base64');
-    const got = crypto.scryptSync(String(value), Buffer.from(m[4], 'base64'), want.length, { N: +m[1], r: +m[2], p: +m[3], maxmem: 256 * +m[1] * +m[2] * 2 });
+    if (want.length < 16 || want.length > 128) return false;
+    const got = crypto.scryptSync(str, Buffer.from(m[4], 'base64'), want.length, { N: nVal, r: rVal, p: pVal, maxmem: 256 * nVal * rVal * 2 });
     return got.length === want.length && crypto.timingSafeEqual(got, want);
+  },
+  // Constant-time dummy check when a user record does not exist, preventing timing-based email enumeration
+  dummyCheck(value) {
+    if (!dummyHashCache) dummyHashCache = Hash.make('som-dummy-timing-guard-password');
+    return Hash.check(String(value || '').slice(0, 256), dummyHashCache);
   },
   // a quick, unsalted hash for random tokens (they are long and random already)
   sha256: (value) => crypto.createHash('sha256').update(String(value)).digest('hex'),
@@ -77,7 +92,17 @@ const Str = {
 let fallbackKey = null;
 function appKey() {
   const k = process.env.APP_KEY;
-  if (k) return k.startsWith('base64:') ? Buffer.from(k.slice(7), 'base64') : Buffer.from(k);
+  // In production a missing or weak key is an error, not a warning: sessions and signed links would
+  // either break on every restart (each process makes its own key) or rest on a guessable secret.
+  const production = process.env.APP_ENV === 'production' || process.env.NODE_ENV === 'production';
+  if (k) {
+    const buf = k.startsWith('base64:') ? Buffer.from(k.slice(7), 'base64') : Buffer.from(k);
+    if (buf.length >= 16) return buf;
+    if (production) throw new Error('APP_KEY is shorter than 16 bytes. Run `som key:generate` and put the new key in .env.');
+    console.warn('  APP_KEY in .env is shorter than 16 bytes; run `som key:generate` for a 256-bit key.');
+    return buf;
+  }
+  if (production) throw new Error('APP_KEY is not set. Run `som key:generate` and put the key in .env (production needs one that every process shares).');
   if (!fallbackKey) {
     fallbackKey = crypto.randomBytes(32);
     console.warn('  No APP_KEY in .env: signed links stop working when the server restarts.');
@@ -86,6 +111,19 @@ function appKey() {
 }
 
 /* ------------------------------------------------------------------ Url */
+const canonicalSignedTarget = (rawPath, extraParams = {}) => {
+  const str = String(rawPath || '/');
+  const qIdx = str.indexOf('?');
+  const basePath = qIdx < 0 ? str : str.slice(0, qIdx);
+  const params = new URLSearchParams(qIdx < 0 ? '' : str.slice(qIdx + 1));
+  for (const [k, v] of Object.entries(extraParams)) {
+    if (v !== undefined) params.set(k, String(v));
+  }
+  params.sort();
+  const qs = params.toString();
+  return basePath + (qs ? '?' + qs : '');
+};
+
 const Url = {
   // the address of the app, for links in emails: APP_URL in .env
   to(path = '/') {
@@ -94,19 +132,23 @@ const Url = {
   },
   // a link that only works unchanged and, with minutes, until it expires
   signed(path, minutes = null) {
-    const sep = path.includes('?') ? '&' : '?';
-    const withExpiry = minutes ? `${path}${sep}expires=${Math.floor(Date.now() / 1000) + minutes * 60}` : path;
-    return `${withExpiry}${withExpiry.includes('?') ? '&' : '?'}signature=${sign(withExpiry)}`;
+    const extra = minutes != null ? { expires: Math.floor(Date.now() / 1000) + Number(minutes) * 60 } : {};
+    const target = canonicalSignedTarget(path, extra);
+    return `${target}${target.includes('?') ? '&' : '?'}signature=${sign(target)}`;
   },
   // check(path, { expires, signature, …the rest of the query })
   check(path, query = {}) {
-    const { signature, ...rest } = query;
-    if (!signature) return false;
-    const qs = Object.keys(rest).length ? '?' + new URLSearchParams(rest).toString() : '';
-    const want = Buffer.from(sign(path + qs));
+    const { signature, ...rest } = query || {};
+    if (!signature || typeof signature !== 'string') return false;
+    const target = canonicalSignedTarget(path, rest);
+    const want = Buffer.from(sign(target));
     const got = Buffer.from(String(signature));
     if (want.length !== got.length || !crypto.timingSafeEqual(want, got)) return false;
-    return !rest.expires || Number(rest.expires) * 1000 > Date.now();
+    if (rest.expires !== undefined) {
+      const exp = Number(rest.expires);
+      if (!Number.isFinite(exp) || exp * 1000 <= Date.now()) return false;
+    }
+    return true;
   },
 };
 const sign = (text) => crypto.createHmac('sha256', appKey()).update(text).digest('hex');
@@ -115,9 +157,15 @@ const sign = (text) => crypto.createHmac('sha256', appKey()).update(text).digest
 // MAIL_URL=smtp://user:password@smtp.example.com:587 in .env (and npm i nodemailer) sends real email.
 // Without it, the email is printed in the terminal (log driver).
 let transport = null;
+const cleanMailHeader = (v) => (v == null ? v : String(v).replace(/[\r\n\0]+/g, ' ').trim());
 const Mail = {
   async send({ to, subject = '', text = '', html, from, cc, bcc, replyTo, attachments } = {}) {
-    from = from || process.env.MAIL_FROM || `"${process.env.APP_NAME || 'App'}" <hello@example.com>`;
+    from = cleanMailHeader(from || process.env.MAIL_FROM || `"${String(process.env.APP_NAME || 'App').replace(/[\r\n"\\]+/g, '')}" <hello@example.com>`);
+    to = cleanMailHeader(to);
+    cc = cleanMailHeader(cc);
+    bcc = cleanMailHeader(bcc);
+    replyTo = cleanMailHeader(replyTo);
+    subject = cleanMailHeader(subject);
     if (process.env.MAIL_URL) {
       if (!transport) {
         let nodemailer;
@@ -144,21 +192,22 @@ const Crypt = {
   encryptString(value) {
     const key = crypto.createHash('sha256').update(appKey()).digest();
     const iv = crypto.randomBytes(12);
-    const c = crypto.createCipheriv('aes-256-gcm', key, iv);
+    const c = crypto.createCipheriv('aes-256-gcm', key, iv, { authTagLength: 16 });
     const data = Buffer.concat([c.update(String(value), 'utf8'), c.final()]);
     return Buffer.concat([iv, c.getAuthTag(), data]).toString('base64url');
   },
   decryptString(payload) {
     try {
       const buf = Buffer.from(String(payload), 'base64url');
+      if (buf.length < 28) throw new Error('Payload too short.');
       const key = crypto.createHash('sha256').update(appKey()).digest();
-      const d = crypto.createDecipheriv('aes-256-gcm', key, buf.subarray(0, 12));
+      const d = crypto.createDecipheriv('aes-256-gcm', key, buf.subarray(0, 12), { authTagLength: 16 });
       d.setAuthTag(buf.subarray(12, 28));
       return Buffer.concat([d.update(buf.subarray(28)), d.final()]).toString('utf8');
     } catch (_) { throw Object.assign(new Error('The payload is invalid.'), { status: 400 }); }
   },
   encrypt: (value) => Crypt.encryptString(JSON.stringify(value)),
-  decrypt: (payload) => JSON.parse(Crypt.decryptString(payload)),
+  decrypt: (payload) => require('../safe-json.js').parseJson(Crypt.decryptString(payload)),
 };
 
 /* ------------------------------------------------------------------ Log */
@@ -179,11 +228,12 @@ const Log = {
   getDirectory() { return getLogDir(); },
   path() { return require('path').join(getLogDir(), 'som.log'); },
   write(level, message, context) {
-    if (LEVELS[level] < LEVELS[(process.env.LOG_LEVEL || 'debug').toLowerCase()] ?? 0) return;
+    if (LEVELS[level] < (LEVELS[(process.env.LOG_LEVEL || 'debug').toLowerCase()] ?? 0)) return;
     const time = new Date().toISOString().slice(0, 19).replace('T', ' ');
-    const envName = process.env.APP_ENV || process.env.NODE_ENV || 'local';
-    const ctxStr = context && Object.keys(context).length ? ' ' + JSON.stringify(context) : '';
-    const line = `[${time}] ${envName}.${level.toUpperCase()}: ${message}${ctxStr}`;
+    const envName = String(process.env.APP_ENV || process.env.NODE_ENV || 'local').replace(/[\r\n\x00-\x1f\x7f]+/g, '');
+    const safeMsg = String(message ?? '').replace(/\r/g, '\\r').replace(/\n/g, '\\n').replace(/[\x00-\x08\x0b\x0c\x0e-\x1f\x7f]/g, '');
+    const ctxStr = context && Object.keys(context).length ? ' ' + JSON.stringify(context).replace(/[\r\n\x00-\x08\x0b\x0c\x0e-\x1f\x7f]/g, '') : '';
+    const line = `[${time}] ${envName}.${level.toUpperCase()}: ${safeMsg}${ctxStr}`;
     if (process.env.LOG_CHANNEL !== 'file') (level === 'error' || level === 'critical' ? console.error : console.log)('  ' + line);
     if (process.env.LOG_CHANNEL !== 'stderr') {
       const dir = getLogDir();
@@ -200,42 +250,108 @@ const Log = {
 };
 for (const level of Object.keys(LEVELS)) Log[level] = (message, context) => Log.write(level, message, context);
 
-/* ------------------------------------------------------------------ Lang */
-// backend/lang/en/messages.json { "welcome": "Welcome, :name" } → __('messages.welcome', { name: 'Maxamuud' })
+/* ------------------------------------------------------------------ Lang (i18n & l10n) */
+// Laravel-compatible translation from the [lang] folder:
+//   lang/en/auth.json         → __('auth.failed')
+//   lang/en/messages.json     → __('messages.welcome', { name: 'Maxamuud' })
+//   lang/en.json              → __('Sign In')
+//   Pluralization             → transChoice('messages.items', 5) or trans_choice(...)
+const langHelper = require('../lang.js');
 let langDir = null;
-const langCache = new Map();
+let diskScanned = false;
+const memoryTranslations = new Map();
+
+function ensureDiskLoaded() {
+  if (diskScanned) return;
+  const dirs = langDir ? [langDir, ...langHelper.findLangDirs()] : langHelper.findLangDirs();
+  const diskData = langHelper.scanLangDir(dirs);
+  for (const [loc, dict] of Object.entries(diskData)) {
+    const existing = memoryTranslations.get(loc) || {};
+    memoryTranslations.set(loc, { ...existing, ...dict });
+  }
+  diskScanned = true;
+}
+
 const Lang = {
-  setDirectory(dir) { langDir = dir; langCache.clear(); },
-  locale: () => Lang.current || process.env.APP_LOCALE || 'en',
-  setLocale(l) { Lang.current = l; },
-  get(key, replace = {}, locale = Lang.locale()) {
-    const [file, ...rest] = String(key).split('.');
-    const read = (loc) => {
-      if (!loc || !file || /[\/\\]|\.\./.test(file) || /[\/\\]|\.\./.test(loc) || ['__proto__', 'constructor', 'prototype'].includes(file)) return undefined;
-      const k = loc + '/' + file;
-      if (!langCache.has(k)) {
-        let data = null;
-        if (langDir) {
-          try {
-            const targetPath = require('path').resolve(langDir, loc, file + '.json');
-            if (targetPath.startsWith(require('path').resolve(langDir))) {
-              data = JSON.parse(require('fs').readFileSync(targetPath, 'utf8'));
-            }
-          } catch (_) { /* none */ }
-        }
-        langCache.set(k, data);
-      }
-      const data = langCache.get(k);
-      return data ? rest.reduce((o, p) => (o == null || ['__proto__', 'constructor', 'prototype'].includes(p) ? undefined : o[p]), data) : undefined;
-    };
-    let text = read(locale);
-    if (text === undefined) text = read(process.env.APP_FALLBACK_LOCALE || 'en');
-    if (text === undefined) return key;
-    return String(text).replace(/:(\w+)/g, (m, name) => (replace[name] !== undefined ? replace[name] : m));
+  setDirectory(dir) {
+    langDir = dir;
+    diskScanned = false;
   },
-  has: (key, locale) => Lang.get(key, {}, locale) !== key,
+  getDirectory() {
+    return langDir || (langHelper.findLangDirs()[0] || null);
+  },
+  locale: () => Lang.current || process.env.APP_LOCALE || 'en',
+  setLocale(l) { Lang.current = l ? String(l).trim() : null; },
+  fallbackLocale: () => Lang._fallback || process.env.APP_FALLBACK_LOCALE || 'en',
+  setFallbackLocale(l) { Lang._fallback = l ? String(l).trim() : null; },
+  translations(locale, dict) {
+    if (!dict && typeof locale === 'object') {
+      for (const [l, d] of Object.entries(locale)) Lang.translations(l, d);
+      return Lang;
+    }
+    if (!locale) return Lang;
+    const loc = String(locale).toLowerCase();
+    const existing = memoryTranslations.get(loc) || {};
+    memoryTranslations.set(loc, { ...existing, ...dict });
+    return Lang;
+  },
+  all(locale = Lang.locale()) {
+    ensureDiskLoaded();
+    const loc = String(locale || Lang.locale()).toLowerCase();
+    return memoryTranslations.get(loc) || {};
+  },
+  dir(locale = Lang.locale()) { return langHelper.dir(locale); },
+  isRtl(locale = Lang.locale()) { return langHelper.isRtl(locale); },
+  get(key, replace = {}, locale = Lang.locale()) {
+    ensureDiskLoaded();
+    const loc = String(locale || Lang.locale()).toLowerCase();
+    const fallback = String(Lang.fallbackLocale()).toLowerCase();
+    const strKey = String(key || '');
+
+    const lookupInDict = (dict, k) => {
+      if (!dict || typeof dict !== 'object') return undefined;
+      // 1. Direct exact key match (JSON translation string, e.g. __('Sign In') or __('auth.failed'))
+      if (dict[k] !== undefined && !['__proto__', 'constructor', 'prototype'].includes(k)) return dict[k];
+      // 2. Group and nested path match: 'auth.failed' -> dict['auth']['failed']
+      const parts = k.split('.');
+      let cur = dict;
+      for (const p of parts) {
+        if (!p || ['__proto__', 'constructor', 'prototype'].includes(p) || cur == null || typeof cur !== 'object') return undefined;
+        cur = cur[p];
+      }
+      return cur;
+    };
+
+    let text = lookupInDict(memoryTranslations.get(loc), strKey);
+    if (text === undefined && loc !== fallback) text = lookupInDict(memoryTranslations.get(fallback), strKey);
+    if (text === undefined) return key;
+    if (typeof text !== 'string') return text;
+
+    return langHelper.replacePlaceholders(text, replace);
+  },
+  choice(key, number, replace = {}, locale = Lang.locale()) {
+    const raw = Lang.get(key, {}, locale);
+    const chosen = langHelper.choose(raw, number, locale);
+    const fullReplace = { count: number, ...replace };
+    return langHelper.replacePlaceholders(chosen, fullReplace);
+  },
+  has(key, locale = Lang.locale()) {
+    return Lang.get(key, {}, locale) !== key;
+  },
+  formatNumber(n, options, locale = Lang.locale()) {
+    return new Intl.NumberFormat(locale, options).format(n);
+  },
+  formatCurrency(amount, currency = 'USD', locale = Lang.locale()) {
+    return new Intl.NumberFormat(locale, { style: 'currency', currency }).format(amount);
+  },
+  formatDate(date, options, locale = Lang.locale()) {
+    return new Intl.DateTimeFormat(locale, options).format(date instanceof Date ? date : new Date(date));
+  },
 };
 const __ = (key, replace, locale) => Lang.get(key, replace, locale);
+const trans = (key, replace, locale) => Lang.get(key, replace, locale);
+const transChoice = (key, number, replace, locale) => Lang.choice(key, number, replace, locale);
+const trans_choice = transChoice;
 
 /* ------------------------------------------------------------------ Http (a client for other APIs) */
 // const res = await Http.withToken(t).get('https://api.example.com/users', { page: 2 });  res.ok  res.status  res.json()
@@ -286,6 +402,12 @@ const base32 = {
   encode(buf) { let bits = '', out = ''; for (const b of buf) bits += b.toString(2).padStart(8, '0'); for (let i = 0; i + 5 <= bits.length; i += 5) out += B32[parseInt(bits.slice(i, i + 5), 2)]; return out; },
   decode(str) { let bits = ''; for (const c of String(str).toUpperCase().replace(/[^A-Z2-7]/g, '')) bits += B32.indexOf(c).toString(2).padStart(5, '0'); const out = []; for (let i = 0; i + 8 <= bits.length; i += 8) out.push(parseInt(bits.slice(i, i + 8), 2)); return Buffer.from(out); },
 };
+const usedTotpCodes = new Map();
+setInterval(() => {
+  const now = Date.now();
+  for (const [k, exp] of usedTotpCodes) if (exp < now) usedTotpCodes.delete(k);
+}, 60000).unref();
+
 const TOTP = {
   secret: (bytes = 20) => base32.encode(crypto.randomBytes(bytes)),
   code(secret, at = Date.now()) {
@@ -295,12 +417,23 @@ const TOTP = {
     const o = h[h.length - 1] & 0xf;
     return String(((h.readUInt32BE(o) & 0x7fffffff) % 1000000)).padStart(6, '0');
   },
-  verify(secret, code, window = 1) {
+  verify(secret, code, window = 1, { replayProtection = true } = {}) {
     const given = String(code || '').replace(/\s/g, '');
     if (!/^\d{6}$/.test(given)) return false;
+    const nowMs = Date.now();
     for (let w = -window; w <= window; w++) {
-      const want = TOTP.code(secret, Date.now() + w * 30000);
-      if (crypto.timingSafeEqual(Buffer.from(want), Buffer.from(given))) return true;
+      const slotTime = nowMs + w * 30000;
+      const want = TOTP.code(secret, slotTime);
+      if (crypto.timingSafeEqual(Buffer.from(want), Buffer.from(given))) {
+        if (replayProtection) {
+          const slot = Math.floor(slotTime / 1000 / 30);
+          const key = crypto.createHash('sha256').update(`${secret}:${slot}:${given}`).digest('hex');
+          if (usedTotpCodes.has(key)) return false;
+          if (usedTotpCodes.size >= 10000) usedTotpCodes.delete(usedTotpCodes.keys().next().value);
+          usedTotpCodes.set(key, nowMs + (window + 2) * 30000);
+        }
+        return true;
+      }
     }
     return false;
   },
@@ -343,16 +476,17 @@ const slug = Object.assign(
 );
 
 /* ------------------------------------------------------------------ SEO */
+const escAttr = (s) => String(s ?? '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#39;');
 const SEO = {
   renderTags(options = {}) {
     const o = typeof options === 'string' ? { title: options } : options;
     const tags = [];
-    if (o.title) tags.push(`<title>${o.title}</title>`);
-    if (o.description) tags.push(`<meta name="description" content="${String(o.description).replace(/"/g, '&quot;')}">`);
-    if (o.keywords) tags.push(`<meta name="keywords" content="${Array.isArray(o.keywords) ? o.keywords.join(', ') : o.keywords}">`);
-    if (o.author) tags.push(`<meta name="author" content="${o.author}">`);
-    if (o.robots) tags.push(`<meta name="robots" content="${o.robots}">`);
-    if (o.canonical) tags.push(`<link rel="canonical" href="${o.canonical}">`);
+    if (o.title) tags.push(`<title>${escAttr(o.title)}</title>`);
+    if (o.description) tags.push(`<meta name="description" content="${escAttr(o.description)}">`);
+    if (o.keywords) tags.push(`<meta name="keywords" content="${escAttr(Array.isArray(o.keywords) ? o.keywords.join(', ') : o.keywords)}">`);
+    if (o.author) tags.push(`<meta name="author" content="${escAttr(o.author)}">`);
+    if (o.robots) tags.push(`<meta name="robots" content="${escAttr(o.robots)}">`);
+    if (o.canonical) tags.push(`<link rel="canonical" href="${escAttr(o.canonical)}">`);
 
     // OpenGraph
     const og = o.og || o.openGraph || {};
@@ -363,12 +497,12 @@ const SEO = {
     const ogType = og.type || 'website';
     const ogSite = og.siteName || og.site_name || o.siteName || o.site_name;
 
-    if (ogTitle) tags.push(`<meta property="og:title" content="${String(ogTitle).replace(/"/g, '&quot;')}">`);
-    if (ogDesc) tags.push(`<meta property="og:description" content="${String(ogDesc).replace(/"/g, '&quot;')}">`);
-    if (ogImage) tags.push(`<meta property="og:image" content="${ogImage}">`);
-    if (ogUrl) tags.push(`<meta property="og:url" content="${ogUrl}">`);
-    if (ogType) tags.push(`<meta property="og:type" content="${ogType}">`);
-    if (ogSite) tags.push(`<meta property="og:site_name" content="${String(ogSite).replace(/"/g, '&quot;')}">`);
+    if (ogTitle) tags.push(`<meta property="og:title" content="${escAttr(ogTitle)}">`);
+    if (ogDesc) tags.push(`<meta property="og:description" content="${escAttr(ogDesc)}">`);
+    if (ogImage) tags.push(`<meta property="og:image" content="${escAttr(ogImage)}">`);
+    if (ogUrl) tags.push(`<meta property="og:url" content="${escAttr(ogUrl)}">`);
+    if (ogType) tags.push(`<meta property="og:type" content="${escAttr(ogType)}">`);
+    if (ogSite) tags.push(`<meta property="og:site_name" content="${escAttr(ogSite)}">`);
 
     // Twitter
     const tw = o.twitter || {};
@@ -377,17 +511,19 @@ const SEO = {
     const twDesc = tw.description || ogDesc;
     const twImage = tw.image || ogImage;
 
-    if (twCard) tags.push(`<meta name="twitter:card" content="${twCard}">`);
-    if (twTitle) tags.push(`<meta name="twitter:title" content="${String(twTitle).replace(/"/g, '&quot;')}">`);
-    if (twDesc) tags.push(`<meta name="twitter:description" content="${String(twDesc).replace(/"/g, '&quot;')}">`);
-    if (twImage) tags.push(`<meta name="twitter:image" content="${twImage}">`);
-    if (tw.site) tags.push(`<meta name="twitter:site" content="${tw.site}">`);
-    if (tw.creator) tags.push(`<meta name="twitter:creator" content="${tw.creator}">`);
+    if (twCard) tags.push(`<meta name="twitter:card" content="${escAttr(twCard)}">`);
+    if (twTitle) tags.push(`<meta name="twitter:title" content="${escAttr(twTitle)}">`);
+    if (twDesc) tags.push(`<meta name="twitter:description" content="${escAttr(twDesc)}">`);
+    if (twImage) tags.push(`<meta name="twitter:image" content="${escAttr(twImage)}">`);
+    if (tw.site) tags.push(`<meta name="twitter:site" content="${escAttr(tw.site)}">`);
+    if (tw.creator) tags.push(`<meta name="twitter:creator" content="${escAttr(tw.creator)}">`);
 
     // JSON-LD Schema
     if (o.schema || o.jsonLd) {
       const s = o.schema || o.jsonLd;
-      tags.push(`<script type="application/ld+json">${typeof s === 'string' ? s : JSON.stringify(s)}</script>`);
+      const rawJson = typeof s === 'string' ? s : JSON.stringify(s);
+      const safeJson = String(rawJson).replace(/</g, '\\u003c').replace(/>/g, '\\u003e').replace(/&/g, '\\u0026');
+      tags.push(`<script type="application/ld+json">${safeJson}</script>`);
     }
 
     return tags.join('\n');
@@ -400,7 +536,7 @@ const SEO = {
       const loc = `${cleanBase}${path.startsWith('/') ? path : '/' + path}`;
       const changefreq = (typeof r === 'object' && r.changefreq) || 'weekly';
       const priority = (typeof r === 'object' && r.priority) || (path === '/' ? '1.0' : '0.8');
-      return `  <url>\n    <loc>${loc}</loc>\n    <lastmod>${date}</lastmod>\n    <changefreq>${changefreq}</changefreq>\n    <priority>${priority}</priority>\n  </url>`;
+      return `  <url>\n    <loc>${escAttr(loc)}</loc>\n    <lastmod>${date}</lastmod>\n    <changefreq>${escAttr(changefreq)}</changefreq>\n    <priority>${escAttr(priority)}</priority>\n  </url>`;
     });
     return `<?xml version="1.0" encoding="UTF-8"?>\n<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n${urls.join('\n')}\n</urlset>\n`;
   },
@@ -413,4 +549,4 @@ const SEO = {
   },
 };
 
-module.exports = { Hash, Str, slug, uniqueSlug, Url, Mail, Crypt, Log, Lang, __, Http, env, now, appKey, TOTP, SEO };
+module.exports = { Hash, Str, slug, uniqueSlug, Url, Mail, Crypt, Log, Lang, __, trans, transChoice, trans_choice, Http, env, now, appKey, TOTP, SEO };

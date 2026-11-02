@@ -40,10 +40,10 @@ const abortUnless = (cond, status, message) => { if (!cond) abort(status, messag
 const same = (a, b) => {
   if (typeof a !== 'string' || typeof b !== 'string') return false;
   if (!a || !b) return false;
-  const bufA = Buffer.from(a);
-  const bufB = Buffer.from(b);
-  if (bufA.length !== bufB.length) return false;
-  return crypto.timingSafeEqual(bufA, bufB);
+  // Use fixed-length SHA-256 hashes to prevent timing leaks of secret length
+  const hashA = crypto.createHash('sha256').update(a).digest();
+  const hashB = crypto.createHash('sha256').update(b).digest();
+  return crypto.timingSafeEqual(hashA, hashB);
 };
 
 class Response {
@@ -69,8 +69,11 @@ class Response {
   }
   json(body, status) { this.body = body; if (status) this.statusCode = status; return this; }
   // response(user).cookie('name', 'value', { maxAge: 3600, httpOnly: true })  — HttpOnly, SameSite=Lax and Path=/ by default
-  cookie(name, value, { maxAge, path = '/', httpOnly = true, sameSite = 'Lax', secure = cookieSecure(), domain } = {}) {
+  cookie(name, value, { maxAge, path = '/', httpOnly = true, sameSite = process.env.SESSION_SAME_SITE || 'Lax', secure = cookieSecure(), domain } = {}) {
     if (/[\r\n;=]/.test(String(name))) throw new Error('Invalid characters in cookie name.');
+    if (/[\r\n;]/.test(String(path)) || /[\r\n;]/.test(String(sameSite)) || (domain && /[\r\n;]/.test(String(domain)))) {
+      throw new Error('Invalid characters in cookie attributes.');
+    }
     const parts = [`${name}=${encodeURIComponent(value)}`, `Path=${path}`, `SameSite=${sameSite}`];
     if (maxAge != null) parts.push(`Max-Age=${Math.floor(maxAge)}`);
     if (httpOnly) parts.push('HttpOnly');
@@ -83,8 +86,12 @@ class Response {
   }
   withoutCookie(name, { path = '/' } = {}) { return this.cookie(name, '', { maxAge: 0, path }); }
 }
-// cookies are Secure when the app runs on https (APP_URL), or SESSION_SECURE_COOKIE=true
-const cookieSecure = () => process.env.SESSION_SECURE_COOKIE ? process.env.SESSION_SECURE_COOKIE === 'true' : /^https:/i.test(process.env.APP_URL || '');
+// cookies are Secure when the app runs on https (APP_URL), in production, or SESSION_SECURE_COOKIE=true
+const cookieSecure = () => {
+  if (process.env.SESSION_SECURE_COOKIE != null) return process.env.SESSION_SECURE_COOKIE === 'true';
+  const isProd = process.env.APP_ENV === 'production' || process.env.NODE_ENV === 'production';
+  return isProd || /^https:/i.test(process.env.APP_URL || '');
+};
 // response(data, 201) / response().json(data) / response().noContent()
 function response(body, status = 200, headers = {}) { return new Response(body, status, headers); }
 response.json = (body, status = 200, headers = {}) => new Response(body, status, headers);
@@ -114,13 +121,27 @@ class Request {
   }
   get url() { return this.raw.url; }
   // the visitor's address. X-Forwarded-For is only believed from a proxy you trust (TRUSTED_PROXIES in .env:
-  // "*" or "10.0.0.1,10.0.0.2"); anyone else could send a fake one to dodge throttle
+  // "*" or "10.0.0.1,10.0.0.2"); anyone else could send a fake one to dodge throttle.
+  // A proxy adds the address it saw to the END of the list, so the list is read from the right: the first
+  // address that isn't one of your proxies is the visitor. The left side is whatever the visitor wrote.
+  // With "*", TRUSTED_PROXY_HOPS (default 1) says how many proxies stand in front of the app.
   ip() {
+    const strip = (a) => String(a).replace(/^::ffff:/, '');
     const direct = (this.raw.socket && this.raw.socket.remoteAddress) || '';
     const trusted = String(process.env.TRUSTED_PROXIES || '').split(',').map((x) => x.trim()).filter(Boolean);
-    const forwarded = String(this.raw.headers['x-forwarded-for'] || '').split(',')[0].trim();
-    const fromProxy = trusted.includes('*') || trusted.includes(direct) || trusted.includes(direct.replace(/^::ffff:/, ''));
-    return (fromProxy && forwarded) || direct;
+    const any = trusted.includes('*');
+    const isProxy = (a) => any || trusted.includes(a) || trusted.includes(strip(a));
+    if (!isProxy(direct)) return direct;
+    const list = String(this.raw.headers['x-forwarded-for'] || '').split(',').map((x) => x.trim()).filter(Boolean);
+    const valid = (a) => a.length <= 45 && /^[0-9a-fA-F:.]+$/.test(a);
+    let hops = any ? Math.max(1, parseInt(process.env.TRUSTED_PROXY_HOPS, 10) || 1) - 1 : Infinity;
+    for (let i = list.length - 1; i >= 0; i--) {
+      if (!valid(list[i])) return direct;
+      if (!any && isProxy(list[i])) continue;
+      if (any && hops-- > 0) continue;
+      return list[i];
+    }
+    return direct;
   }
   header(name, fallback = null) { const v = this.raw.headers[String(name).toLowerCase()]; return v == null ? fallback : v; }
   cookie(name, fallback = null) {
@@ -166,6 +187,46 @@ class Request {
   async uniqueSlug(target, column, key, sep = '-') { const { uniqueSlug } = require('./support.js'); return uniqueSlug(target, column, this.input(key), sep); }
   isMethod(m) { return this.method === String(m).toUpperCase(); }
   expectsJson() { return /json/.test(this.header('accept', '')); }
+
+  // Localization
+  locale() {
+    if (this._locale) return this._locale;
+    // 1. Query parameter ?lang= or ?locale=
+    const q = this.query && (this.query.lang || this.query.locale);
+    if (q && typeof q === 'string') {
+      this._locale = q.toLowerCase().trim();
+      return this._locale;
+    }
+    // 2. Cookie locale / lang / som_locale
+    const c = this.cookie('locale') || this.cookie('lang') || this.cookie('som_locale');
+    if (c && typeof c === 'string') {
+      this._locale = c.toLowerCase().trim();
+      return this._locale;
+    }
+    // 3. Accept-Language header (e.g. ar,en-US;q=0.9,en;q=0.8)
+    const al = this.header('accept-language');
+    if (al && typeof al === 'string') {
+      const parsed = al.split(',')
+        .map((part) => {
+          const [tag, qVal] = part.trim().split(';q=');
+          return { tag: tag.trim(), q: qVal ? parseFloat(qVal) : 1.0 };
+        })
+        .filter((item) => item.tag && !isNaN(item.q))
+        .sort((a, b) => b.q - a.q);
+      if (parsed.length > 0) {
+        this._locale = parsed[0].tag;
+        return this._locale;
+      }
+    }
+    // 4. Fallback to Lang.locale()
+    const { Lang } = require('./support.js');
+    this._locale = Lang.locale();
+    return this._locale;
+  }
+  setLocale(l) {
+    this._locale = l ? String(l).trim() : null;
+    return this;
+  }
 
   // CSRF token helpers
   csrfToken() {
@@ -355,7 +416,7 @@ function createRouter() {
     // GET /api/csrf-cookie: sets the XSRF-TOKEN cookie for client-side API calls
     csrfCookie: (uri = '/csrf-cookie') => add(['GET', 'HEAD'], uri, (req) => {
       const token = req.csrfToken();
-      return response.noContent().cookie('XSRF-TOKEN', token, { httpOnly: false, sameSite: 'Lax', path: '/' });
+      return response.noContent().cookie('XSRF-TOKEN', token, { httpOnly: false, sameSite: process.env.SESSION_SAME_SITE || 'Lax', secure: cookieSecure(), path: '/' });
     }),
     // posts → GET /posts, POST /posts, GET /posts/{post}, PUT|PATCH /posts/{post}, DELETE /posts/{post}
     apiResource(name, Controller, { only, except, parameter } = {}) {
@@ -449,7 +510,7 @@ function createRouter() {
       return '/api' + r.uri.replace(/\{(\w+)\??\}/g, (_, k) => encodeURIComponent(params[k] ?? '')).replace(/\/+$/, '');
     },
     list: () => routes,
-    reset() { routes = []; stack = [{ prefix: '', middleware: [], name: '' }]; },
+    reset() { routes = []; stack = [{ prefix: '', middleware: [], name: '', namespace: '' }]; },
   };
   return Route;
 }
@@ -466,7 +527,7 @@ class VerifyCsrfToken {
     const exceptList = [...this.except, ...args];
     const isExempt = exceptList.some((pattern) => {
       if (!pattern) return false;
-      const cleanPattern = pattern.replace(/\/+$/, '').replace(/\*/g, '.*');
+      const cleanPattern = String(pattern).replace(/\/+$/, '').replace(/[.+?^${}()|[\]\\]/g, '\\$&').replace(/\*/g, '.*');
       const re = new RegExp('^' + cleanPattern + '/?$', 'i');
       return re.test(req.path) || re.test(req.path.replace(/^\/api/, ''));
     });
@@ -492,7 +553,7 @@ class VerifyCsrfToken {
     const token = req.cookie('XSRF-TOKEN') || req.csrfToken();
     const res = toResponse(await next(req));
     if (!req.cookie('XSRF-TOKEN')) {
-      res.cookie('XSRF-TOKEN', token, { httpOnly: false, sameSite: 'Lax', path: '/' });
+      res.cookie('XSRF-TOKEN', token, { httpOnly: false, sameSite: process.env.SESSION_SAME_SITE || 'Lax', secure: cookieSecure(), path: '/' });
     }
     return res;
   }
@@ -526,7 +587,11 @@ const builtIn = {
     const key = req.ip() + '|' + (req.routeEntry ? req.routeEntry.methods.join(',') + ' ' + req.routeEntry.uri : req.path) + '|' + max + '/' + windowMs;
     const t = Date.now();
     let h = hits.get(key);
-    if (!h || h.reset < t) { h = { count: 0, reset: t + windowMs }; hits.set(key, h); }
+    if (!h || h.reset < t) {
+      if (!h && hits.size >= 20000) hits.delete(hits.keys().next().value);
+      h = { count: 0, reset: t + windowMs };
+      hits.set(key, h);
+    }
     h.count++;
     const left = Math.max(0, max - h.count);
     if (h.count > max) {
@@ -542,6 +607,18 @@ const builtIn = {
   },
   async verifyCsrfToken(req, next, ...args) {
     return new VerifyCsrfToken().handle(req, next, ...args);
+  },
+  // Set locale from request (query, cookie, accept-language header)
+  async setLocale(req, next) {
+    const loc = req.locale();
+    const { Lang } = require('./support.js');
+    const prev = Lang.locale();
+    Lang.setLocale(loc);
+    try {
+      return await next(req);
+    } finally {
+      Lang.setLocale(prev);
+    }
   },
 };
 

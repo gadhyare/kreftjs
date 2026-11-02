@@ -12,7 +12,8 @@
     "dev": "node bin/som.js dev --api demo/db.json --db sqlite:demo/database/demo.db --migrations demo/database/migrations --server demo/server --backend demo --seed",
     "start": "node bin/som.js dev --api demo/db.json --db sqlite:demo/database/demo.db --migrations demo/database/migrations --server demo/server --backend demo --seed",
     "build": "node bin/som.js build demo --out dist/demo --include docs",
-    "preview": "node bin/som.js dev dist --api demo/db.json --db sqlite:demo/database/demo.db --migrations demo/database/migrations --server demo/server --backend demo --seed"
+    "preview": "node bin/som.js dev dist --api demo/db.json --db sqlite:demo/database/demo.db --migrations demo/database/migrations --server demo/server --backend demo --seed",
+    "test": "node --test test/security.test.js"
   },
   "files": [
     "som.js",
