@@ -1,4 +1,4 @@
-// Type definitions for Som.js 3.0.1
+// Type definitions for Som.js 3.0.2
 // Use from TypeScript or for editor hints in plain JavaScript (// @ts-check).
 
 export interface Signal<T> { value: T }

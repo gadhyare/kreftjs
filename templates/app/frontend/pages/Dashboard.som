@@ -110,7 +110,7 @@ load board = api.get('/api/dashboard')
         <div class="info-list">
           <div class="info-item">
             <span class="info-label">Framework Engine</span>
-            <span class="info-value">Som.js {Som.version || '3.0.1'}</span>
+            <span class="info-value">Som.js {Som.version || '3.0.2'}</span>
           </div>
           <div class="info-item">
             <span class="info-label">Active Database</span>
