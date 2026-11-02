@@ -29,12 +29,23 @@ FILESYSTEM_DISK=local
 # REDIS_PASSWORD=
 # REDIS_DB=0
 # REDIS_PREFIX=som:
-# local while you work, production on the server
+# Environment & Debugging:
+# - local: plain HTTP allowed on localhost, interactive bug diagnostics & stack traces shown
+# - production: plain HTTP disallowed for security (enforces HTTPS & HSTS), bug details & stack traces hidden
 APP_ENV=local
+APP_DEBUG=true
+
+# Force all traffic over secure HTTPS in production (auto-redirects HTTP -> HTTPS with HSTS)
+FORCE_HTTPS=false
+SESSION_SECURE_COOKIE=false
 
 # Security & Sessions
 # A login token nobody used for this many days stops working
 AUTH_TOKEN_DAYS=30
+# wrong passwords allowed per account (in LOGIN_WINDOW_SECONDS) before logins for it are refused, and wrong two-factor codes
+LOGIN_MAX_FAILURES=10
+LOGIN_WINDOW_SECONDS=900
+TWO_FACTOR_MAX_FAILURES=8
 # Session lifetime in minutes (backend inactivity timeout)
 SESSION_LIFETIME=120
 SESSION_EXPIRE_ON_CLOSE=false

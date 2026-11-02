@@ -1039,7 +1039,10 @@ async function devServer(args, { production = false } = {}) {
       if (urlPath.startsWith('/storage/')) {
         const pub = path.join(backendDir, 'storage', 'app', 'public');
         const f = path.join(pub, urlPath.slice('/storage/'.length));
-        if ((f.startsWith(pub + path.sep)) && !secret(urlPath) && isFile(f)) {
+        // a link inside the folder that points outside it must not be followed
+        const real = (x) => { try { return fs.realpathSync(x); } catch (_) { return null; } };
+        const realPub = real(pub), realF = real(f);
+        if ((f.startsWith(pub + path.sep)) && !secret(urlPath) && isFile(f) && realPub && realF && realF.startsWith(realPub + path.sep)) {
           const type = types[path.extname(f).toLowerCase()] || 'application/octet-stream';
           res.writeHead(200, { 'Content-Type': type, 'X-Content-Type-Options': 'nosniff', 'Content-Security-Policy': "default-src 'none'; img-src 'self'; style-src 'unsafe-inline'; sandbox", 'Cache-Control': 'public, max-age=3600' });
           return fs.createReadStream(f).pipe(res);

@@ -214,3 +214,62 @@ test('server cleanHtml: a tag it can not read is turned into text, not passed th
   assert.strictEqual(cleanHtml('<a href="https://e.com/" target="_blank">l</a>'), '<a href="https://e.com/" target="_blank" rel="noopener noreferrer">l</a>');
   assert.strictEqual(cleanHtml('1 < 2'), '1 &lt; 2');
 });
+
+test('Throttle: failures are counted per account, shared through the Cache, and cleared by a success', async () => {
+  process.env.CACHE_STORE = 'memory';
+  await templateAuth();
+  const Throttle = require(path.join(ROOT, 'templates/app/backend/app/Auth/Throttle.js'));
+  assert.strictEqual(await Throttle.wait('login', 'Ann@Example.com', 3), 0);
+  for (let i = 0; i < 3; i++) await Throttle.hit('login', 'ann@example.com', 60);
+  assert.ok(await Throttle.wait('login', 'ANN@example.com', 3) > 0, 'the address is matched without regard to case');
+  assert.strictEqual(await Throttle.wait('login', 'bob@example.com', 3), 0, 'another account is not affected');
+  assert.strictEqual(await Throttle.wait('2fa', 'ann@example.com', 3), 0, 'another kind of attempt is counted apart');
+  await Throttle.clear('login', 'ann@example.com');
+  assert.strictEqual(await Throttle.wait('login', 'ann@example.com', 3), 0);
+});
+
+test('ProfileController: changing the email needs a recent password confirmation, the name does not', async () => {
+  process.env.CACHE_STORE = 'memory';
+  const { app, User } = await templateAuth();
+  const ProfileController = require(path.join(app, 'Http/Controllers/ProfileController.js'));
+  const user = await User.create({ name: 'Ada', email: 'ada@example.com', password: 'x' });
+  const request = (email, confirmedAt) => ({
+    user, accessToken: { type: 'session', password_confirmed_at: confirmedAt, can: () => true },
+    validate: async () => ({ name: 'Ada L', email }),
+  });
+  const status = async (req) => { try { await new ProfileController().update(req); return 200; } catch (e) { return e.status; } };
+  assert.strictEqual(await status(request('ada@example.com', null)), 200); // same address: just the name
+  assert.strictEqual(await status(request('new@example.com', null)), 423);
+  assert.strictEqual(await status(request('new@example.com', new Date(Date.now() - 4 * 3600 * 1000))), 423); // confirmed too long ago
+  assert.strictEqual(await status(request('new@example.com', new Date())), 200);
+});
+
+test('uploads: only known plain-data extensions keep their name, and "BM" text is not a BMP', () => {
+  const { UploadedFile } = require(path.join(ROOT, 'bin/backend/storage.js'));
+  const ext = (name) => new UploadedFile({ name, type: 'application/octet-stream', buffer: Buffer.from('x') }).hashName().split('.').pop();
+  assert.strictEqual(ext('photo.PNG'), 'png');
+  for (const n of ['a.xml', 'a.hta', 'a.jar', 'a.phar', 'a.html', 'a.svg', 'a.xsl', 'noext']) assert.strictEqual(ext(n), 'bin', n);
+  const image = (buffer) => new UploadedFile({ name: 'a.bmp', type: 'image/bmp', buffer }).isImage();
+  assert.strictEqual(image(Buffer.from('BM is not a picture, just text that starts like one')), false);
+  const bmp = Buffer.alloc(40); bmp.write('BM'); bmp.writeUInt32LE(40, 14);
+  assert.strictEqual(image(bmp), true);
+});
+
+test('login: after too many wrong passwords the account is locked even for the right one', async () => {
+  process.env.CACHE_STORE = 'memory';
+  process.env.LOGIN_MAX_FAILURES = '3';
+  const { app, User } = await templateAuth();
+  const { Hash } = require(path.join(ROOT, 'server.js'));
+  await User.create({ name: 'Ada', email: 'lock@example.com', password: Hash.make('correct horse') });
+  const Controller = require(path.join(app, 'Http/Controllers/Auth/AuthenticatedSessionController.js'));
+  const attempt = async (password) => {
+    const data = { email: 'lock@example.com', password };
+    const req = { validate: async () => data, input: () => null, string: () => '', boolean: () => false, all: () => data, header: () => null, cookie: () => null, ip: () => '127.0.0.1' };
+    try { await new Controller().store(req); return 200; } catch (e) { return e.status; }
+  };
+  assert.strictEqual(await attempt('wrong 1'), 422);
+  assert.strictEqual(await attempt('wrong 2'), 422);
+  assert.strictEqual(await attempt('wrong 3'), 422);
+  assert.strictEqual(await attempt('correct horse'), 429, 'locked: the right password is refused too');
+  delete process.env.LOGIN_MAX_FAILURES;
+});

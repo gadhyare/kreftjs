@@ -1,7 +1,7 @@
 // 'auth' in the routes: only signed-in users get through, and req.user is the user.
 // A browser is signed in with the HttpOnly som_session cookie (app/Auth/Session.js);
 // an app or script with  Authorization: Bearer 5|k3J9…  (an API token, see /profile → API tokens).
-const { abort, Hash, Str, Crypt, response } = require('somjs/server')
+const { abort, Hash, Str, Crypt, response, cookieSecure } = require('somjs/server')
 const crypto = require('crypto')
 const PersonalAccessToken = require('../../Models/PersonalAccessToken')
 const User = require('../../Models/User')
@@ -76,7 +76,7 @@ class Authenticate {
     req.accessToken = token
     const res = await next(req)
     // a cookie login without the XSRF cookie (cleared, or an old browser): give it a new one
-    if (fromCookie && !req.cookie(XSRF)) res.cookie(XSRF, Str.random(40), { httpOnly: false, maxAge: token.remember ? days * 86400 : undefined })
+    if (fromCookie && !req.cookie(XSRF)) res.cookie(XSRF, Str.random(40), { httpOnly: false, secure: cookieSecure(), sameSite: process.env.SESSION_SAME_SITE || 'Lax', path: '/', maxAge: token.remember ? days * 86400 : undefined })
     return res
   }
 }
