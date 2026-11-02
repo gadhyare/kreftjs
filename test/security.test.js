@@ -166,3 +166,51 @@ test('APP_KEY: production refuses a missing or short key', () => {
     assert.throws(() => appKey(), /APP_KEY is not set/);
   } finally { for (const [k, v] of [['NODE_ENV', saved.E], ['APP_ENV', saved.A], ['APP_KEY', saved.K]]) { if (v === undefined) delete process.env[k]; else process.env[k] = v; } }
 });
+
+/* ------------------------------------------------------------------ the project template's auth */
+// loads the template's own middleware and models against an in-memory database with its real migrations
+async function templateAuth() {
+  const Module = require('node:module');
+  const origResolve = Module._resolveFilename;
+  Module._resolveFilename = function (request, ...rest) {
+    if (request === 'somjs/server') return path.join(ROOT, 'server.js');
+    return origResolve.call(this, request, ...rest);
+  };
+  const { connect } = require(path.join(ROOT, 'bin/db.js'));
+  const { setConnection } = require(path.join(ROOT, 'bin/backend/query.js'));
+  const migrator = require(path.join(ROOT, 'bin/backend/migrator.js'));
+  const db = await connect('sqlite::memory:');
+  setConnection(db);
+  await migrator.migrate(db, path.join(ROOT, 'templates/app/backend/database/migrations'));
+  const app = path.join(ROOT, 'templates/app/backend/app');
+  return { db, app, Authenticate: require(path.join(app, 'Http/Middleware/Authenticate.js')), User: require(path.join(app, 'Models/User.js')) };
+}
+
+test('Authenticate: an API token can only use the methods its abilities allow, on every route', async () => {
+  const { Authenticate, User } = await templateAuth();
+  const user = await User.create({ name: 'Ada', email: 'ada@example.com', password: 'x' });
+  const readOnly = (await user.createToken('read only', { type: 'api', abilities: ['read'] })).plainTextToken;
+  const full = (await user.createToken('full', { type: 'api', abilities: ['*'] })).plainTextToken;
+  const call = async (method, bearer) => {
+    const req = { method, header: () => null, cookie: () => null, bearerToken: () => bearer, ip: () => '127.0.0.1' };
+    try { await new Authenticate().handle(req, async () => ({ withHeaders() {}, cookie() {} })); return 200; } catch (e) { return e.status; }
+  };
+  assert.strictEqual(await call('GET', readOnly), 200);
+  assert.strictEqual(await call('DELETE', readOnly), 403);
+  assert.strictEqual(await call('PATCH', readOnly), 403);
+  assert.strictEqual(await call('POST', readOnly), 403);
+  assert.strictEqual(await call('DELETE', full), 200);
+});
+
+test('server cleanHtml: a tag it can not read is turned into text, not passed through', () => {
+  const { cleanHtml } = require(path.join(ROOT, 'bin/backend/html.js'));
+  for (const html of ['<img src="x"onerror=alert(1)>', '<a href="x"onclick=alert(1)>c</a>', '<img src=x onerror=alert(1)//', '<img src="x"/onerror=alert(1)>']) {
+    assert.doesNotMatch(cleanHtml(html), /<[^>]*\bon\w+\s*=/i, html);
+  }
+  // an attribute VALUE that looks like a handler is only text inside quotes
+  assert.strictEqual(cleanHtml('<img src=x/onerror=alert(1)>'), '<img src="x/onerror=alert(1)" />');
+  // normal markup and plain text keep working
+  assert.strictEqual(cleanHtml('<ul><li>a</li></ul>'), '<ul><li>a</li></ul>');
+  assert.strictEqual(cleanHtml('<a href="https://e.com/" target="_blank">l</a>'), '<a href="https://e.com/" target="_blank" rel="noopener noreferrer">l</a>');
+  assert.strictEqual(cleanHtml('1 < 2'), '1 &lt; 2');
+});

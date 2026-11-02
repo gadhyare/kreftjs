@@ -82,7 +82,8 @@ function help() {
         --db <kind>         …on another database (sqlite, mysql or postgres), plus a Todos example
         --redis             …configure Redis for caching, background queues and pub/sub
         --ui <library>      …with a CSS library from a CDN: tailwind, bootstrap, bulma or pico
-        --ts                …with the backend in TypeScript (and a tsconfig.json)
+        --ts                …use TypeScript across frontend (.som, .ts) and backend (.ts)
+        --js                …use JavaScript (default when non-interactive)
         --electron          …with Electron desktop app support (main.js, preload.js, packaging)
         --vite              …with Vite.js bundling & instant HMR (vite.config.js, npm run vite)
     som dev [folder]        Start the dev server (default: this folder)
@@ -131,11 +132,22 @@ function help() {
     som log:clear           Clear the log file
     som make:model Post     app/Models/Post.js (-m -f -s -c -p -r, --route=file, --auth, --all)
     som make:controller PostController (--api, --model Post, -r, --route=file, --auth)
+    som make:request StorePostRequest  app/Http/Requests/StorePostRequest.js (--model Post)
+    som make:resource PostResource     app/Http/Resources/PostResource.js
+    som make:rule Uppercase            app/Rules/Uppercase.js
     som make:page Post      frontend/pages/Post.som (--model Post, -r, --route=file, --auth)
     som make:factory PostFactory database/factories/PostFactory.js (--model Post)
     som make:migration create_posts_table
     som make:seeder PostSeeder
     som make:middleware EnsureIsAdmin
+    som make:job SendWelcomeEmail      app/Jobs/SendWelcomeEmail.js
+    som make:event OrderShipped        app/Events/OrderShipped.js
+    som make:listener SendShipmentNotice app/Listeners/SendShipmentNotice.js (--event OrderShipped)
+    som make:mail WelcomeMail          app/Mail/WelcomeMail.js
+    som make:notification InvoicePaid  app/Notifications/InvoicePaid.js
+    som make:policy PostPolicy         app/Policies/PostPolicy.js (--model Post)
+    som make:observer PostObserver     app/Observers/PostObserver.js (--model Post)
+    som make:command SendReport        app/Console/Commands/SendReport.js (--command report:send)
     som make:errors         The error pages in errors/ (401, 403, 404, 419, 429, 500, 503…)
     som make:admin <email>  Let that user open the admin panel at /admin (--remove: take it away)
     som make:routes admin   A new route file for pages: frontend/routes/admin.som (--api: backend/routes/admin.js)
@@ -175,10 +187,11 @@ function unknown() {
 }
 
 /* ------------------------------------------------------------------ som new */
-function createProject(args) {
-  let name = null, dbKind = null, ui = null, ts = false, electron = false, vite = false, redis = false;
+async function createProject(args) {
+  let name = null, dbKind = null, ui = null, ts = false, langChosen = false, electron = false, vite = false, redis = false;
   for (let i = 0; i < args.length; i++) {
-    if (args[i] === '--ts' || args[i] === '--typescript') ts = true;
+    if (args[i] === '--ts' || args[i] === '--typescript') { ts = true; langChosen = true; }
+    else if (args[i] === '--js' || args[i] === '--javascript') { ts = false; langChosen = true; }
     else if (args[i] === '--electron' || args[i] === '--desktop') electron = true;
     else if (args[i] === '--vite') vite = true;
     else if (args[i] === '--redis') redis = true;
@@ -197,13 +210,24 @@ function createProject(args) {
     process.exit(1);
   }
   if (!name) {
-    console.error('  Give the project a name:  som new my-app');
+    console.error('  Give the project a name:  som new my-app  (or: som new my-app --ts)');
     process.exit(1);
   }
   const target = path.resolve(name);
   if (fs.existsSync(target) && fs.readdirSync(target).length) {
     console.error(`  The folder "${name}" already exists and is not empty.`);
     process.exit(1);
+  }
+  if (!langChosen && process.stdin.isTTY && process.stdout.isTTY) {
+    const readline = require('readline');
+    const rl = readline.createInterface({ input: process.stdin, output: process.stdout });
+    const answer = await new Promise((resolve) => {
+      console.log(`\n  Creating ${name} — choose your language:`);
+      console.log('    1) JavaScript (default)');
+      console.log('    2) TypeScript (--ts)\n');
+      rl.question('  Language [1/2]: ', (ans) => { rl.close(); resolve(String(ans || '').trim().toLowerCase()); });
+    });
+    if (answer === '2' || answer === 'ts' || answer === 'typescript') ts = true;
   }
   const template = path.join(__dirname, '..', 'templates', 'app');
   copyFolder(template, target);
@@ -263,7 +287,7 @@ function createProject(args) {
 `);
 }
 
-// som new my-app --ts  →  the backend in TypeScript, a tsconfig.json, and npm run typecheck
+// som new my-app --ts  →  TypeScript across backend (.ts) and frontend (.som, .ts), tsconfig.json, and npm run typecheck
 function toTypeScript(target, projectPkg) {
   const { toTs, TSCONFIG } = require('./to-ts.js');
   const walk = (dir) => {
@@ -278,22 +302,71 @@ function toTypeScript(target, projectPkg) {
   projectPkg.scripts.typecheck = 'tsc --noEmit';
   projectPkg.devDependencies = { esbuild: '^0.25.0', typescript: '^5.8.0', '@types/node': '^22.13.0' };
   projectPkg.allowScripts = { esbuild: true };
+  // Shared TypeScript interfaces for the frontend
+  fs.writeFileSync(path.join(target, 'frontend', 'types.ts'), `// Shared TypeScript interfaces for your .som pages and frontend modules.
+// Import in any .som file or .ts module:  import type { User } from '../types.ts'
+
+export interface User {
+  id: number
+  name: string
+  email: string
+  email_verified_at?: string | null
+  created_at?: string
+}
+
+export interface ApiList<T> {
+  data: T[]
+  total?: number
+}
+`);
   // a typed helper for the frontend, used like any module: import { money } from '../logic/format.ts'
   fs.mkdirSync(path.join(target, 'frontend', 'logic'), { recursive: true });
   fs.writeFileSync(path.join(target, 'frontend', 'logic', 'format.ts'), `// A TypeScript module for the pages: import { money, ago } from '../logic/format.ts'
 // som dev turns it into JavaScript as it is sent; som build writes it as format.js
 
-export function money(amount: number, currency = 'USD'): string {
+export function money(amount: number, currency: string = 'USD'): string {
   return new Intl.NumberFormat('en', { style: 'currency', currency }).format(amount)
 }
 
 export function ago(date: string | Date): string {
-  const seconds = Math.round((Date.now() - new Date(date).getTime()) / 1000)
+  const seconds: number = Math.round((Date.now() - new Date(date).getTime()) / 1000)
   const units: [number, string][] = [[31536000, 'year'], [2592000, 'month'], [86400, 'day'], [3600, 'hour'], [60, 'minute']]
   for (const [size, name] of units) if (seconds >= size) return \`\${Math.floor(seconds / size)} \${name}\${seconds >= size * 2 ? 's' : ''} ago\`
   return 'just now'
 }
 `);
+  // Upgrade Counter.som to showcase TypeScript in .som components
+  const counterSom = path.join(target, 'frontend', 'tests', 'components', 'Counter.som');
+  if (fs.existsSync(counterSom)) {
+    fs.writeFileSync(counterSom, `<!-- A TypeScript .som component: a button that counts. Used by tests/pages/Test.som as <counter>. -->
+prop start: number = 0
+
+state count: number = start
+derive double: number = count * 2
+
+action add(step: number = 1): void {
+  count += step
+}
+
+<view>
+  <button class="primary" @click={add(1)}>Clicked {count} {count === 1 ? 'time' : 'times'}, double {double}</button>
+</view>
+
+<style scoped>
+button { font-variant-numeric: tabular-nums; justify-self: start; }
+</style>
+`);
+  }
+  // If --db created Todos.som, upgrade it with TypeScript interfaces & typed actions
+  const todosSom = path.join(target, 'frontend', 'pages', 'Todos.som');
+  if (fs.existsSync(todosSom)) {
+    const src = fs.readFileSync(todosSom, 'utf8');
+    fs.writeFileSync(todosSom, src
+      .replace('load todos = api.get(\'/api/todos\')', `interface Todo {\n  id: number\n  title: string\n  done: boolean\n}\n\nload todos: Todo[] = api.get<Todo[]>('/api/todos')`)
+      .replace('action add() {', 'action add(): Promise<void> {')
+      .replace('action toggle(todo) {', 'action toggle(todo: Todo): Promise<void> {')
+      .replace('action remove(todo) {', 'action remove(todo: Todo): Promise<void> {'));
+  }
 }
 
 // som new my-app --ui bootstrap  →  the library's CDN links in index.html
@@ -405,12 +478,11 @@ module.exports = TodoSeeder
   const seeder = path.join(back, 'database', 'seeders', 'DatabaseSeeder.js');
   fs.writeFileSync(seeder, fs.readFileSync(seeder, 'utf8').replace(/(    await user\.save\(\)\n)/, "$1    await this.call(require('./TodoSeeder'))\n"));
   const routes = path.join(back, 'routes', 'api.js');
-  fs.writeFileSync(routes, fs.readFileSync(routes, 'utf8').replace("// A controller for a table:", `// The todos table, for signed-in users: index, store, show, update, destroy (app/Http/Controllers/TodoController.js)
-Route.middleware('auth').group(() => {
-  Route.apiResource('todos', require('../app/Http/Controllers/TodoController'))
-})
-
-// Another table:`));
+  const routesSrc = fs.readFileSync(routes, 'utf8');
+  const todoBlock = `\nconst TodoController = require('../app/Http/Controllers/TodoController')\n\n// The todos table, for signed-in users: index, store, show, update, destroy (app/Http/Controllers/TodoController.js)\nRoute.middleware('auth').group(() => {\n  Route.apiResource('todos', TodoController)\n})\n`;
+  fs.writeFileSync(routes, routesSrc.includes('// A controller for a table:')
+    ? routesSrc.replace('// A controller for a table:', todoBlock.trim() + '\n\n// Another table:')
+    : routesSrc.trimEnd() + '\n' + todoBlock);
   const url = { sqlite: 'sqlite:backend/database/app.db', mysql: `mysql://root:secret@localhost:3306/${projectName.replace(/-/g, '_')}`, postgres: `postgres://postgres:secret@localhost:5432/${projectName.replace(/-/g, '_')}` }[kind];
   // the address of the database goes in .env (DATABASE_URL)
   const setUrl = (f, u) => fs.writeFileSync(f, fs.readFileSync(f, 'utf8').replace(/^DATABASE_URL=.*$/m, () => 'DATABASE_URL=' + u));
@@ -520,6 +592,7 @@ function installVscode() {
 
 /* ------------------------------------------------------------------ som dev */
 async function devServer(args, { production = false } = {}) {
+  const isProd = Boolean(production || process.env.APP_ENV === 'production' || process.env.NODE_ENV === 'production');
   let port = production ? Number(process.env.PORT) || 8000 : 8000, folder = production ? 'dist' : '.', apiFile = null, delay = 0, saveApi = true, hot = !production, dbUrl = null, migrations = null, serverFolder = null, backendFolder = null, seedNew = false;
   // som dev only answers this computer; --host 0.0.0.0 shares it on your network.
   // som serve answers everyone (HOST in the environment can narrow it).
@@ -609,6 +682,7 @@ async function devServer(args, { production = false } = {}) {
         let busy = false;
         setInterval(async () => {
           if (busy) return;
+          if (queue.isStopped()) return;
           busy = true;
           try { for (let i = 0; i < 20 && (await queue.workOne({ queues, log: console.log })); i++); } catch (e) { if (!/no such table|doesn't exist|does not exist/i.test(e.message)) console.log('  queue: ' + e.message); }
           busy = false;
@@ -646,24 +720,33 @@ async function devServer(args, { production = false } = {}) {
 
   function send(res, file) {
     // a TypeScript module for the browser: its JavaScript (som build writes it as .js)
-    if (!production && /\.ts$/i.test(file) && !file.endsWith('.d.ts')) {
-      const es = require('./backend/typescript.js').loadEsbuild(project);
-      res.writeHead(200, { 'Content-Type': 'text/javascript; charset=utf-8', 'Cache-Control': 'no-store' });
-      if (!es) return res.end(`throw new Error(${JSON.stringify(path.basename(file) + ' is TypeScript: install esbuild once:  som add -D esbuild')});`);
-      try { return res.end(es.transformSync(fs.readFileSync(file, 'utf8'), { loader: 'ts', format: 'esm', target: 'es2020', sourcefile: file, sourcemap: 'inline' }).code); }
-      catch (e) { return res.end(`throw new Error(${JSON.stringify((e.errors && e.errors[0] ? e.errors[0].text : e.message) + ' (' + path.basename(file) + ')')});`); }
+    if (!production && /\.(m|c)?ts$/i.test(file) && !file.endsWith('.d.ts')) {
+      const { transpileTs } = require('./backend/typescript.js');
+      res.writeHead(200, { 'Content-Type': 'text/javascript; charset=utf-8', 'Cache-Control': 'no-store', 'X-Content-Type-Options': 'nosniff' });
+      try {
+        const code = transpileTs(fs.readFileSync(file, 'utf8'), { filename: file, format: 'esm', projectDir: project });
+        return res.end(code);
+      } catch (e) {
+        return res.end(`throw new Error(${JSON.stringify((e.errors && e.errors[0] ? e.errors[0].text : e.message) + ' (' + path.basename(file) + ')')});`);
+      }
     }
     const type = types[path.extname(file).toLowerCase()] || 'application/octet-stream';
     res.writeHead(200, {
       'Content-Type': type + (type.startsWith('text/') || type.endsWith('json') ? '; charset=utf-8' : ''),
-      'Cache-Control': production ? 'no-cache' : 'no-store', // dev: always pick up your latest changes
-      ...(production ? { 'X-Content-Type-Options': 'nosniff', 'Referrer-Policy': 'same-origin', 'X-Frame-Options': 'SAMEORIGIN' } : {}),
+      'Cache-Control': isProd ? 'no-cache' : 'no-store', // dev: always pick up your latest changes
+      'X-Content-Type-Options': 'nosniff',
+      ...(isProd ? { 'Referrer-Policy': 'same-origin', 'X-Frame-Options': 'SAMEORIGIN', 'Strict-Transport-Security': 'max-age=31536000; includeSubDomains; preload' } : {}),
     });
     if (!production && type === 'text/html') {
       let html = fs.readFileSync(file, 'utf8');
       // PUBLIC_ values from .env, as Som.env (som build puts them in app.js)
       const envTag = `<script>${env.envScript(env.publicEnv())}</script>`;
-      html = /<head[^>]*>/i.test(html) ? html.replace(/<head[^>]*>/i, (m) => m + '\n' + envTag) : envTag + '\n' + html;
+      const langHelper = require('./lang.js');
+      const langDirs = langHelper.findLangDirs(root);
+      const langData = langHelper.scanLangDir(langDirs);
+      const langTag = Object.keys(langData).length ? `<script>${langHelper.langScript(langData)}</script>` : '';
+      const tagsToInject = [envTag, langTag].filter(Boolean).join('\n');
+      html = /<head[^>]*>/i.test(html) ? html.replace(/<head[^>]*>/i, (m) => m + '\n' + tagsToInject) : tagsToInject + '\n' + html;
       // the import map, so `import dayjs from 'dayjs'` finds the package; merged into yours if the page has one
       const map = npmMap();
       if (map) {
@@ -853,10 +936,13 @@ async function devServer(args, { production = false } = {}) {
   function maintenance(req, res, urlPath) {
     const down = downInfo();
     if (!down) return false;
+    const { same, cookieSecure } = require('./backend/http.js');
     const cookie = (req.headers.cookie || '').match(/(?:^|;\s*)som_bypass=([^;]+)/);
-    if (down.secret && cookie && cookie[1] === down.secret) return false;
-    if (down.secret && urlPath === '/' + down.secret) {
-      res.writeHead(302, { Location: '/', 'Set-Cookie': `som_bypass=${down.secret}; Path=/; HttpOnly; SameSite=Lax; Max-Age=43200` });
+    let cookieVal = null;
+    if (cookie) { try { cookieVal = decodeURIComponent(cookie[1]); } catch (_) { cookieVal = cookie[1]; } }
+    if (down.secret && cookieVal && same(cookieVal, String(down.secret))) return false;
+    if (down.secret && same(urlPath, '/' + String(down.secret))) {
+      res.writeHead(302, { Location: '/', 'Set-Cookie': `som_bypass=${encodeURIComponent(down.secret)}; Path=/; HttpOnly; SameSite=Lax; Max-Age=43200${cookieSecure() ? '; Secure' : ''}` });
       res.end();
       return true;
     }
@@ -875,8 +961,47 @@ async function devServer(args, { production = false } = {}) {
     return true;
   }
 
+  // DNS rebinding: a web page can make its own name (evil.example) point at 127.0.0.1 and then read everything
+  // som dev serves, with the browser believing it is the same site. A server that only answers this computer
+  // therefore only answers the names of this computer (add more with SOM_ALLOWED_HOSTS=my-tunnel.example).
+  const hostOnly = (h) => String(h || '').toLowerCase().replace(/:\d+$/, '').replace(/^\[|\]$/g, '');
+  const isLocalName = (n) => n === 'localhost' || n === '127.0.0.1' || n === '::1' || n.endsWith('.localhost');
+  const allowedHosts = new Set(String(process.env.SOM_ALLOWED_HOSTS || '').split(',').map((x) => x.trim().toLowerCase()).filter(Boolean));
+  const loopbackBind = !production && (host === 'localhost' || host === '::1' || /^127\./.test(host));
+  // a request from another web site (Origin) that changes data in the unauthenticated API (--api, --db)
+  const crossSiteWrite = (req) => {
+    if (['GET', 'HEAD', 'OPTIONS'].includes(String(req.method).toUpperCase())) return false;
+    const origin = req.headers.origin;
+    if (!origin) return false; // not a browser (curl, a script), or the same site on a method that sends no Origin
+    let oh;
+    try { oh = hostOnly(new URL(origin).host); } catch (_) { return true; }
+    const mine = hostOnly(req.headers.host);
+    return !(oh === mine || (isLocalName(oh) && isLocalName(mine)) || allowedHosts.has(oh));
+  };
+
   const server = http.createServer(async (req, res) => {
     try {
+      if (loopbackBind && !isLocalName(hostOnly(req.headers.host)) && !allowedHosts.has(hostOnly(req.headers.host))) {
+        res.writeHead(403, { 'Content-Type': 'text/plain; charset=utf-8' });
+        return res.end(`Blocked: this server only answers localhost. To reach it by the name "${hostOnly(req.headers.host)}", start it with SOM_ALLOWED_HOSTS=${hostOnly(req.headers.host)} (or --host 0.0.0.0 to share it on your network).`);
+      }
+      // In production: plain HTTP is not allowed for security (force HTTPS / HSTS)
+      if (isProd) {
+        const isEncrypted = Boolean(req.socket && req.socket.encrypted);
+        const forwardedProto = (req.headers['x-forwarded-proto'] || '').split(',')[0].trim().toLowerCase();
+        const forceHttps = process.env.FORCE_HTTPS === 'true' || (process.env.APP_URL && process.env.APP_URL.startsWith('https://'));
+        const isPlainHttp = forwardedProto === 'http' || (!isEncrypted && forceHttps);
+        if (isPlainHttp) {
+          const host = req.headers.host || 'localhost';
+          res.writeHead(301, {
+            Location: `https://${host}${req.url}`,
+            'Strict-Transport-Security': 'max-age=31536000; includeSubDomains; preload',
+            'Content-Type': 'text/plain; charset=utf-8',
+          });
+          return res.end('Redirecting to HTTPS');
+        }
+      }
+
       let urlPath;
       try { urlPath = decodeURIComponent(new URL(req.url, 'http://x').pathname); }
       catch (_) { res.writeHead(400); return res.end('Bad request'); }
@@ -897,6 +1022,10 @@ async function devServer(args, { production = false } = {}) {
       }
       if (!production && /^\/__som\/(deps|npm)\//.test(urlPath)) return npmFiles(req, res, urlPath);
       if ((dbApi || mockApi) && (urlPath === '/api' || urlPath.startsWith('/api/'))) {
+        if (crossSiteWrite(req)) {
+          res.writeHead(403, { 'Content-Type': 'application/json; charset=utf-8', 'Cache-Control': 'no-store' });
+          return res.end(JSON.stringify({ message: 'Blocked: another web site may not change data here.' }));
+        }
         if (!dbApi) return mockApi(req, res, urlPath);
         if (!mockApi) return dbApi(req, res, urlPath);
         // both: a database table wins, the rest goes to the JSON file
@@ -925,6 +1054,10 @@ async function devServer(args, { production = false } = {}) {
       if (insideServerDir(file) && isFile(file)) { res.writeHead(404, { 'Content-Type': 'text/plain; charset=utf-8' }); return res.end('Not found: ' + urlPath); } // server code stays on the server
 
       if (isFile(file)) return send(res, file);
+      if (!production && /\.js$/i.test(file)) {
+        const tsFile = file.replace(/\.js$/i, '.ts');
+        if (isFile(tsFile)) return send(res, tsFile);
+      }
       if (lay.public && !urlPath.startsWith('/storage/')) {
         const pubFile = path.join(lay.public, urlPath);
         if (pubFile.startsWith(lay.public + path.sep) && isFile(pubFile) && !secret(urlPath)) return send(res, pubFile);
@@ -946,7 +1079,7 @@ async function devServer(args, { production = false } = {}) {
       res.end('Not found: ' + urlPath);
     } catch (err) {
       if (!res.headersSent) res.writeHead(500, { 'Content-Type': 'text/plain; charset=utf-8' });
-      res.end('Internal Server Error: ' + (err && err.message ? err.message : String(err)));
+      res.end(isProd ? 'Internal Server Error' : 'Internal Server Error: ' + (err && err.message ? err.message : String(err)));
     }
   });
 
@@ -1079,12 +1212,17 @@ function createMockApi(file, delay, save) {
   };
   const send = (res, status, data) => {
     const body = data === undefined ? '' : JSON.stringify(data);
-    res.writeHead(status, { 'Content-Type': 'application/json; charset=utf-8', 'Cache-Control': 'no-store' });
+    res.writeHead(status, { 'Content-Type': 'application/json; charset=utf-8', 'Cache-Control': 'no-store', 'X-Content-Type-Options': 'nosniff', 'X-Frame-Options': 'DENY' });
     setTimeout(() => res.end(body), delay);
   };
+  const MAX_MOCK_BODY = 1024 * 1024;
   const readBody = (req) => new Promise((resolve) => {
-    let raw = '';
-    req.on('data', (c) => { raw += c; });
+    let raw = '', size = 0;
+    req.on('data', (c) => {
+      size += c.length;
+      if (size > MAX_MOCK_BODY) { req.destroy(); resolve(null); }
+      else raw += c;
+    });
     req.on('end', () => { try { resolve(raw ? require('./safe-json.js').parseJson(raw) : {}); } catch (_) { resolve(null); } });
   });
   const validate = (name, item, partial) => {

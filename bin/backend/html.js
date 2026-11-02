@@ -35,7 +35,11 @@ const UNESCAPE_MAP = {
   '&quot;': '"',
   '&#39;': "'",
   '&#039;': "'",
+  '&apos;': "'",
   '&nbsp;': ' ',
+  '&colon;': ':',
+  '&tab;': '\t',
+  '&newline;': '\n',
 };
 
 // Default allowed HTML tags for rich content
@@ -81,7 +85,16 @@ function escapeHtml(str) {
 
 function unescapeHtml(str) {
   if (str == null) return '';
-  return String(str).replace(/&(?:amp|lt|gt|quot|#39|#039|nbsp);/g, (c) => UNESCAPE_MAP[c] || c);
+  return String(str)
+    .replace(/&#x([0-9a-fA-F]+);?/g, (_, hex) => {
+      const code = parseInt(hex, 16);
+      return Number.isNaN(code) ? '' : String.fromCodePoint(Math.min(code, 0x10ffff));
+    })
+    .replace(/&#(\d+);?/g, (_, dec) => {
+      const code = parseInt(dec, 10);
+      return Number.isNaN(code) ? '' : String.fromCodePoint(Math.min(code, 0x10ffff));
+    })
+    .replace(/&(?:amp|lt|gt|quot|#39|#039|apos|nbsp|colon|tab|newline);/gi, (c) => UNESCAPE_MAP[c.toLowerCase()] || c);
 }
 
 function stripTags(html) {
@@ -97,13 +110,18 @@ function stripTags(html) {
 
 function isSafeUrl(url) {
   if (!url) return false;
-  // Decode HTML entities and strip non-printable characters to prevent scheme evasion
-  const decoded = unescapeHtml(String(url)).trim().replace(/[\x00-\x1f\s]/g, '');
-  if (/^(?:javascript|vbscript|data):/i.test(decoded)) {
+  // Decode HTML entities (including numeric/hex entities) and strip control/whitespace characters to prevent scheme evasion
+  const decoded = unescapeHtml(String(url)).trim().replace(/[\x00-\x20\s]/g, '');
+  if (!decoded) return false;
+  if (/^(?:javascript|vbscript|data|file|blob):/i.test(decoded)) {
     // Only allow safe static raster images in base64 data URIs (svg is blocked because it can execute script)
     if (/^data:image\/(?:png|jpeg|jpg|gif|webp);base64,[A-Za-z0-9+/=]+$/i.test(decoded)) {
       return true;
     }
+    return false;
+  }
+  const schemeMatch = decoded.match(/^([a-zA-Z][a-zA-Z0-9+.-]*:)/);
+  if (schemeMatch && !SAFE_SCHEMES.includes(schemeMatch[1].toLowerCase())) {
     return false;
   }
   return true;
@@ -141,8 +159,8 @@ function cleanHtml(rawHtml, options = {}) {
 
   // 1. Unconditionally strip active execution tags (loop to prevent nested tag bypasses)
   let prev;
-  const dangerousTagRegex = /<\/?(?:script|style|iframe|object|embed|applet|form|base|meta|link)\b[^>]*>/gi;
-  const blockRegex = /<(script|style|iframe|object|embed|applet|form)[\s\S]*?<\/\1>/gi;
+  const dangerousTagRegex = /<\/?(?:script|style|iframe|object|embed|applet|form|base|meta|link|svg|math|noscript|template)\b[^>]*>/gi;
+  const blockRegex = /<(script|style|iframe|object|embed|applet|form|svg|math|noscript|template)[\s\S]*?<\/\1>/gi;
   do {
     prev = html;
     html = html
@@ -152,7 +170,7 @@ function cleanHtml(rawHtml, options = {}) {
   } while (html !== prev);
 
   // 2. Parse and sanitize all tags and attributes
-  const tagRegex = /<\/?([a-zA-Z0-9:-]+)((?:\s+[a-zA-Z0-9:-]+(?:\s*=\s*(?:"[^"]*"|'[^']*'|[^\s>]+))?)*)\s*(\/?)>/g;
+  const tagRegex = /<\/?([a-zA-Z0-9:-]+)((?:\s+[^>"']*|"[^"]*"|'[^']*')*)\s*(\/?)>/g;
 
   html = html.replace(tagRegex, (match, tagName, rawAttrs, selfClose) => {
     const tag = tagName.toLowerCase();
@@ -202,14 +220,16 @@ function cleanHtml(rawHtml, options = {}) {
         attrVal = sanitizedStyle;
       }
 
-      // 5. Enforce rel="noopener noreferrer" for external anchor links
-      if (tag === 'a' && attrName === 'target' && /_blank/i.test(attrVal)) {
-        if (!cleanAttrs.some((a) => a.startsWith('rel='))) {
-          cleanAttrs.push('rel="noopener noreferrer"');
-        }
+      // 5. Track target="_blank" for anchor links; rel="noopener noreferrer" is enforced below
+      if (tag === 'a' && attrName === 'rel') {
+        continue;
       }
 
       cleanAttrs.push(`${attrName}="${escapeHtml(attrVal)}"`);
+    }
+
+    if (tag === 'a' && cleanAttrs.some((a) => /^target=".*_blank.*"/i.test(a))) {
+      cleanAttrs.push('rel="noopener noreferrer"');
     }
 
     const attrsString = cleanAttrs.length > 0 ? ' ' + cleanAttrs.join(' ') : '';
@@ -217,8 +237,14 @@ function cleanHtml(rawHtml, options = {}) {
     return `<${tag}${attrsString}${isSelfClosing ? ' /' : ''}>`;
   });
 
-  return html;
+  // 3. Fail closed. The pattern above can only read tags written the way it expects; one it can't read
+  //    (<img src="x"onerror=alert(1)>, an unfinished <img src=x onerror=…) used to pass through untouched,
+  //    and a browser reads such tags happily. Only the exact form this function writes is allowed to stay a
+  //    tag: every other "<" becomes text.
+  return html.replace(CLEAN_TAG_OR_LT, (m) => (m === '<' ? '&lt;' : m));
 }
+// <tag>, </tag>, <tag name="value" …> or <tag … />, with the quoted, escaped attributes step 2 writes
+const CLEAN_TAG_OR_LT = /<\/?[a-z0-9:-]+(?: [a-z0-9:-]+="[^"<>]*")* ?\/?>|</gi;
 
 // SafeHtml Wrapper Class
 class SafeHtml {
