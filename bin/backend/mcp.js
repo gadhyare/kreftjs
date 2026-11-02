@@ -63,10 +63,16 @@ class McpServer {
         throw new Error('Access denied: Dangerous SQL functions, mutations, or file operations are prohibited in MCP.');
       }
       // Credentials stay out of reach whatever they are renamed to (SELECT password AS p …)
-      const SECRET_NAME_RE = /(password|passwd|secret|token|api_?key|private_?key|recovery_?code|credential|salt|hash)/i;
+      const SECRET_NAME_RE = /(password|passwd|secret|token|api_?key|private_?key|recovery_?code|credential|salt|hash|authentication)/i;
       const SECRET_TABLE_RE = /\b(personal_access_tokens|password_reset_tokens|password_resets|sessions|failed_jobs|jobs)\b/i;
       if (SECRET_TABLE_RE.test(code)) {
         throw new Error('Access denied: this table holds credentials or queued payloads and is not readable via MCP.');
+      }
+      // The database server's own accounts, sessions and settings are not the app's data (mysql.user holds account hashes,
+      // processlist other people's SQL): the app's tables and information_schema.tables / columns are what MCP is for
+      const SERVER_INTERNALS_RE = /\b(?:mysql|performance_schema|sys)["`]?\s*\.|\binformation_schema["`]?\s*\.\s*["`]?(?:processlist|user_privileges|schema_privileges|table_privileges|column_privileges|user_attributes|innodb_\w+)|\b(?:pg_authid|pg_shadow|pg_roles|pg_auth_members|pg_user_mappings?|pg_stat_activity|pg_stat_ssl|pg_hba_file_rules|pg_file_settings|pg_settings)\b/i;
+      if (SERVER_INTERNALS_RE.test(code)) {
+        throw new Error('Access denied: the database server\'s own accounts, sessions and settings are not readable via MCP.');
       }
       if (SECRET_NAME_RE.test(code)) {
         throw new Error('Access denied: columns holding credentials cannot be named in MCP queries (SELECT * hides them).');
@@ -91,7 +97,7 @@ class McpServer {
       try { await Promise.race([guarded, timedOut]); } finally { clearTimeout(timer); }
 
       // Credentials are masked by column name, and also by what the value looks like (a hash, a token, a JSON text)
-      const SENSITIVE_KEY_RE = /(password|passwd|secret|token|api_?key|private_?key|recovery_?code|hash|salt|credential)/i;
+      const SENSITIVE_KEY_RE = /(password|passwd|secret|token|api_?key|private_?key|recovery_?code|hash|salt|credential|authentication)/i;
       const HASH_RE = /\$(?:scrypt|2[abxy]|argon2\w*|pbkdf2\S*)\$[^\s"']+/gi;
       const MASK = '******** [REDACTED]';
       const mask = (v, key) => {

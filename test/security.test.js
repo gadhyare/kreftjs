@@ -290,3 +290,13 @@ test('https redirect: the Host header can not send a visitor to another site', (
   assert.strictEqual(to('', '/'), null);
   assert.strictEqual(to('example.com', '//evil.example/x'), 'https://example.com/', 'a path that starts with // is not kept');
 });
+
+test('MCP query_database: the database server\'s own accounts and sessions are refused (found on MySQL)', async () => {
+  const { connect } = require(path.join(ROOT, 'bin/db.js'));
+  const { setConnection } = require(path.join(ROOT, 'bin/backend/query.js'));
+  setConnection(await connect('sqlite::memory:'));
+  for (const sql of ['SELECT * FROM mysql.user', 'SELECT user, authentication_string FROM `mysql`.`user`', 'SELECT info FROM information_schema.processlist',
+    'SELECT * FROM performance_schema.threads', 'SELECT * FROM sys.session', 'SELECT * FROM pg_authid', 'SELECT usename, passwd FROM pg_shadow', 'SELECT query FROM pg_stat_activity']) {
+    assert.match(JSON.stringify(await mcpQuery(sql)), /Access denied/, sql);
+  }
+});
