@@ -315,3 +315,16 @@ test('folder guard: a deleted folder or one in the Trash is recognised', () => {
   assert.strictEqual(problem(dir), 'deleted');
   assert.strictEqual(problem(null), 'deleted');
 });
+
+test('som.js loads when the page ships its own translations (window.__SOM_LANG__)', () => {
+  // found by `som new`: a project with a lang/ folder gets __SOM_LANG__ before som.js loads, and registering it
+  // touched `Som` while it was still being created: "Som is not defined" on the first page
+  const vm = require('node:vm');
+  const fs = require('node:fs');
+  const win = { __SOM_LANG__: { en: { greeting: 'Hello :name' }, ar: { greeting: 'مرحبا :name' } } };
+  const ctx = vm.createContext({ window: win, console, setTimeout, clearTimeout, Intl, URL });
+  vm.runInContext(fs.readFileSync(path.join(ROOT, 'som.js'), 'utf8'), ctx);
+  const Som = ctx.Som || win.Som;
+  assert.strictEqual(typeof Som, 'object');
+  assert.deepStrictEqual([...Som.locales()].sort(), ['ar', 'en']);
+});

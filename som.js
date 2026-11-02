@@ -571,15 +571,20 @@
     return clean;
   }
 
-  function registerTranslations(localeOrDict, dict) {
-    if (!dict && typeof localeOrDict === 'object') {
-      for (const [l, d] of Object.entries(localeOrDict)) registerTranslations(l, d);
-      return Som;
+  // adds translations; it must not touch `Som`, because the page's own text (window.__SOM_LANG__) is added
+  // while this file is still loading, before `Som` exists
+  function addTranslations(localeOrDict, dict) {
+    if (!dict && localeOrDict && typeof localeOrDict === 'object') {
+      for (const [l, d] of Object.entries(localeOrDict)) addTranslations(l, d);
+      return;
     }
-    if (!localeOrDict) return Som;
+    if (!localeOrDict) return;
     const loc = String(localeOrDict).toLowerCase().trim();
     if (!translationsStore[loc]) translationsStore[loc] = {};
     deepMergeDict(translationsStore[loc], dict);
+  }
+  function registerTranslations(localeOrDict, dict) {
+    addTranslations(localeOrDict, dict);
     return Som;
   }
 
@@ -647,7 +652,7 @@
   }
 
   if (typeof window !== 'undefined' && window.__SOM_LANG__) {
-    registerTranslations(window.__SOM_LANG__);
+    addTranslations(window.__SOM_LANG__);
   }
 
   function formatNumber(n, options, locale = currentLocaleRef.value) {
