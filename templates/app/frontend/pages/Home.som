@@ -51,7 +51,7 @@ action copyCli() {
     <header class="hero">
       <div class="status-pill">
         <span class="live-indicator" aria-hidden="true"></span>
-        <span class="status-text">Som.js Engine · v{Som.version || '2.5.0'} Ready</span>
+        <span class="status-text">Som.js Engine · v{Som.version || '3.0.0'} Ready</span>
       </div>
 
       <h1 class="headline">

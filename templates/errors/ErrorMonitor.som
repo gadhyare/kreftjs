@@ -116,7 +116,7 @@ action copyReport() {
         <div class="hero-badges">
           <span class="badge-exception">{currentTitle}</span>
           <span class="badge-env">Node.js {typeof process !== 'undefined' ? process.version : 'v22.0.0'}</span>
-          <span class="badge-env">Som.js v2.5.0</span>
+          <span class="badge-env">Som.js v3.0.0</span>
         </div>
         <h1 class="hero-error-message">{currentMessage}</h1>
       </div>

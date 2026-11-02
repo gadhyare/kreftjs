@@ -1,5 +1,5 @@
 /*!
- * Som.js v2.5.0 — reactive by nature
+ * Som.js v3.0.0 — reactive by nature
  * The .som component language (state · derive · action · when · watch · on),
  * { } views with s-if / s-each / s-model, components, slots, router, stores,
  * share / receive, event bus and a template engine.
@@ -4984,7 +4984,7 @@
     stores, storeLog, busLog,
   };
 
-  const VERSION = '2.5.0';
+  const VERSION = '3.0.0';
   const Som = {
     version: VERSION,
     // PUBLIC_ values from .env (som dev and som build put them here); never secrets
