@@ -1,1136 +1,557 @@
-<!-- Som.js Documentation Viewer (docs/Docs.som)
-     A smart, interactive documentation viewer with live full-text search,
-     scroll-spy active section indicator, sticky reading progress header,
-     1-click code copy, keyboard shortcuts, and floating goTop button. -->
+<!-- Som.js documentation viewer (docs/Docs.som)
+     Reads docs/README.en.md, shows it as a manual: parts and chapters on the left, the page in the middle,
+     "On this page" on the right. It sits under the site header, so it uses the site's colours (ui.css),
+     including the light/dark switch. Keys: ⌘K or / search · [ and ] previous / next chapter · Esc closes. -->
 import { markdown } from './markdown.js'
 
-state filter = ''
 state current = ''
-state currentTitle = 'Som.js Documentation'
-state currentSubTitle = ''
 state scrollPct = 0
 state showTop = false
-state copiedSection = false
-state mobileOpen = false
+state copied = false
+state menuOpen = false
+state searchOpen = false
+state query = ''
+state picked = 0
 state article = null
 state searchInput = null
 
-// Load and parse README.en.md with deep section indexing and metrics
+// Load and read the manual
 load doc = (async () => {
-  for (const path of ['docs/README.en.md', '../docs/README.en.md']) {
-    const res = await fetch(new URL(path, document.baseURI))
-    if (!res.ok || /html/.test(res.headers.get('content-type') || '')) continue
-    const raw = (await res.text())
-      .replace(/^🌐.*$/m, '')
-      .replace(/^## Contents\s*$[\s\S]*?^---\s*$/m, '')
-    return markdown(raw)
-  }
-  throw new Error('The documentation file was not found (docs/README.en.md).')
-})()
-
-// TOC and Smart Section Filtering
-derive toc = !doc.data ? [] : doc.data.toc.filter((t) => t.id !== 'contents')
-
-derive shown = (() => {
-  if (!doc.data) return []
-  const q = filter.trim().toLowerCase()
-  if (!q) return doc.data.toc.filter((t) => t.id !== 'contents')
-  
-  // Smart multi-layer search: matches titles, keywords, and section contents
-  const results = []
-  const seen = new Set()
-
-  // Layer 1: Title matches (highest priority)
-  for (const item of doc.data.toc) {
-    if (item.id === 'contents') continue
-    if (item.text.toLowerCase().includes(q)) {
-      results.push({ ...item, matchType: 'title' })
-      seen.add(item.id)
-    }
-  }
-
-  // Layer 2: Deep content & code snippets search
-  if (doc.data.sections) {
-    for (const sec of doc.data.sections) {
-      if (sec.id === 'contents' || seen.has(sec.id)) continue
-      if (sec.content && sec.content.toLowerCase().includes(q)) {
-        results.push({ ...sec, matchType: 'content' })
-        seen.add(sec.id)
+    for (const path of ['docs/README.en.md', '../docs/README.en.md', '/docs/README.en.md', '/demo/docs/README.en.md']) {
+      try {
+        const res = await fetch(new URL(path, document.baseURI))
+        if (!res.ok || /html/.test(res.headers.get('content-type') || '')) continue
+        return markdown(await res.text())
+      } catch (_) {
+        continue
       }
     }
-  }
+    throw new Error('The documentation file was not found (docs/README.en.md).')
+  })()
 
-  return results
-})()
+derive parts = doc.data ? doc.data.parts : []
+derive chapters = doc.data ? doc.data.toc.filter((t) => t.level === 2) : []
+derive byId = new Map((doc.data ? doc.data.toc : []).map((t) => [t.id, t]))
 
-derive activeTitle = (() => {
-  if (currentTitle) return currentTitle
-  if (!doc.data || !current) return 'Overview'
-  const match = doc.data.toc.find((t) => t.id === current)
-  return match ? match.text : 'Overview'
-})()
+// the chapter (a level-2 heading) that the reader is in, even when a level-3 section is on screen
+derive chapterId = (() => {
+    const t = byId.get(current)
+    if (t) return t.level === 3 ? t.parentId : t.id
+    return chapters.length ? chapters[0].id : ''
+  })()
+derive chapter = byId.get(chapterId) || null
+derive outline = doc.data ? doc.data.toc.filter((t) => t.level === 3 && t.parentId === chapterId) : []
+derive prevChapter = (() => {
+    const i = chapters.findIndex((c) => c.id === chapterId)
+    return i > 0 ? chapters[i - 1] : null
+  })()
+derive nextChapter = (() => {
+    const i = chapters.findIndex((c) => c.id === chapterId)
+    return i >= 0 && i < chapters.length - 1 ? chapters[i + 1] : null
+  })()
 
-// Navigate smoothly to target section
-action go(id) {
-  const el = article && article.querySelector('[id="' + id.replace(/["\\]/g, '\\$&') + '"]')
+// search: every word must be in the title or the text of a section; titles come first
+derive results = (() => {
+    if (!doc.data) return []
+    const words = query.toLowerCase().split(/\s+/).filter(Boolean)
+    const all = doc.data.sections
+    if (!words.length) return chapters.slice(0, 8)
+    const out = []
+    for (const s of all) {
+      const title = s.text.toLowerCase()
+      const text = (s.content || '').toLowerCase()
+      if (!words.every((w) => title.includes(w) || text.includes(w))) continue
+      const inTitle = words.every((w) => title.includes(w))
+      let snippet = ''
+      if (!inTitle) {
+        const at = text.indexOf(words[0])
+        const from = Math.max(0, at - 40)
+        snippet = (from > 0 ? '…' : '') + s.content.slice(from, from + 120).trim() + '…'
+      }
+      out.push({ ...s, snippet, score: inTitle ? 0 : 1 })
+    }
+    return out.sort((a, b) => a.score - b.score).slice(0, 12)
+  })()
+
+// what this page remembers between actions. It is state (one copy per page): a plain `let` here would be
+// shared by every page that is opened from this file, so a closed page could stop the next one.
+// `wanted` is the section named in the address when the page was opened (/docs#authentication): read here, at the
+// start, because the router may rewrite the address while the page is still being built
+const wanted = typeof window !== 'undefined' ? decodeURIComponent(window.location.hash.slice(1)) : ''
+state ctl = { moving: false, moveId: 0, hashPending: !!wanted }
+
+function target(id) {
+  return article && article.querySelector('[id="' + id.replace(/["\\]/g, '\\$&') + '"]')
+}
+
+// Go to a chapter or section
+action go(id, instant) {
+  const el = target(id)
   if (!el) return
-  el.scrollIntoView({ behavior: 'smooth', block: 'start' })
   current = id
-  
-  if (doc.data && doc.data.toc) {
-    const match = doc.data.toc.find((t) => t.id === id)
-    if (match) {
-      if (match.level === 3 && match.parentTitle) {
-        currentTitle = match.parentTitle
-        currentSubTitle = match.text
-      } else {
-        currentTitle = match.text
-        currentSubTitle = ''
-      }
-    }
+  menuOpen = false
+  searchOpen = false
+  // keep the page's own address: a bare '#id' would resolve against <base href> and lose /docs
+  if (typeof history !== 'undefined' && history.replaceState) history.replaceState(null, '', window.location.pathname + window.location.search + '#' + id)
+  ctl.moving = true
+  // glide only for short trips: a long smooth scroll across the whole manual just makes the reader wait
+  const calm = instant || (window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches) || Math.abs(el.getBoundingClientRect().top) > window.innerHeight * 2.5
+  // 'instant', not 'auto': the site's CSS sets scroll-behavior: smooth, which 'auto' would follow
+  el.scrollIntoView({ behavior: calm ? 'instant' : 'smooth', block: 'start' })
+  // the scroll may still be gliding (or the browser may glide by itself): wait until the page stops moving
+  // before the reader's position is read again, or the menu would highlight a section we only passed by
+  let last = -1, still = 0, waited = 0
+  const mine = ++ctl.moveId     // only the newest jump may end the "moving" state
+  const rest = () => {
+    if (mine !== ctl.moveId || !article || !article.isConnected) return
+    const y = window.scrollY
+    still = y === last ? still + 1 : 0
+    last = y
+    waited += 100
+    if (still >= 3 || waited > 3000) { ctl.moving = false; syncScroll() }
+    else setTimeout(rest, 100)
   }
-  
-  mobileOpen = false
-  if (typeof history !== 'undefined' && history.replaceState) {
-    history.replaceState(null, '', '#' + id)
-  }
+  setTimeout(rest, 100)
 }
 
-// Floating back-to-top action
 action goTop() {
-  window.scrollTo({ top: 0, behavior: 'smooth' })
   current = ''
-  currentTitle = 'Introduction'
-  currentSubTitle = ''
-  if (typeof history !== 'undefined' && history.replaceState) {
-    history.replaceState(null, '', window.location.pathname)
+  if (typeof history !== 'undefined' && history.replaceState) history.replaceState(null, '', window.location.pathname)
+  window.scrollTo({ top: 0, behavior: 'smooth' })
+}
+
+action openSearch() {
+  searchOpen = true
+  query = ''
+  picked = 0
+  setTimeout(() => { if (searchInput) searchInput.focus() }, 30)
+}
+
+action closeSearch() {
+  searchOpen = false
+}
+
+action searchKeys(e) {
+  if (e.key === 'ArrowDown') {
+    e.preventDefault()
+    if (results.length) picked = (picked + 1) % results.length
+  } else if (e.key === 'ArrowUp') {
+    e.preventDefault()
+    if (results.length) picked = (picked - 1 + results.length) % results.length
+  } else if (e.key === 'Enter') {
+    e.preventDefault()
+    if (results[picked]) go(results[picked].id)
+  } else if (e.key === 'Escape') {
+    closeSearch()
   }
 }
 
-// Reset search filter
-action clearFilter() {
-  filter = ''
-  if (searchInput) searchInput.focus()
-}
-
-// Toggle mobile navigation drawer
-action toggleMobile() {
-  mobileOpen = !mobileOpen
-}
-
-// Copy permalink to active section
-action copyCurrentLink() {
-  if (typeof window === 'undefined') return
+action copyLink() {
   const url = window.location.origin + window.location.pathname + (current ? '#' + current : '')
   navigator.clipboard.writeText(url).then(() => {
-    copiedSection = true
-    setTimeout(() => { copiedSection = false }, 2000)
+    copied = true
+    setTimeout(() => { copied = false }, 1800)
   })
 }
 
-// Event delegation for links and interactive 1-click code copying
-action handleArticleClick(e) {
-  const target = e.target
-
-  // 1. Copy code block handler
-  const copyBtn = target.closest('.copy-btn')
-  if (copyBtn) {
+// clicks inside the page: copy buttons and links to other sections
+action articleClick(e) {
+  const copy = e.target.closest('.copy-btn')
+  if (copy) {
     e.preventDefault()
-    e.stopPropagation()
-    const box = copyBtn.closest('.code-box')
-    const codeEl = box && box.querySelector('code')
-    if (codeEl) {
-      const codeText = codeEl.innerText || codeEl.textContent || ''
-      navigator.clipboard.writeText(codeText).then(() => {
-        const orig = copyBtn.textContent
-        copyBtn.textContent = '✓ Copied!'
-        copyBtn.classList.add('copied')
-        setTimeout(() => {
-          copyBtn.textContent = orig
-          copyBtn.classList.remove('copied')
-        }, 2000)
+    const code = copy.closest('.code-box') && copy.closest('.code-box').querySelector('code')
+    if (code) {
+      navigator.clipboard.writeText(code.innerText || code.textContent || '').then(() => {
+        const label = copy.textContent
+        copy.textContent = 'Copied'
+        copy.classList.add('copied')
+        setTimeout(() => { copy.textContent = label; copy.classList.remove('copied') }, 1800)
       })
     }
     return
   }
-
-  // 2. Section anchor & in-page link navigation
-  const a = target.closest('a')
-  if (!a) return
-  const href = a.getAttribute('href') || ''
-  if (href.startsWith('#')) {
+  const a = e.target.closest('a')
+  const href = a && a.getAttribute('href')
+  if (href && href.startsWith('#')) {
     e.preventDefault()
     go(decodeURIComponent(href.slice(1)))
   }
 }
 
-// Scroll spy & reading progress synchronization
+// which section is on screen, and how far down the page the reader is
 action syncScroll() {
-  if (typeof window === 'undefined') return
-  const docElem = document.documentElement
-  const scrollTop = window.scrollY || docElem.scrollTop || 0
-  const maxScroll = (docElem.scrollHeight - window.innerHeight) || 1
-  scrollPct = Math.min(100, Math.max(0, Math.round((scrollTop / maxScroll) * 100)))
-  showTop = scrollTop > 320
-
-  // Detect active heading in viewport
-  if (!article) return
-  const headings = article.querySelectorAll('h2[id], h3[id]')
-  let activeId = ''
-  let activeText = ''
-  let activeSub = ''
-
-  for (let i = 0; i < headings.length; i++) {
-    const rect = headings[i].getBoundingClientRect()
-    // Trigger when heading passes 120px from top
-    if (rect.top <= 140) {
-      activeId = headings[i].id
-      const titleSpan = headings[i].querySelector('.heading-title')
-      const text = titleSpan ? titleSpan.textContent.trim() : headings[i].textContent.replace(/^#\s*/, '').trim()
-      
-      if (headings[i].tagName.toLowerCase() === 'h3') {
-        activeSub = text
-      } else {
-        activeText = text
-        activeSub = ''
-      }
-    } else {
-      break
-    }
+  const root = document.documentElement
+  const top = window.scrollY || root.scrollTop || 0
+  const max = (root.scrollHeight - window.innerHeight) || 1
+  scrollPct = Math.min(100, Math.max(0, (top / max) * 100))
+  showTop = top > 480
+  if (ctl.moving || ctl.hashPending || !article || !article.isConnected) return
+  let id = ''
+  for (const h of article.querySelectorAll('h2[id], h3[id]')) {
+    if (h.getBoundingClientRect().top <= 120) id = h.id
+    else break
   }
-
-  if (activeId && activeId !== current) {
-    current = activeId
-    if (activeText) currentTitle = activeText
-    if (activeSub) currentSubTitle = activeSub
-  }
+  if (id && id !== current) current = id
 }
 
-// Lifecycle Hooks: attach event listeners and hotkeys
 on ready {
-  const onScroll = () => syncScroll()
-  const onKeyDown = (e) => {
-    // Keyboard shortcut: Press "/" or "Ctrl+K" / "Cmd+K" to focus search
-    const isSlash = e.key === '/'
-    const isCmdK = (e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'k'
-    if (isSlash || isCmdK) {
-      const tag = (document.activeElement && document.activeElement.tagName) || ''
-      if (tag === 'INPUT' || tag === 'TEXTAREA' || document.activeElement.isContentEditable) return
+  let frame = 0
+  const onScroll = () => {
+    if (frame) return
+    frame = requestAnimationFrame(() => { frame = 0; syncScroll() })
+  }
+  const typing = () => {
+    const el = document.activeElement
+    return el && (el.tagName === 'INPUT' || el.tagName === 'TEXTAREA' || el.isContentEditable)
+  }
+  const onKey = (e) => {
+    if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'k') {
       e.preventDefault()
-      if (searchInput) {
-        searchInput.focus()
-        searchInput.select()
-      }
-    } else if (e.key === 'Escape' && filter) {
-      clearFilter()
+      if (searchOpen) closeSearch()
+      else openSearch()
+    } else if (e.key === '/' && !searchOpen && !typing()) {
+      e.preventDefault()
+      openSearch()
+    } else if (e.key === 'Escape') {
+      if (searchOpen) closeSearch()
+      else if (menuOpen) menuOpen = false
+    } else if (e.key === ']' && !typing() && !searchOpen && nextChapter) {
+      go(nextChapter.id)
+    } else if (e.key === '[' && !typing() && !searchOpen && prevChapter) {
+      go(prevChapter.id)
     }
   }
-
   window.addEventListener('scroll', onScroll, { passive: true })
-  window.addEventListener('keydown', onKeyDown)
-  syncScroll()
-
-  // Handle direct hash navigation on page load
-  if (window.location.hash) {
-    setTimeout(() => {
-      const hash = decodeURIComponent(window.location.hash.slice(1))
-      go(hash)
-    }, 250)
+  window.addEventListener('keydown', onKey)
+  let gone = false
+  onDestroy(() => {          // this page is removed: stop listening, and stop looking for the section
+    gone = true
+    window.removeEventListener('scroll', onScroll)
+    window.removeEventListener('keydown', onKey)
+  })
+  // a link such as /docs#authentication opens at that section. The page is built after the text has loaded, and the
+  // router may move to the top once more while it mounts, so look again a few times until the section stays in place.
+  const id = wanted
+  let tries = 0, touched = false
+  const touch = () => { touched = true }
+  const seen = ['wheel', 'touchstart', 'pointerdown', 'keydown']
+  seen.forEach((n) => window.addEventListener(n, touch, { passive: true, once: true }))
+  const done = () => {
+    seen.forEach((n) => window.removeEventListener(n, touch))
+    ctl.hashPending = false
+    syncScroll()
   }
+  // keep putting the section in place until the reader takes over (wheel, touch, key) or about 6 seconds pass
+  const settle = () => {
+    if (gone) return
+    const el = id && target(id)
+    if (el) {
+      const want = parseFloat(getComputedStyle(el).scrollMarginTop) || 80
+      if (Math.abs(el.getBoundingClientRect().top - want) > 40) go(id, true)
+      if (touched || ++tries >= 24) return done()
+      setTimeout(settle, 250)
+    } else if (!touched && ++tries < 40) setTimeout(settle, 150)
+    else done()
+  }
+  if (id) settle()
+  syncScroll()
 }
 
 <view>
-  <div class="docs-wrapper" dir="ltr">
-    <!-- Sticky Smart Reading Topbar -->
-    <header class="docs-topbar">
-      <div class="topbar-inner">
-        <div class="topbar-left">
-          <button class="mobile-toggle-btn" type="button" @click="toggleMobile" aria-label="Toggle Navigation">
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-              <line x1="3" y1="12" x2="21" y2="12"></line>
-              <line x1="3" y1="6" x2="21" y2="6"></line>
-              <line x1="3" y1="18" x2="21" y2="18"></line>
-            </svg>
-            <span>Index</span>
-          </button>
+  <div class="dv" dir="ltr">
+    <div class="dv-progress" aria-hidden="true"><div style={'width:' + scrollPct + '%'}></div></div>
 
-          <div class="section-indicator">
-            <span class="indicator-icon">📌</span>
-            <div class="indicator-text">
-              <span class="active-section-name">{activeTitle}</span>
-              <span s-if="currentSubTitle" class="active-subsection-name">› {currentSubTitle}</span>
+    <!-- narrow screens: a bar with the menu button and the search -->
+    <div class="dv-bar">
+      <button type="button" class="dv-btn" @click="menuOpen = !menuOpen" aria-label="Open the menu" aria-expanded={menuOpen ? 'true' : 'false'}>
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M3 6h18M3 12h18M3 18h18"/></svg>
+        Menu
+      </button>
+      <span class="dv-bar-title">{chapter ? chapter.text : 'Documentation'}</span>
+      <button type="button" class="dv-btn" @click="openSearch" aria-label="Search the docs">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="11" cy="11" r="7"/><path d="M20 20l-3.5-3.5"/></svg>
+      </button>
+    </div>
+
+    <div s-if="menuOpen" class="dv-overlay" @click="menuOpen = false"></div>
+
+    <div class="dv-grid">
+      <!-- left: parts and chapters -->
+      <aside class={'dv-side' + (menuOpen ? ' open' : '')} aria-label="Documentation menu">
+        <button type="button" class="dv-search" @click="openSearch">
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="11" cy="11" r="7"/><path d="M20 20l-3.5-3.5"/></svg>
+          <span>Search the docs</span>
+          <kbd>⌘K</kbd>
+        </button>
+        <nav>
+          {for part in parts key part.id}
+            <div class="dv-part">
+              <p class="dv-part-title">{part.title}</p>
+              <ul>
+                {for item in part.items key item.id}
+                  <li>
+                    <a href={'#' + item.id} class={chapterId === item.id ? 'on' : ''} @click.prevent="go(item.id)">{item.text}</a>
+                  </li>
+                {/for}
+              </ul>
             </div>
-          </div>
-        </div>
-
-        <div class="topbar-right">
-          <span class="read-stats" s-if="doc.data && doc.data.stats">
-            <span class="stats-badge">~{doc.data.stats.readTimeMinutes} min read</span>
-            <span class="stats-progress">{scrollPct}%</span>
-          </span>
-
-          <button class="action-pill-btn" type="button" @click="copyCurrentLink" title="Copy section link">
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-              <path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"></path>
-              <path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"></path>
-            </svg>
-            <span>{copiedSection ? 'Link Copied!' : 'Copy Link'}</span>
-          </button>
-        </div>
-      </div>
-
-      <!-- Real-time dynamic reading progress bar -->
-      <div class="progress-track">
-        <div class="progress-bar-fill" style={'width: ' + scrollPct + '%'}></div>
-      </div>
-    </header>
-
-    <div class="docs-layout">
-      <!-- Sidebar Navigation & Live Search -->
-      <aside class={'docs-sidebar' + (mobileOpen ? ' mobile-active' : '')}>
-        <div class="sidebar-header">
-          <div class="search-box">
-            <svg class="search-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-              <circle cx="11" cy="11" r="8"></circle>
-              <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
-            </svg>
-            <input
-              type="search"
-              s-model="filter"
-              s-ref="searchInput"
-              placeholder="Search topics (Press /)"
-              aria-label="Search documentation"
-              autocomplete="off"
-              spellcheck="false"
-            >
-            <button s-if="filter" type="button" class="clear-search-btn" @click="clearFilter" aria-label="Clear search">×</button>
-            <kbd s-else class="kbd-pill">/</kbd>
-          </div>
-
-          <div class="search-meta">
-            <span s-if="!filter" class="meta-count">{toc.length} Sections Available</span>
-            <span s-else class="meta-count highlight">Found {shown.length} {shown.length === 1 ? 'result' : 'results'}</span>
-            <button s-if="filter" type="button" class="meta-reset-link" @click="clearFilter">Reset</button>
-          </div>
-        </div>
-
-        <nav class="sidebar-nav">
-          <ul class="toc-tree">
-            {for t in shown key t.id}
-              <li class={'toc-item l' + t.level + (current === t.id ? ' is-active' : '')}>
-                <a href={'#' + t.id} @click.prevent="go(t.id)">
-                  <span class="toc-badge" s-if="t.level === 2">§</span>
-                  <span class="toc-bullet" s-else>•</span>
-                  <span class="toc-label">{t.text}</span>
-                  <span s-if="t.matchType === 'content'" class="match-chip">text match</span>
-                </a>
-              </li>
-            {empty}
-              <li class="empty-results">
-                <div class="empty-icon">🔍</div>
-                <div class="empty-title">No matching topics</div>
-                <div class="empty-desc">No section matches "<strong>{filter}</strong>". Try searching for <code>router</code>, <code>database</code>, <code>redis</code>, or <code>actions</code>.</div>
-                <button type="button" class="btn-clear-search" @click="clearFilter">Clear Filter</button>
-              </li>
-            {/for}
-          </ul>
+          {/for}
         </nav>
       </aside>
 
-      <!-- Main Documentation Article -->
-      <main class="docs-main">
-        <article class="docs-article" s-ref="article" @click="handleArticleClick($event)">
-          <div s-if="doc.loading" class="docs-loading-skeleton">
-            <div class="skeleton-shimmer line-title"></div>
-            <div class="skeleton-shimmer line-para"></div>
-            <div class="skeleton-shimmer line-para short"></div>
-            <div class="skeleton-shimmer line-code"></div>
-            <div class="skeleton-shimmer line-para"></div>
-          </div>
+      <!-- middle: the page -->
+      <main class="dv-main">
+        <div class="dv-crumbs" s-if="chapter">
+          <span>{chapter.group}</span>
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><path d="M9 6l6 6-6 6"/></svg>
+          <strong>{chapter.text}</strong>
+          <span class="dv-time" s-if="doc.data">· {doc.data.stats.readTimeMinutes} min for the whole manual</span>
+        </div>
 
-          <div s-elif="doc.error" class="docs-error-card">
-            <div class="error-badge">Documentation Load Error</div>
+        <article class="dv-article" s-ref="article" @click="articleClick($event)">
+          <div s-if="doc.loading" class="dv-skeleton" aria-busy="true">
+            <div class="a"></div><div class="b"></div><div class="b short"></div><div class="c"></div>
+          </div>
+          <aside s-elif="doc.error" class="callout callout-danger" role="alert">
+            <p class="callout-title">Could not load the documentation</p>
             <p>{doc.error.message}</p>
-            <button type="button" class="btn-retry" @click="window.location.reload()">Reload Page</button>
-          </div>
+          </aside>
+          <div s-else class="dv-body" s-html="doc.data.html"></div>
 
-          <div s-else class="markdown-body" s-html="doc.data.html"></div>
+          <footer class="dv-pager" s-if="doc.data">
+            <a s-if="prevChapter" href={'#' + prevChapter.id} class="prev" @click.prevent="go(prevChapter.id)">
+              <small>Previous</small>
+              <span>{prevChapter.text}</span>
+            </a>
+            <span s-else></span>
+            <a s-if="nextChapter" href={'#' + nextChapter.id} class="next" @click.prevent="go(nextChapter.id)">
+              <small>Next</small>
+              <span>{nextChapter.text}</span>
+            </a>
+          </footer>
         </article>
       </main>
+
+      <!-- right: on this page -->
+      <aside class="dv-toc" aria-label="On this page">
+        <div class="dv-toc-in">
+          <p class="dv-toc-title">On this page</p>
+          <ul s-if="outline.length">
+            {for item in outline key item.id}
+              <li><a href={'#' + item.id} class={current === item.id ? 'on' : ''} @click.prevent="go(item.id)">{item.text}</a></li>
+            {/for}
+          </ul>
+          <p s-else class="dv-toc-empty">No sections in this chapter.</p>
+          <div class="dv-toc-tools">
+            <button type="button" @click="copyLink">{copied ? 'Link copied' : 'Copy link to this section'}</button>
+            <button type="button" @click="goTop">Back to top</button>
+          </div>
+        </div>
+      </aside>
     </div>
 
-    <!-- Floating Go-To-Top Button with live scroll percentage ring -->
-    <button
-      type="button"
-      class={'go-top-btn' + (showTop ? ' is-visible' : '')}
-      @click="goTop"
-      aria-label="Back to top"
-      title="Back to top"
-    >
-      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
-        <line x1="12" y1="19" x2="12" y2="5"></line>
-        <polyline points="5 12 12 5 19 12"></polyline>
-      </svg>
-      <span class="go-top-text">Top</span>
-      <span class="go-top-pct">{scrollPct}%</span>
+    <!-- search -->
+    <div s-if="searchOpen" class="dv-modal" @click="closeSearch">
+      <div class="dv-modal-box" role="dialog" aria-modal="true" aria-label="Search the documentation" @click.stop="">
+        <div class="dv-modal-in">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="11" cy="11" r="7"/><path d="M20 20l-3.5-3.5"/></svg>
+          <input type="search" s-model="query" s-ref="searchInput" placeholder="Search guides, commands and APIs" autocomplete="off" @keydown="searchKeys($event)">
+          <kbd @click="closeSearch">Esc</kbd>
+        </div>
+        <ul class="dv-results">
+          {for (item, idx) in results key item.id}
+            <li class={idx === picked ? 'on' : ''} @mouseenter="picked = idx" @click="go(item.id)">
+              <span class="r-title">{item.text}</span>
+              <span class="r-where">{item.level === 3 ? item.parentTitle + ' · ' : ''}{item.group}</span>
+              <span class="r-snippet" s-if="item.snippet">{item.snippet}</span>
+            </li>
+          {empty}
+            <li class="none">Nothing found for "{query}". Try fewer or different words.</li>
+          {/for}
+        </ul>
+        <div class="dv-modal-foot">
+          <span><kbd>↑</kbd> <kbd>↓</kbd> move</span>
+          <span><kbd>↵</kbd> open</span>
+          <span><kbd>Esc</kbd> close</span>
+        </div>
+      </div>
+    </div>
+
+    <button type="button" class={'dv-top' + (showTop ? ' show' : '')} @click="goTop" aria-label="Back to top">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M12 19V5M5 12l7-7 7 7"/></svg>
     </button>
   </div>
 </view>
 
-<style scoped>
-/* Som.js Documentation Styles — Modern, Glassmorphic, High-Contrast */
-.docs-wrapper {
-  color: var(--foreground);
-  min-height: 100vh;
+<style>
+.dv {
+  --dv-bar: 60px;                              /* height of the site header above */
+  --dv-accent: var(--primary, #18181b);
+  --dv-code-bg: var(--terminal-bg, #09090b);
+  --dv-code-fg: var(--terminal-fg, #f4f4f5);
+  --dv-soft: var(--accent, #f4f4f5);
+  --dv-line: var(--border, #e4e4e7);
+  --dv-text: var(--foreground, #09090b);
+  --dv-muted: var(--muted, #52525b);
+  color: var(--dv-text);
+  font-family: var(--font, system-ui, sans-serif);
   position: relative;
 }
-
-/* 1. Sticky Smart Reading Topbar */
-.docs-topbar {
-  position: sticky;
-  top: 0;
-  z-index: 40;
-  background: var(--background);
-  background: color-mix(in srgb, var(--background) 88%, transparent);
-  backdrop-filter: blur(14px);
-  -webkit-backdrop-filter: blur(14px);
-  border-bottom: 1px solid var(--border);
-  margin: 0 -32px 28px -32px;
-  padding: 10px 32px 0 32px;
-  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.03);
-}
-
-.topbar-inner {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  max-width: 1220px;
-  margin: 0 auto;
-  padding-bottom: 10px;
-  gap: 16px;
-}
-
-.topbar-left {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  min-width: 0;
-}
-
-.mobile-toggle-btn {
-  display: none;
-  align-items: center;
-  gap: 6px;
-  background: var(--accent);
-  color: var(--foreground);
-  border: 1px solid var(--border);
-  padding: 6px 12px;
-  font-size: 13px;
-  font-weight: 600;
-  cursor: pointer;
-  border-radius: 6px;
-}
-
-.section-indicator {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  min-width: 0;
-}
-
-.indicator-icon {
-  font-size: 15px;
-  flex-shrink: 0;
-}
-
-.indicator-text {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  overflow: hidden;
-  white-space: nowrap;
-  text-overflow: ellipsis;
-}
-
-.active-section-name {
-  font-size: 14px;
-  font-weight: 700;
-  letter-spacing: -0.01em;
-  color: var(--foreground);
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-
-.active-subsection-name {
-  font-size: 13px;
-  color: var(--muted);
-  font-weight: 500;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-
-.topbar-right {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  flex-shrink: 0;
-}
-
-.read-stats {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  font-size: 12px;
-  color: var(--muted);
-}
-
-.stats-badge {
-  background: var(--accent);
-  border: 1px solid var(--border);
-  padding: 3px 8px;
-  border-radius: 4px;
-  font-weight: 500;
-}
-
-.stats-progress {
-  font-weight: 700;
-  color: var(--foreground);
-  min-width: 34px;
-  text-align: right;
-  font-variant-numeric: tabular-nums;
-}
-
-.action-pill-btn {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  background: var(--accent);
-  color: var(--foreground);
-  border: 1px solid var(--border);
-  padding: 5px 11px;
-  font-size: 12px;
-  font-weight: 600;
-  border-radius: 6px;
-  cursor: pointer;
-  transition: all 0.15s ease;
-}
-
-.action-pill-btn:hover {
-  background: var(--border);
-  transform: translateY(-1px);
-}
-
-/* Dynamic Reading Progress Bar */
-.progress-track {
-  width: calc(100% + 64px);
-  margin-left: -32px;
-  height: 2px;
-  background: transparent;
-  overflow: hidden;
-}
-
-.progress-bar-fill {
-  height: 100%;
-  background: var(--foreground);
-  transition: width 0.1s linear;
-}
-
-/* 2. Grid Layout */
-.docs-layout {
-  display: grid;
-  grid-template-columns: 290px minmax(0, 1fr);
-  gap: 52px;
-  align-items: start;
-}
-
-/* 3. Sidebar */
-.docs-sidebar {
-  position: sticky;
-  top: 72px;
-  max-height: calc(100vh - 86px);
-  display: flex;
-  flex-direction: column;
-  border-inline-end: 1px solid var(--border);
-  padding-inline-end: 24px;
-  overflow: hidden;
-}
-
-.sidebar-header {
-  padding-bottom: 14px;
-  border-bottom: 1px solid var(--border);
-  margin-bottom: 12px;
-  flex-shrink: 0;
-}
-
-.search-box {
-  position: relative;
-  display: flex;
-  align-items: center;
-  width: 100%;
-}
-
-.search-box input {
-  width: 100%;
-  padding: 9px 36px 9px 34px;
-  font-size: 13.5px;
-  background: var(--accent);
-  color: var(--foreground);
-  border: 1px solid var(--border);
-  border-radius: 8px;
-  outline: none;
-  transition: border-color 0.2s, box-shadow 0.2s;
-}
-
-.search-box input:focus {
-  border-color: var(--foreground);
-  box-shadow: 0 0 0 2px rgba(125, 125, 125, 0.15);
-}
-
-.search-icon {
-  position: absolute;
-  left: 10px;
-  color: var(--muted);
-  pointer-events: none;
-}
-
-.clear-search-btn {
-  position: absolute;
-  right: 8px;
-  background: none;
-  border: none;
-  color: var(--muted);
-  font-size: 18px;
-  line-height: 1;
-  padding: 4px;
-  cursor: pointer;
-}
-
-.clear-search-btn:hover {
-  color: var(--foreground);
-}
-
-.kbd-pill {
-  position: absolute;
-  right: 10px;
-  font-family: var(--mono, monospace);
-  font-size: 11px;
-  background: var(--background);
-  color: var(--muted);
-  border: 1px solid var(--border);
-  padding: 2px 6px;
-  border-radius: 4px;
-  pointer-events: none;
-}
-
-.search-meta {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  margin-top: 8px;
-  font-size: 11.5px;
-  color: var(--muted);
-}
-
-.meta-count.highlight {
-  color: var(--foreground);
-  font-weight: 600;
-}
-
-.meta-reset-link {
-  background: none;
-  border: none;
-  color: var(--foreground);
-  text-decoration: underline;
-  cursor: pointer;
-  font-size: 11px;
-  padding: 0;
-}
-
-.sidebar-nav {
-  overflow-y: auto;
-  flex: 1;
-  padding-bottom: 24px;
-  padding-inline-end: 4px;
-}
-
-.sidebar-nav::-webkit-scrollbar {
-  width: 4px;
-}
-
-.sidebar-nav::-webkit-scrollbar-thumb {
-  background: var(--border);
-  border-radius: 4px;
-}
-
-.toc-tree {
-  list-style: none;
-  margin: 0;
-  padding: 0;
-}
-
-.toc-item {
-  margin: 2px 0;
-}
-
-.toc-item a {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  padding: 6px 10px;
-  color: var(--muted);
-  text-decoration: none;
-  font-size: 13.5px;
-  border-radius: 6px;
-  line-height: 1.4;
-  transition: all 0.15s ease;
-}
-
-.toc-item a:hover {
-  color: var(--foreground);
-  background: var(--accent);
-}
-
-.toc-item.is-active a {
-  color: var(--foreground);
-  font-weight: 700;
-  background: var(--accent);
-  box-shadow: inset 3px 0 0 var(--foreground);
-}
-
-.toc-item.l3 a {
-  padding-inline-start: 24px;
-  font-size: 12.5px;
-}
-
-.toc-badge {
-  font-size: 12px;
-  color: var(--muted);
-  opacity: 0.7;
-}
-
-.toc-bullet {
-  font-size: 10px;
-  color: var(--muted);
-}
-
-.toc-label {
-  flex: 1;
-  min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-
-.match-chip {
-  font-size: 10px;
-  background: var(--border);
-  color: var(--muted);
-  padding: 1px 5px;
-  border-radius: 3px;
-  text-transform: uppercase;
-  font-weight: 600;
-}
-
-.empty-results {
-  padding: 24px 12px;
-  text-align: center;
-}
-
-.empty-icon {
-  font-size: 26px;
-  margin-bottom: 8px;
-}
-
-.empty-title {
-  font-size: 14px;
-  font-weight: 700;
-  color: var(--foreground);
-  margin-bottom: 4px;
-}
-
-.empty-desc {
-  font-size: 12px;
-  color: var(--muted);
-  line-height: 1.5;
-  margin-bottom: 12px;
-}
-
-.btn-clear-search {
-  background: var(--accent);
-  color: var(--foreground);
-  border: 1px solid var(--border);
-  padding: 5px 12px;
-  font-size: 12px;
-  border-radius: 4px;
-  cursor: pointer;
-  font-weight: 600;
-}
-
-/* 4. Main Article Container */
-.docs-main {
-  min-width: 0;
-  max-width: 840px;
-}
-
-.docs-article {
-  min-width: 0;
-  line-height: 1.75;
-  font-size: 15.5px;
-  color: var(--foreground);
-}
-
-/* Skeletons */
-.docs-loading-skeleton {
-  padding: 24px 0;
-}
-
-.skeleton-shimmer {
-  background: linear-gradient(90deg, var(--accent) 25%, var(--border) 50%, var(--accent) 75%);
-  background-size: 200% 100%;
-  animation: shimmer 1.5s infinite;
-  border-radius: 6px;
-  margin-bottom: 16px;
-}
-
-.line-title { height: 38px; width: 60%; margin-bottom: 24px; }
-.line-para { height: 16px; width: 100%; }
-.line-para.short { width: 75%; }
-.line-code { height: 120px; width: 100%; margin: 24px 0; }
-
-@keyframes shimmer {
-  0% { background-position: 200% 0; }
-  100% { background-position: -200% 0; }
-}
-
-.docs-error-card {
-  border: 1px solid var(--destructive, #ef4444);
-  background: color-mix(in srgb, var(--destructive, #ef4444) 8%, var(--background));
-  padding: 24px;
-  border-radius: 8px;
-}
-
-.error-badge {
-  font-weight: 700;
-  color: var(--destructive, #ef4444);
-  font-size: 16px;
-  margin-bottom: 8px;
-}
-
-.btn-retry {
-  margin-top: 12px;
-  background: var(--foreground);
-  color: var(--background);
-  border: none;
-  padding: 6px 14px;
-  border-radius: 6px;
-  font-weight: 600;
-  cursor: pointer;
-}
-
-/* 5. Deep Article Styling */
-.docs-article :deep(h1) {
-  font-size: 38px;
-  letter-spacing: -0.04em;
-  margin: 0 0 20px;
-  color: var(--foreground);
-  font-weight: 800;
-  line-height: 1.2;
-}
-
-.docs-article :deep(h2) {
-  font-size: 25px;
-  letter-spacing: -0.03em;
-  margin: 54px 0 16px;
-  padding-top: 28px;
-  border-top: 1px solid var(--border);
-  scroll-margin-top: 80px;
-  color: var(--foreground);
-  font-weight: 700;
-  display: flex;
-  align-items: center;
-  position: relative;
-}
-
-.docs-article :deep(h3) {
-  font-size: 19px;
-  margin: 36px 0 12px;
-  scroll-margin-top: 80px;
-  color: var(--foreground);
-  font-weight: 600;
-  display: flex;
-  align-items: center;
-  position: relative;
-}
-
-.docs-article :deep(h4) {
-  font-size: 15.5px;
-  margin: 26px 0 10px;
-  color: var(--foreground);
-  font-weight: 600;
-}
-
-.docs-article :deep(.heading-anchor) {
-  position: absolute;
-  left: -24px;
-  color: var(--muted);
-  text-decoration: none;
-  opacity: 0;
-  font-weight: 400;
-  padding: 0 4px;
-  transition: opacity 0.15s ease;
-}
-
-.docs-article :deep(h2:hover .heading-anchor),
-.docs-article :deep(h3:hover .heading-anchor) {
-  opacity: 1;
-}
-
-.docs-article :deep(p),
-.docs-article :deep(li) {
-  color: var(--foreground);
-  opacity: 0.94;
-  margin-bottom: 12px;
-}
-
-.docs-article :deep(li) {
-  margin-bottom: 8px;
-}
-
-.docs-article :deep(strong) {
-  color: var(--foreground);
-  font-weight: 700;
-}
-
-.docs-article :deep(a) {
-  color: var(--foreground);
-  text-decoration: underline;
-  text-underline-offset: 3px;
-  font-weight: 500;
-  transition: opacity 0.15s;
-}
-
-.docs-article :deep(a:hover) {
-  opacity: 0.75;
-}
-
-.docs-article :deep(code) {
-  font-family: var(--mono, monospace);
-  font-size: 0.88em;
-  padding: 2px 6px;
-  background: var(--accent);
-  border: 1px solid var(--border);
-  border-radius: 4px;
-  color: var(--foreground);
-}
-
-/* Interactive Code Boxes */
-.docs-article :deep(.code-box) {
-  margin: 24px 0;
-  border: 1px solid var(--border);
-  border-radius: 8px;
-  overflow: hidden;
-  background: var(--terminal-bg, #0d1117);
-  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.08);
-}
-
-.docs-article :deep(.code-head) {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: 8px 16px;
-  background: color-mix(in srgb, var(--terminal-bg, #0d1117) 90%, #fff 10%);
-  border-bottom: 1px solid color-mix(in srgb, var(--terminal-bg, #0d1117) 80%, #fff 20%);
-}
-
-.docs-article :deep(.code-lang) {
-  font-family: var(--mono, monospace);
-  font-size: 11.5px;
-  font-weight: 700;
-  letter-spacing: 0.05em;
-  color: var(--terminal-fg, #c9d1d9);
-  opacity: 0.75;
-}
-
-.docs-article :deep(.copy-btn) {
-  background: color-mix(in srgb, var(--terminal-bg, #0d1117) 70%, #fff 30%);
-  color: var(--terminal-fg, #c9d1d9);
-  border: 1px solid color-mix(in srgb, var(--terminal-bg, #0d1117) 60%, #fff 40%);
-  padding: 4px 10px;
-  font-size: 11.5px;
-  font-weight: 600;
-  border-radius: 4px;
-  cursor: pointer;
-  transition: all 0.15s ease;
-}
-
-.docs-article :deep(.copy-btn:hover) {
-  background: color-mix(in srgb, var(--terminal-bg, #0d1117) 50%, #fff 50%);
-  color: #fff;
-}
-
-.docs-article :deep(.copy-btn.copied) {
-  background: #10b981;
-  color: #ffffff;
-  border-color: #10b981;
-}
-
-.docs-article :deep(pre) {
-  margin: 0;
-  direction: ltr;
-  text-align: left;
-  font-size: 13.5px;
-  line-height: 1.65;
-  color: var(--terminal-fg, #e6edf3);
-  padding: 18px 20px;
-  overflow-x: auto;
-}
-
-.docs-article :deep(pre code) {
-  background: none;
-  border: none;
-  padding: 0;
-  color: inherit;
-  font-size: inherit;
-  border-radius: 0;
-}
-
-/* Tables */
-.docs-article :deep(.table) {
-  overflow-x: auto;
-  margin: 24px 0;
-  border: 1px solid var(--border);
-  border-radius: 8px;
-}
-
-.docs-article :deep(table) {
-  font-size: 14px;
-  width: 100%;
-  border-collapse: collapse;
-}
-
-.docs-article :deep(th),
-.docs-article :deep(td) {
-  padding: 11px 16px;
-  border-bottom: 1px solid var(--border);
-  text-align: left;
-}
-
-.docs-article :deep(tr:last-child td) {
-  border-bottom: 0;
-}
-
-.docs-article :deep(th) {
-  background: var(--accent);
-  color: var(--foreground);
-  font-weight: 700;
-}
-
-.docs-article :deep(blockquote) {
-  margin: 22px 0;
-  padding: 14px 20px;
-  border: 1px solid var(--border);
-  border-inline-start: 4px solid var(--foreground);
-  background: var(--accent);
-  color: var(--foreground);
-  border-radius: 0 8px 8px 0;
-}
-
-.docs-article :deep(kbd) {
-  font-family: var(--mono, monospace);
-  font-size: 11.5px;
-  padding: 2px 6px;
-  background: var(--accent);
-  border: 1px solid var(--border);
-  border-radius: 4px;
-  box-shadow: 0 1px 1px rgba(0, 0, 0, 0.1);
-}
-
-.docs-article :deep(hr) {
-  display: none;
-}
-
-/* 6. Floating Go-To-Top Button */
-.go-top-btn {
-  position: fixed;
-  bottom: 28px;
-  right: 28px;
-  z-index: 50;
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  background: var(--foreground);
-  color: var(--background);
-  border: none;
-  border-radius: 30px;
-  padding: 9px 16px;
-  font-size: 13px;
-  font-weight: 700;
-  cursor: pointer;
-  box-shadow: 0 10px 25px rgba(0, 0, 0, 0.2);
-  opacity: 0;
-  visibility: hidden;
-  transform: translateY(16px);
-  transition: opacity 0.25s ease, transform 0.25s ease, visibility 0.25s;
-}
-
-.go-top-btn.is-visible {
-  opacity: 1;
-  visibility: visible;
-  transform: translateY(0);
-}
-
-.go-top-btn:hover {
-  transform: translateY(-2px);
-  box-shadow: 0 14px 30px rgba(0, 0, 0, 0.28);
-}
-
-.go-top-pct {
-  font-size: 11px;
-  background: color-mix(in srgb, var(--background) 25%, transparent);
-  padding: 2px 6px;
-  border-radius: 12px;
-  font-variant-numeric: tabular-nums;
-}
-
-/* 7. Responsive Breakpoints */
-@media (max-width: 960px) {
-  .docs-topbar {
-    margin: 0 -16px 20px -16px;
-    padding: 8px 16px 0 16px;
-  }
-  .progress-track {
-    width: calc(100% + 32px);
-    margin-left: -16px;
-  }
-  .mobile-toggle-btn {
-    display: inline-flex;
-  }
-  .docs-layout {
-    grid-template-columns: 1fr;
-    gap: 20px;
-  }
-  .docs-sidebar {
-    display: none;
-    position: fixed;
-    top: 56px;
-    left: 0;
-    right: 0;
-    bottom: 0;
-    max-height: none;
-    z-index: 60;
-    background: var(--background);
-    padding: 16px 20px;
-    border-inline-end: none;
-  }
-  .docs-sidebar.mobile-active {
-    display: flex;
-  }
-  .docs-article :deep(.heading-anchor) {
-    display: none;
-  }
-  .go-top-btn {
-    bottom: 18px;
-    right: 18px;
-    padding: 8px 13px;
-  }
+.dv *, .dv *::before, .dv *::after { box-sizing: border-box; }
+
+/* reading progress */
+.dv-progress { position: fixed; inset: 0 0 auto 0; height: 2px; z-index: 60; pointer-events: none; }
+.dv-progress div { height: 100%; background: var(--dv-accent); transition: width .1s linear; }
+
+/* the three columns */
+.dv-grid { display: grid; grid-template-columns: 260px minmax(0, 1fr) 220px; gap: 0 40px; align-items: start; }
+.dv-side, .dv-toc { position: sticky; top: calc(var(--dv-bar) + 16px); max-height: calc(100vh - var(--dv-bar) - 32px); overflow: auto; }
+.dv-side { padding: 20px 8px 24px 0; scrollbar-width: thin; }
+.dv-main { min-width: 0; padding: 24px 0 64px; }
+.dv-toc { margin-top: 28px; scrollbar-width: thin; }
+.dv-toc-in { padding-inline-start: 16px; border-inline-start: 1px solid var(--dv-line); }
+
+/* menu */
+.dv-search { display: flex; align-items: center; gap: 10px; width: 100%; height: 38px; padding: 0 10px; margin-bottom: 18px; background: var(--background, #fff); color: var(--dv-muted); border: 1px solid var(--dv-line); border-radius: var(--radius, 6px); font: inherit; font-size: 14px; cursor: pointer; text-align: start; }
+.dv-search:hover { border-color: var(--dv-muted); color: var(--dv-text); }
+.dv-search span { flex: 1; }
+.dv kbd { font-family: var(--mono, monospace); font-size: 11px; line-height: 1; padding: 3px 6px; color: var(--dv-muted); background: var(--dv-soft); border: 1px solid var(--dv-line); border-radius: 4px; }
+.dv-part { margin-bottom: 22px; }
+.dv-part-title { margin: 0 0 6px; padding: 0 10px; font-size: 11px; font-weight: 600; letter-spacing: .08em; text-transform: uppercase; color: var(--dv-muted); }
+.dv-part ul, .dv-toc ul { list-style: none; margin: 0; padding: 0; }
+.dv-part a { display: block; padding: 6px 10px; border-radius: var(--radius, 6px); color: var(--dv-muted); font-size: 14px; line-height: 1.35; text-decoration: none; }
+.dv-part a:hover { color: var(--dv-text); background: var(--dv-soft); }
+.dv-part a.on { color: var(--dv-text); background: var(--dv-soft); font-weight: 600; }
+
+/* right column */
+.dv-toc-title { margin: 0 0 8px; font-size: 12px; font-weight: 600; letter-spacing: .06em; text-transform: uppercase; color: var(--dv-muted); }
+.dv-toc li a { display: block; padding: 4px 0; font-size: 13px; line-height: 1.4; color: var(--dv-muted); text-decoration: none; }
+.dv-toc li a:hover, .dv-toc li a.on { color: var(--dv-text); }
+.dv-toc li a.on { font-weight: 600; }
+.dv-toc-empty { margin: 0; font-size: 13px; color: var(--dv-muted); }
+.dv-toc-tools { display: flex; flex-direction: column; align-items: flex-start; gap: 6px; margin-top: 18px; padding-top: 14px; border-top: 1px solid var(--dv-line); }
+.dv-toc-tools button { padding: 0; background: none; border: 0; font: inherit; font-size: 13px; color: var(--dv-muted); cursor: pointer; }
+.dv-toc-tools button:hover { color: var(--dv-text); text-decoration: underline; }
+
+/* breadcrumb */
+.dv-crumbs { display: flex; align-items: center; flex-wrap: wrap; gap: 6px; margin-bottom: 8px; font-size: 13px; color: var(--dv-muted); }
+.dv-crumbs strong { color: var(--dv-text); font-weight: 600; }
+.dv-time { margin-inline-start: auto; }
+
+/* the page itself */
+.dv-article { max-width: 780px; }
+.dv-body { font-size: 16px; line-height: 1.75; }
+.dv-body > :first-child { margin-top: 0; }
+.dv-body p { margin: 0 0 16px; }
+.dv-body a { color: var(--dv-text); text-decoration: underline; text-decoration-color: var(--dv-line); text-underline-offset: 3px; }
+.dv-body a:hover { text-decoration-color: currentColor; }
+.dv-body strong { font-weight: 600; }
+.dv-body ul, .dv-body ol { margin: 0 0 16px; padding-inline-start: 22px; }
+.dv-body li { margin: 4px 0; }
+.dv-body li > p { margin: 6px 0; }
+.dv-body hr { margin: 36px 0; border: 0; border-top: 1px solid var(--dv-line); }
+
+.dv-body .doc-heading { position: relative; scroll-margin-top: calc(var(--dv-bar) + 20px); font-weight: 650; letter-spacing: -.01em; }
+.dv-body .heading-anchor { position: absolute; inset-inline-start: -22px; opacity: 0; color: var(--dv-muted); text-decoration: none; font-weight: 400; }
+.dv-body .doc-heading:hover .heading-anchor { opacity: 1; }
+.dv-body .doc-h1 { margin: 72px 0 8px; padding-top: 28px; border-top: 1px solid var(--dv-line); font-size: 12px; font-weight: 600; letter-spacing: .12em; text-transform: uppercase; color: var(--dv-muted); }
+.dv-body .doc-h1:first-child { margin-top: 0; padding-top: 0; border-top: 0; }
+.dv-body .doc-h2 { margin: 28px 0 14px; font-size: 32px; line-height: 1.2; }
+.dv-body .doc-h3 { margin: 40px 0 12px; font-size: 21px; line-height: 1.3; }
+.dv-body .doc-h4 { margin: 28px 0 8px; font-size: 17px; }
+
+/* inline code and keys */
+.dv-body :not(pre) > code { padding: 2px 6px; font-family: var(--mono, monospace); font-size: .88em; background: var(--dv-soft); border: 1px solid var(--dv-line); border-radius: 5px; }
+
+/* code blocks: always dark, with the language and a copy button */
+.dv-body .code-box { margin: 0 0 20px; overflow: hidden; background: var(--dv-code-bg); color: var(--dv-code-fg); border: 1px solid var(--dv-line); border-radius: var(--radius-lg, 8px); }
+.dv-body .code-head { display: flex; align-items: center; justify-content: space-between; padding: 6px 10px 6px 14px; border-bottom: 1px solid rgba(255,255,255,.08); }
+.dv-body .code-lang { font-family: var(--mono, monospace); font-size: 11px; letter-spacing: .08em; color: rgba(244,244,245,.55); }
+.dv-body .copy-btn { padding: 3px 9px; background: transparent; color: rgba(244,244,245,.75); border: 1px solid rgba(255,255,255,.16); border-radius: 5px; font: inherit; font-size: 12px; cursor: pointer; }
+.dv-body .copy-btn:hover { color: #fff; border-color: rgba(255,255,255,.4); }
+.dv-body .copy-btn.copied { color: #86efac; border-color: #86efac; }
+.dv-body pre { margin: 0; padding: 14px 16px; overflow-x: auto; font-family: var(--mono, monospace); font-size: 13.5px; line-height: 1.65; tab-size: 2; }
+.dv-body pre code { padding: 0; background: none; border: 0; color: inherit; font-size: inherit; }
+.dv-body li > pre { margin: 10px 0; background: var(--dv-code-bg); color: var(--dv-code-fg); border-radius: var(--radius, 6px); }
+
+/* tables scroll sideways on a narrow screen instead of breaking the page */
+.dv-body .table { margin: 0 0 20px; overflow-x: auto; border: 1px solid var(--dv-line); border-radius: var(--radius-lg, 8px); }
+.dv-body table { width: 100%; border-collapse: collapse; font-size: 14.5px; }
+.dv-body th, .dv-body td { padding: 9px 14px; text-align: start; vertical-align: top; border-bottom: 1px solid var(--dv-line); }
+.dv-body th { font-weight: 600; background: var(--dv-soft); white-space: nowrap; }
+.dv-body tr:last-child td { border-bottom: 0; }
+.dv-body td code { white-space: nowrap; }
+.dv-body td:first-child { min-width: 9em; }
+
+.dv-body blockquote { margin: 0 0 16px; padding: 4px 16px; color: var(--dv-muted); border-inline-start: 3px solid var(--dv-line); }
+
+/* callouts: markdown makes <aside class="callout callout-note|tip|warning|danger|important"> */
+.dv .callout { --c: #2563eb; margin: 0 0 18px; padding: 12px 16px; background: color-mix(in srgb, var(--c) 8%, transparent); border: 1px solid color-mix(in srgb, var(--c) 28%, transparent); border-inline-start: 4px solid var(--c); border-radius: var(--radius-lg, 8px); }
+.dv .callout-tip { --c: #059669; }
+.dv .callout-warning { --c: #d97706; }
+.dv .callout-danger { --c: #dc2626; }
+.dv .callout-important { --c: #7c3aed; }
+.dv .callout p { margin: 0; font-size: 15px; line-height: 1.6; }
+.dv .callout p + p { margin-top: 4px; }
+.dv .callout-title { font-weight: 650; font-size: 13px !important; letter-spacing: .04em; text-transform: uppercase; color: var(--c); }
+
+/* previous / next */
+.dv-pager { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; margin-top: 64px; padding-top: 24px; border-top: 1px solid var(--dv-line); }
+.dv-pager a { display: flex; flex-direction: column; gap: 2px; padding: 14px 16px; text-decoration: none; color: var(--dv-text); border: 1px solid var(--dv-line); border-radius: var(--radius-lg, 8px); }
+.dv-pager a:hover { border-color: var(--dv-muted); }
+.dv-pager small { font-size: 12px; color: var(--dv-muted); }
+.dv-pager span { font-weight: 600; }
+.dv-pager .next { text-align: end; grid-column: 2; }
+
+/* loading */
+.dv-skeleton div { height: 14px; margin-bottom: 12px; background: var(--dv-soft); border-radius: 6px; animation: dv-pulse 1.2s ease-in-out infinite; }
+.dv-skeleton .a { width: 42%; height: 34px; margin-bottom: 24px; }
+.dv-skeleton .b.short { width: 60%; }
+.dv-skeleton .c { height: 120px; margin-top: 20px; }
+@keyframes dv-pulse { 50% { opacity: .45; } }
+
+/* search window */
+.dv-modal { position: fixed; inset: 0; z-index: 80; display: flex; align-items: flex-start; justify-content: center; padding: 12vh 16px 16px; background: rgba(9,9,11,.55); }
+.dv-modal-box { width: 100%; max-width: 620px; max-height: 70vh; display: flex; flex-direction: column; overflow: hidden; background: var(--background, #fff); color: var(--dv-text); border: 1px solid var(--dv-line); border-radius: 12px; box-shadow: 0 24px 60px rgba(0,0,0,.35); }
+.dv-modal-in { display: flex; align-items: center; gap: 10px; padding: 0 14px; border-bottom: 1px solid var(--dv-line); color: var(--dv-muted); }
+.dv-modal-in input { flex: 1; height: 52px; background: transparent; color: var(--dv-text); border: 0; outline: 0; font: inherit; font-size: 16px; }
+.dv-results { list-style: none; margin: 0; padding: 8px; overflow: auto; }
+.dv-results li { display: flex; flex-wrap: wrap; align-items: baseline; gap: 2px 10px; padding: 9px 12px; border-radius: var(--radius, 6px); cursor: pointer; }
+.dv-results li.on { background: var(--dv-soft); }
+.dv-results .r-title { font-weight: 600; }
+.dv-results .r-where { font-size: 12px; color: var(--dv-muted); }
+.dv-results .r-snippet { flex-basis: 100%; font-size: 13px; color: var(--dv-muted); }
+.dv-results .none { color: var(--dv-muted); cursor: default; }
+.dv-modal-foot { display: flex; gap: 16px; padding: 9px 14px; border-top: 1px solid var(--dv-line); font-size: 12px; color: var(--dv-muted); }
+
+.dv-top { position: fixed; inset-inline-end: 20px; bottom: 20px; z-index: 40; display: grid; place-items: center; width: 40px; height: 40px; background: var(--background, #fff); color: var(--dv-text); border: 1px solid var(--dv-line); border-radius: 50%; cursor: pointer; opacity: 0; pointer-events: none; transform: translateY(8px); transition: opacity .2s, transform .2s; }
+.dv-top.show { opacity: 1; pointer-events: auto; transform: none; }
+
+/* narrow screens */
+.dv-bar { display: none; }
+.dv-overlay { display: none; }
+@media (max-width: 1180px) {
+  .dv-grid { grid-template-columns: 240px minmax(0, 1fr); }
+  .dv-toc { display: none; }
+}
+@media (max-width: 860px) {
+  .dv-grid { display: block; }
+  .dv-bar { position: sticky; top: var(--dv-bar); z-index: 30; display: flex; align-items: center; gap: 10px; height: 46px; margin: 0 -16px; padding: 0 16px; background: var(--background, #fff); border-bottom: 1px solid var(--dv-line); }
+  .dv-bar-title { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 14px; font-weight: 600; text-align: center; }
+  .dv-btn { display: inline-flex; align-items: center; gap: 6px; height: 32px; padding: 0 10px; background: transparent; color: var(--dv-text); border: 1px solid var(--dv-line); border-radius: var(--radius, 6px); font: inherit; font-size: 13px; cursor: pointer; }
+  .dv-side { position: fixed; inset: 0 auto 0 0; z-index: 70; width: min(86vw, 320px); max-height: none; padding: 16px; background: var(--background, #fff); border-inline-end: 1px solid var(--dv-line); transform: translateX(-102%); transition: transform .22s ease; }
+  .dv-side.open { transform: none; }
+  .dv-overlay { display: block; position: fixed; inset: 0; z-index: 65; background: rgba(9,9,11,.5); }
+  .dv-main { padding-top: 16px; }
+  .dv-time { display: none; }
+  .dv-body .doc-heading { scroll-margin-top: calc(var(--dv-bar) + 66px); }
+  .dv-body .doc-h2 { font-size: 26px; }
+  .dv-body .heading-anchor { display: none; }
+  .dv-pager { grid-template-columns: 1fr; }
+  .dv-pager .next { grid-column: 1; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .dv-side, .dv-top, .dv-progress div { transition: none; }
+  .dv-skeleton div { animation: none; }
 }
 </style>

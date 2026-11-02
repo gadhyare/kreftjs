@@ -28,7 +28,8 @@ function inline(text) {
 
 export function markdown(source) {
   const lines = source.replace(/\r\n?/g, '\n').split('\n');
-  const out = [], toc = [], sections = [];
+  const out = [], toc = [], sections = [], parts = [], usedIds = new Map();
+  let currentPart = null;
   let i = 0;
   let currentSection = null;
   let currentH2Id = null;
@@ -54,7 +55,11 @@ export function markdown(source) {
     let m;
     if ((m = line.match(/^(#{1,6})\s+(.*)$/))) {
       const level = m[1].length, text = m[2].replace(/^‏/, '');
-      const id = slug(text);
+      let id = slug(text);
+      // the same heading text twice (two "Example" sections) must not share an id
+      const seen = usedIds.get(id) || 0;
+      usedIds.set(id, seen + 1);
+      if (seen) id = `${id}-${seen + 1}`;
       const cleanTitle = text.replace(/[`*]/g, '').trim();
       const item = {
         level,
@@ -63,11 +68,18 @@ export function markdown(source) {
         title: cleanTitle,
         parentId: level === 3 && currentH2Id ? currentH2Id : null,
         parentTitle: level === 3 && currentH2Title ? currentH2Title : null,
+        group: currentPart ? currentPart.title : '',
         content: '',
       };
+      if (level === 1) {
+        // a "part" of the manual (Start here, Backend…): it groups the chapters that follow
+        currentPart = { id, title: cleanTitle, items: [] };
+        parts.push(currentPart);
+      }
       if (level === 2 || level === 3) {
         toc.push(item);
         sections.push(item);
+        if (level === 2 && currentPart) currentPart.items.push(item);
         currentSection = item;
         if (level === 2) {
           currentH2Id = id;
@@ -108,7 +120,12 @@ export function markdown(source) {
       while (i < lines.length && /^>/.test(lines[i])) body.push(lines[i++].replace(/^>\s?/, ''));
       const quoteText = body.join(' ');
       addTextToCurrent(quoteText);
-      out.push(`<blockquote>${inline(quoteText)}</blockquote>`);
+      // > [!NOTE] / [!TIP] / [!WARNING] / [!DANGER] / [!IMPORTANT] makes a labelled callout box
+      const call = quoteText.match(/^\[!(NOTE|TIP|WARNING|DANGER|IMPORTANT)\]\s*(.*)$/i);
+      if (call) {
+        const kind = call[1].toLowerCase();
+        out.push(`<aside class="callout callout-${kind}" role="note"><p class="callout-title">${kind.charAt(0).toUpperCase() + kind.slice(1)}</p><p>${inline(call[2])}</p></aside>`);
+      } else out.push(`<blockquote>${inline(quoteText)}</blockquote>`);
       continue;
     }
     if ((m = line.match(/^(\s*)([-*]|\d+\.)\s+/))) {
@@ -158,6 +175,7 @@ export function markdown(source) {
   return {
     html: out.join('\n'),
     toc,
+    parts,
     sections,
     stats: {
       words: totalWords,
