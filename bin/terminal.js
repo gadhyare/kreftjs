@@ -178,6 +178,7 @@ function renderDevBanner({
 
   lines.push('---');
   lines.push(`  ${c.dim('Press')} ${c.bold('Ctrl+C')} ${c.dim('to stop the server ·')} ${c.dim('Press')} ${c.bold('h')} ${c.dim('for help')}`);
+  lines.push(`  ${c.dim('Stop the server (')}${c.bold('Ctrl+C')}${c.dim(') before you move or delete this folder.')}`);
 
   return '\n' + renderBox(lines, { width: 66, borderColor: c.cyan }) + '\n';
 }

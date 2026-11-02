@@ -1556,6 +1556,7 @@ Run `som list` to see every command your installed version has, and `som help` f
 - `som dev` answers only this computer (`127.0.0.1`) and only requests whose `Host` is a local name (`localhost`, `127.0.0.1`, `::1`, `*.localhost`). This stops DNS-rebinding attacks, where a web page tries to reach your dev server through its own domain name.
 - To reach it through a tunnel or another name, set `SOM_ALLOWED_HOSTS=my-tunnel.example`. To share it on your network, use `--host 0.0.0.0`.
 - Requests that change data in `--api` or `--db` mode are refused when they come from another web site (a browser `Origin` that is not local).
+- **Moving or deleting the project folder.** The operating system cannot refuse a delete, so the server says so after it happens: if the project folder is deleted or moved to the Trash while `som dev` or `som serve` runs, it stops at once with a message. Any `som` command started from a deleted folder or one in the Trash refuses to run. Stop the server with <kbd>Ctrl</kbd>+<kbd>C</kbd> before you move or delete a project.
 
 ## Developer tools
 
@@ -1633,7 +1634,62 @@ som build --prerender                       # every route without :params
 som build --prerender /users/1,/users/2     # and these addresses too
 ```
 
-Each page is opened in a simulated browser, its data loaded, and the result saved as `dist/<page>/index.html`, so visitors and search engines get finished HTML. There is still no server that renders pages on every request.
+Each page is opened in a simulated browser, its data loaded, and the result saved as `dist/<page>/index.html`, so visitors and search engines get finished HTML.
+
+The tags a page sets with `.seo({...})` or `meta` (description, canonical, Open Graph, Twitter, `hreflang`, JSON-LD, `lang` and `dir`) are saved in the page's HTML too, so link previews and crawlers that don't run JavaScript see them. A canonical written in `index.html` is kept for the home page only. A page where the app shows its error page is skipped.
+
+Pages that come from your data (`/posts/:slug`) need their addresses: `som build --prerender --urls urls.js`. The file is `urls.json` (a list), `urls.txt` (one address per line), or `urls.js` (a list, or an async function that returns it).
+
+### SEO for pages from your database: `backend/routes/seo.js`
+
+A page whose content comes from a table can't be known at build time. List what the server should put in `<head>` for an address:
+
+```js
+// backend/routes/seo.js
+const Post = require('../app/Models/Post')
+
+module.exports = {
+  '/': { title: 'My shop', description: 'Everything for the home' },
+  '/posts/:slug': async ({ slug }) => {
+    const post = await Post.where('slug', slug).first()
+    if (!post) return null                  // a real 404, with noindex
+    return {
+      title: post.title,
+      description: post.excerpt,
+      og: { image: post.image },
+      schema: { '@type': 'Article', headline: post.title },
+      alternates: { en: `https://example.com/posts/${slug}`, ar: `https://example.com/ar/posts/${slug}` },
+    }
+  },
+  // the addresses of your data pages, for `som sitemap`: '/path' or { path, lastmod }
+  urls: async () => (await Post.all()).map((p) => ({ path: '/posts/' + p.slug, lastmod: p.updated_at })),
+}
+```
+
+`som dev` and `som serve` answer a page request with `index.html` plus the tags of the first matching address (`:param` and a trailing `/*` work). Set `APP_URL` and each page also gets its `canonical`. An address that isn't listed is the normal page. The browser keeps these tags until the first navigation, then the router's own tags take over.
+
+### Whole pages for crawlers
+
+A crawler or link preview (Googlebot, Bingbot, WhatsApp, Facebook, X, Slack, Telegram …) that doesn't run JavaScript would see an empty `<div id="app">`. For these visitors `som dev` and `som serve` open the page in the same simulated browser as `--prerender`, wait until its data has loaded, and answer with the page already drawn. If the app shows its `errors/404.som` page, the answer has status 404. A page that `som build --prerender` already drew is sent as it is. Everyone else gets the normal page.
+
+```bash
+npm i -D jsdom        # once per project
+SOM_SSR=bots          # default: crawlers and link previews only
+SOM_SSR=all           # every visitor
+SOM_SSR=off           # never
+SOM_SSR_TTL=300       # seconds a drawn page is kept (som dev never keeps them)
+```
+
+At most two pages are drawn at a time; when the server is busy, jsdom is missing, or a page fails, the normal page is sent. Responses carry `Vary: User-Agent`.
+
+### Sitemap and robots.txt: `som sitemap`
+
+```bash
+som sitemap --url https://example.com                  # public/sitemap.xml and public/robots.txt
+som sitemap --url https://example.com --urls urls.js   # and the addresses in that file
+```
+
+It lists the routes of `Som.router({ routes })` in `index.html` and `routes/web.som`, skipping redirects and patterns like `/posts/:id`, plus the `urls` of `backend/routes/seo.js` and `--urls`. A `lastmod` is written only when you give one (a database date such as `2026-01-02 10:00:00` becomes `2026-01-02`). A route can list `alternates: { en: '/about', ar: '/ar/about' }` for `xhtml:link` entries.
 
 ### Deploying the backend
 
@@ -1868,7 +1924,7 @@ Go through this before your first real user:
 - Inside a view, `<` directly followed by a letter starts a tag, so write `{a < b}` with a space.
 - The memory of which two-factor codes were already used, and login tickets, is kept per process. Behind several servers, a code can be replayed once on each. The per-account lockout (kept in the cache) still limits guessing.
 - The sanitizer removes unsafe markup; it is not a substitute for choosing carefully what HTML you show.
-- `--prerender` makes static HTML at build time. There is no per-request server rendering.
+- `--prerender` makes static HTML at build time. On a running server whole pages are drawn only for crawlers and link previews; every other visitor gets the page drawn by the browser, and an address the app does not have answers 200 (the app shows its own 404 page) unless `seo.js` says otherwise.
 - `.som` files must be served over `http://` or `https://`, not opened from `file://`.
 
 # Reference

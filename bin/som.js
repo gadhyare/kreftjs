@@ -65,6 +65,10 @@ const commands = {
   i: (args) => require('./add.js')(args),
   new: createProject, dev: devServer, serve: (a) => devServer(a, { production: true }), db: dbCommand, vscode: installVscode, build: (args) => require('./build.js')(args), update: (args) => require('./update.js')(args), upgrade: (args) => require('./update.js')(args), help, '--help': help, '-h': help, '--version': version, '-v': version
 };
+// a folder that was deleted or put in the Trash must not be worked in (see guard.js)
+const guard = require('./guard.js');
+guard.checkStart(command);
+if (['queue:work', 'queue:start', 'schedule:work'].includes(command)) guard.watch([process.cwd()]);
 if (commands[command]) commands[command](rest);
 else if (command && !command.startsWith('-')) {
   // your own commands: app/Console/Commands (som make:command SendReport)
@@ -718,7 +722,7 @@ async function devServer(args, { production = false } = {}) {
   };
   const isFile = (p) => { try { return fs.statSync(p).isFile(); } catch (_) { return false; } };
 
-  function send(res, file) {
+  function send(res, file, opts = {}) { // opts.seo: tags for <head> (pages from seo.js), opts.status: 404 for a page that does not exist
     // a TypeScript module for the browser: its JavaScript (som build writes it as .js)
     if (!production && /\.(m|c)?ts$/i.test(file) && !file.endsWith('.d.ts')) {
       const { transpileTs } = require('./backend/typescript.js');
@@ -731,7 +735,7 @@ async function devServer(args, { production = false } = {}) {
       }
     }
     const type = types[path.extname(file).toLowerCase()] || 'application/octet-stream';
-    res.writeHead(200, {
+    res.writeHead(opts.status || 200, {
       'Content-Type': type + (type.startsWith('text/') || type.endsWith('json') ? '; charset=utf-8' : ''),
       'Cache-Control': isProd ? 'no-cache' : 'no-store', // dev: always pick up your latest changes
       'X-Content-Type-Options': 'nosniff',
@@ -768,8 +772,9 @@ async function devServer(args, { production = false } = {}) {
         html = im ? html.replace(im[0], () => im[0] + '\n' + tag) : html.replace(/<head[^>]*>/i, (m) => m + '\n' + tag);
         if (!html.includes(tag)) html = tag + '\n' + html;
       }
-      return res.end(html);
+      return res.end(opts.seo ? require('./backend/seo-pages.js').inject(html, opts.seo) : html);
     }
+    if (type === 'text/html' && opts.seo) return res.end(require('./backend/seo-pages.js').inject(fs.readFileSync(file, 'utf8'), opts.seo));
     const stream = fs.createReadStream(file);
     stream.on('error', () => {
       if (!res.headersSent) res.writeHead(404, { 'Content-Type': 'text/plain; charset=utf-8' });
@@ -883,6 +888,32 @@ async function devServer(args, { production = false } = {}) {
   const secret = (p) => /(^|\/)\.|\.(db|sqlite3?|db-wal|db-shm|sqlite-wal|sqlite-shm|sql|bak|dump|key|pem|crt)$|(^|\/)(som\.config\.json|package(-lock)?\.json|pnpm-lock\.yaml|yarn\.lock|bun\.lockb|composer\.(json|lock)|docker-compose.*\.ya?ml|Dockerfile|node_modules|vendor)(\/|$)/i.test(p)
     || (production && /(^|\/)(database|app|routes)\//i.test(p));
   setInterval(() => clients.forEach((c) => c.write(': ping\n\n')), 25000).unref();
+  // a page of the app: index.html, with the SEO tags of backend/routes/seo.js for this address (and its status)
+  async function sendPage(req, res, file, urlPath) {
+    let seo = null;
+    if (req.method === 'GET' || req.method === 'HEAD') {
+      try { seo = await require('./backend/seo-pages.js').resolve(backendDir, urlPath, req); } catch (e) { console.log('  routes/seo.js: ' + (e && e.message || e)); }
+    }
+    // a crawler or link preview gets the page already drawn (and a 404 when the app shows its 404 page)
+    if (ssr.wants(req) && (!seo || seo.status === 200) && !fs.readFileSync(file, 'utf8').includes('data-som-ssg')) { // a page som build --prerender already drew is sent as it is
+      const page = await ssr.render(urlPath);
+      if (page) {
+        res.writeHead(page.status, { 'Content-Type': 'text/html; charset=utf-8', 'Cache-Control': 'no-cache', 'Vary': 'User-Agent', 'X-Content-Type-Options': 'nosniff' });
+        return res.end(req.method === 'HEAD' ? undefined : page.html);
+      }
+    }
+    return send(res, file, seo ? { seo: seo.tags, status: seo.status } : {});
+  }
+  const ssr = require('./ssr.js').create({
+    root,
+    cached: production,
+    log: console.log,
+    origin: () => { // where this server can be reached from itself
+      const a = server.address();
+      const host = !a.address || a.address === '0.0.0.0' || a.address === '::' ? '127.0.0.1' : a.address;
+      return `http://${host.includes(':') ? '[' + host + ']' : host}:${a.port}`;
+    },
+  });
   // /demo/users/2 → demo/users/2/index.html, demo/users/index.html, demo/index.html, index.html
   function nearestIndex(urlPath) {
     let dir = urlPath;
@@ -1068,11 +1099,11 @@ async function devServer(args, { production = false } = {}) {
       }
       if (isFile(path.join(file, 'index.html'))) {
         if (!urlPath.endsWith('/')) { res.writeHead(301, { Location: urlPath + '/' }); return res.end(); }
-        return send(res, path.join(file, 'index.html'));
+        return sendPage(req, res, path.join(file, 'index.html'), urlPath);
       }
       // a page path (no extension) gets the nearest index.html, so clean URLs work on reload
       const index = !path.extname(urlPath) && nearestIndex(urlPath);
-      if (index) return send(res, index);
+      if (index) return sendPage(req, res, index, urlPath);
 
       // the Som.js repository itself has no index.html at the top: show the demo
       if (urlPath === '/' && isFile(path.join(root, 'demo/index.html'))) {
@@ -1100,6 +1131,8 @@ async function devServer(args, { production = false } = {}) {
     }
   });
   server.listen(port, host, () => {
+    // stop, with a message, if the project folder is deleted or moved to the Trash while the server runs
+    require('./guard.js').watch([project, backendDir, process.cwd()], { onStop: () => server.close() });
     const p = server.address().port;
     const start = isFile(path.join(root, 'index.html')) ? '' : isFile(path.join(root, 'demo/index.html')) ? 'demo/' : '';
     const { renderDevBanner } = require('./terminal.js');

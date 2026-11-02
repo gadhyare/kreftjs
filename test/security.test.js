@@ -300,3 +300,18 @@ test('MCP query_database: the database server\'s own accounts and sessions are r
     assert.match(JSON.stringify(await mcpQuery(sql)), /Access denied/, sql);
   }
 });
+
+test('folder guard: a deleted folder or one in the Trash is recognised', () => {
+  const fs = require('node:fs');
+  const os = require('node:os');
+  const { problem, inTrash } = require(path.join(ROOT, 'bin/guard.js'));
+  assert.ok(inTrash('/Users/ada/.Trash/my-app'));
+  assert.ok(inTrash('/home/ada/.local/share/Trash/files/my-app'));
+  assert.ok(inTrash('C:\\$Recycle.Bin\\S-1\\my-app'));
+  assert.ok(!inTrash('/Users/ada/Projects/trash-talk/app'));
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'som-guard-'));
+  assert.strictEqual(problem(dir), null);
+  fs.rmSync(dir, { recursive: true });
+  assert.strictEqual(problem(dir), 'deleted');
+  assert.strictEqual(problem(null), 'deleted');
+});
