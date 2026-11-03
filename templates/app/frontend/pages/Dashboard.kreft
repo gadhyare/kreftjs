@@ -112,7 +112,7 @@ state docs = (Kreftjs.env.PUBLIC_DOCS_URL || 'http://kreftjs.com').replace(/\/+$
         <div class="info-list">
           <div class="info-item">
             <span class="info-label">Framework Engine</span>
-            <span class="info-value">Kreft {Kreftjs.version || '0.0.9-beta'}</span>
+            <span class="info-value">Kreft {Kreftjs.version || '0.0.10-beta'}</span>
           </div>
           <div class="info-item">
             <span class="info-label">Active Database</span>

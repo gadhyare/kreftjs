@@ -1,6 +1,6 @@
 {
   "name": "kreftjs",
-  "version": "0.0.9-beta",
+  "version": "0.0.10-beta",
   "description": "A tiny reactive framework with its own component language (.kreft files): router with nested routes, stores, saved data, animations, an API client, hot reload, DevTools and a template engine.",
   "license": "Elastic-2.0",
   "main": "kreftjs.js",
