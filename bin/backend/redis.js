@@ -26,7 +26,7 @@
  *   REDIS_PORT=6379
  *   REDIS_PASSWORD=
  *   REDIS_DB=0
- *   REDIS_PREFIX=som:
+ *   REDIS_PREFIX=kreft:
  *
  * Zero mandatory dependencies: works out of the box with Node's native net module (RESP protocol).
  * Seamlessly wraps ioredis or redis npm packages when installed.

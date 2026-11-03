@@ -1,4 +1,4 @@
-// The queue's tables: jobs waiting (kreftjs queue:work, or kreftjs dev, runs them) and jobs that failed
+// The queue's tables: jobs waiting (kreft queue:work, or kreft dev, runs them) and jobs that failed
 module.exports = {
   up(schema) {
     schema.create('jobs', (table) => {

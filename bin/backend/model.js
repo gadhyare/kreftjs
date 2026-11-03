@@ -61,7 +61,7 @@ class ModelNotFoundError extends Error {
   }
 }
 
-// where the project's backend is (for factories); set by kreftjs dev / kreftjs serve / the kreftjs commands
+// where the project's backend is (for factories); set by kreft dev / kreft serve / the kreftjs commands
 let baseDir = null;
 const setBaseDir = (dir) => { baseDir = dir; };
 const getBaseDir = () => baseDir;
@@ -454,7 +454,7 @@ class Model {
     if ((await fire(C, 'saving', this)) === false) return false;
     if ((await fire(C, creating ? 'creating' : 'updating', this)) === false) return false;
     if (!(await tableExists(C.table))) {
-      throw new Error(`Table "${C.table}" does not exist in the database. Run "kreftjs migrate" to create it.`);
+      throw new Error(`Table "${C.table}" does not exist in the database. Run "kreft migrate" to create it.`);
     }
     const cols = await columnsOf(C.table);
     const has = (c) => cols.some((x) => x.name === c);

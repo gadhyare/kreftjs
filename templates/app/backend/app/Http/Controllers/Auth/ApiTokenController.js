@@ -4,7 +4,7 @@ const PersonalAccessToken = require('../../../Models/PersonalAccessToken')
 // What an API token may do: change this list for your app. 'abilities:posts:write' in a route checks it.
 const ABILITIES = ['read', 'create', 'update', 'delete']
 
-// API tokens for scripts and other apps (pages/Profile.kreftjs → API tokens), like Jetstream / Sanctum
+// API tokens for scripts and other apps (pages/Profile.kreft → API tokens), like Jetstream / Sanctum
 class ApiTokenController {
   // GET /api/user/tokens
   async index(req) {

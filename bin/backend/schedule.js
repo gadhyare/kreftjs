@@ -7,7 +7,7 @@
  *   Schedule.command('cache:clear').hourly()
  *   Schedule.call(fn).cron('* /15 * * * *')     (no space: every 15 minutes)
  *
- * kreftjs dev runs them while it is on; for a real server: kreftjs schedule:work (or `kreftjs schedule:run` from cron each minute).
+ * kreft dev runs them while it is on; for a real server: kreft schedule:work (or `kreft schedule:run` from cron each minute).
  */
 const tasks = [];
 
@@ -96,7 +96,7 @@ function loadSchedule(baseDir) {
   require(file);
   return file;
 }
-// kreftjs dev / kreftjs schedule:work: check every minute, on the minute
+// kreft dev / kreftjs schedule:work: check every minute, on the minute
 function startScheduler(baseDir, log = console.log) {
   let timer = null;
   const tick = async () => {

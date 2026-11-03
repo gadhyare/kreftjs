@@ -2,7 +2,7 @@ const { Hash, Url, abort, same } = require('kreftjs/server')
 const User = require('../../../Models/User')
 
 class EmailVerificationController {
-  // POST /api/email/verification-notification: send the link again (pages/auth/VerifyEmail.kreftjs)
+  // POST /api/email/verification-notification: send the link again (pages/auth/VerifyEmail.kreft)
   async send(req) {
     if (req.user.hasVerifiedEmail()) return { message: 'Your email address is already verified.' }
     await req.user.sendEmailVerificationNotification()

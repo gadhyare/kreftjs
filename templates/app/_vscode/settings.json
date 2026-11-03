@@ -1,8 +1,9 @@
 {
   "files.associations": {
-    "*.kreftjs": "kreft"
+    "*.kreft": "kreftjs",
+    "*.kreftjs": "kreftjs"
   },
-  "[kreft]": {
+  "[kreftjs]": {
     "editor.defaultFormatter": "kreft.kreftjs",
     "editor.formatOnSave": true
   }

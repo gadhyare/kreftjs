@@ -1,6 +1,6 @@
 // Your API: every address here starts with /api.
 // All API routes live directly in this file. Add your new routes here!
-// See them all anytime with: kreftjs route:list
+// See them all anytime with: kreft route:list
 const { Route, use, namespace } = require('kreftjs/server')
 
 // PHP-style namespace imports (e.g. use('App\Http\Controllers\Admin\UserController')):

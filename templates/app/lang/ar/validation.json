@@ -12,6 +12,7 @@
     "array": "يجب ألا يحتوي :attribute على أكثر من :max عناصر."
   },
   "confirmed": "تأكيد :attribute غير متطابق.",
+  "not_common_password": "كلمة :attribute شائعة جداً أو يسهل تخمينها. اختر كلمة أخرى.",
   "attributes": {
     "email": "البريد الإلكتروني",
     "password": "كلمة المرور",
@@ -19,4 +20,3 @@
     "title": "العنوان"
   }
 }
-

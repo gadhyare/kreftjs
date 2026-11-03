@@ -2,12 +2,12 @@
  * Kreft Vite Plugin
  *
  * Full-featured Vite.js support for Kreft:
- *   • Compiles .kreftjs components into native ES modules
+ *   • Compiles .kreft components into native ES modules
  *   • Scoped CSS (<style scoped>) extracted into Vite virtual CSS modules with instant HMR
- *   • Route files (routes/*.kreftjs) automatically transformed and registered
+ *   • Route files (routes/*.kreft) automatically transformed and registered
  *   • Component HMR preserves live state and reactivity
  *   • Precompiles view expressions ahead of time (zero eval / CSP-safe)
- *   • Automatically resolves and aliases 'kreftjs' (and 'kreft' and 'som', the earlier names)
+ *   • Automatically resolves and aliases 'kreftjs' (and 'kreft', the earlier name)
  *
  * Usage (vite.config.js):
  *   import { defineConfig } from 'vite';
@@ -186,10 +186,10 @@ function scanHtml(html, on) {
 
 /* ------------------------------------------------------------------ the plugin */
 function kreftPlugin(options = {}) {
-  const include = options.include || /\.(?:kreftjs|kreft|som)$/; // .kreft and .som: files of an older project
+  const include = options.include || /\.(?:kreftjs|kreft)$/; // .kreftjs: files of a project from the 0.0.x betas
   const exclude = options.exclude || /node_modules/;
   const precompile = options.precompile !== false;
-  const isComponentFile = (f) => /\.(?:kreftjs|kreft|som)$/.test(f);
+  const isComponentFile = (f) => /\.(?:kreftjs|kreft)$/.test(f);
   const kreftRuntimePath = path.resolve(__dirname, '..', 'kreftjs.js');
 
   const filter = (id) => {
@@ -213,11 +213,11 @@ function kreftPlugin(options = {}) {
       return {
         resolve: {
           alias: [
-            { find: /^(?:kreftjs|kreft|som)$/, replacement: kreftRuntimePath }, // kreft and som: the earlier names
+            { find: /^(?:kreftjs|kreft)$/, replacement: kreftRuntimePath }, // kreft: the earlier name
           ],
         },
         optimizeDeps: {
-          exclude: ['kreftjs', 'kreft', 'som'],
+          exclude: ['kreftjs', 'kreft'],
         },
       };
     },
@@ -277,7 +277,7 @@ function kreftPlugin(options = {}) {
       if (query && query.includes('type=style')) return null;
       if (!filter(filePath)) return null;
 
-      // 1. Route files: routes/web.kreftjs or any .kreftjs file without <view>
+      // 1. Route files: routes/web.kreft or any .kreft file without <view>
       if (!/<view(\s[^>]*)?>([\s\S]*)<\/view>/i.test(code)) {
         const baseName = path.basename(filePath);
         return {
@@ -329,12 +329,12 @@ export default routes;
         const m = stmt.match(/^import\s+(?:([\s\S]+?)\s+from\s+)?(['"])(.+?)\2/);
         if (!m) continue;
         const [, what, , spec] = m;
-        if (/^(?:kreftjs|kreft|som)(\.js)?$/.test(spec)) continue;
+        if (/^(?:kreftjs|kreft)(\.js)?$/.test(spec)) continue;
         if (/\.css(?:[?#].*)?$/i.test(spec)) {
           topImports.push(`import ${JSON.stringify(spec)};`);
           continue;
         }
-        if (/\.(?:kreftjs|kreft|som)$/i.test(spec)) {
+        if (/\.(?:kreftjs|kreft)$/i.test(spec)) {
           topImports.push(`import ${what} from ${JSON.stringify(spec)};`);
           const names = extractImportedNames(what);
           names.forEach((name) => {
@@ -393,7 +393,7 @@ var __def = Kreftjs.__makeDef({
 if (typeof window !== 'undefined' && window.Kreftjs && window.Kreftjs.__registerDef) {
   window.Kreftjs.__registerDef(${JSON.stringify(filePath)}, __def);
   window.Kreftjs.__registerDef(${JSON.stringify(baseName)}, __def);
-  window.Kreftjs.__registerDef(${JSON.stringify(sp.name + '.kreftjs')}, __def);
+  window.Kreftjs.__registerDef(${JSON.stringify(sp.name + '.kreft')}, __def);
 }
 
 if (import.meta.hot) {
@@ -401,7 +401,7 @@ if (import.meta.hot) {
     if (newMod && newMod.default && typeof window !== 'undefined' && window.Kreftjs && window.Kreftjs.__hotDef) {
       window.Kreftjs.__hotDef(${JSON.stringify(filePath)}, newMod.default);
       window.Kreftjs.__hotDef(${JSON.stringify(baseName)}, newMod.default);
-      window.Kreftjs.__hotDef(${JSON.stringify(sp.name + '.kreftjs')}, newMod.default);
+      window.Kreftjs.__hotDef(${JSON.stringify(sp.name + '.kreft')}, newMod.default);
     }
   });
 }
@@ -461,6 +461,4 @@ module.exports = kreftPlugin;
 module.exports.default = kreftPlugin;
 module.exports.kreftjs = kreftPlugin;
 module.exports.kreft = kreftPlugin; // the earlier Kreft name
-module.exports.som = kreftPlugin; // the Som.js names
-module.exports.somPlugin = kreftPlugin;
 module.exports.kreftPlugin = kreftPlugin;

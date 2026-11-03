@@ -17,9 +17,7 @@ const { createSchema } = require('./schema.js');
 const { setConnection } = require('./query.js');
 const { forgetTables } = require('./model.js');
 
-// TODO(3.1): the table keeps its Som.js name so deployed databases keep their history. Rename it to kreft_migrations
-// in a migration of its own, and read the old table as a fallback until every database has moved.
-const TABLE = 'som_migrations';
+const TABLE = 'kreft_migrations';
 
 async function ensureTable(db) {
   const text = db.kind === 'postgres' ? 'TEXT' : 'VARCHAR(255)';

@@ -1,6 +1,6 @@
 /*!
- * Kreft v3.0.0 — reactive by nature
- * The .kreftjs component language (state · derive · action · when · watch · on),
+ * Kreft v0.0.9-beta — reactive by nature
+ * The .kreft component language (state · derive · action · when · watch · on),
  * { } views with k-if / k-each / k-model, components, slots, router, stores,
  * share / receive, event bus and a template engine.
  * One file, no build step, no virtual DOM. MIT License.
@@ -28,8 +28,8 @@
     } catch (e) { console.error('[Kreft error]', e); }
   };
   const text = () => document.createTextNode('');
-  // `kreftjs dev` turns this on: live components are tracked for hot reload and the DevTools panel
-  const devMode = () => !!(global.__KREFT_DEV__ || global.__SOM_DEV__);
+  // `kreft dev` turns this on: live components are tracked for hot reload and the DevTools panel
+  const devMode = () => !!global.__KREFT_DEV__;
   const liveInstances = new Set();
   const BAD_PATH_KEYS = new Set(['__proto__', 'constructor', 'prototype']);
   const getPath = (obj, path) => String(path).split('.').reduce((o, k) => (o == null || BAD_PATH_KEYS.has(k) ? undefined : o[k]), obj);
@@ -651,8 +651,8 @@
     return replacePlaceholders(chosen, fullReplace);
   }
 
-  if (typeof window !== 'undefined' && (window.__KREFT_LANG__ || window.__SOM_LANG__)) {
-    addTranslations(window.__KREFT_LANG__ || window.__SOM_LANG__);
+  if (typeof window !== 'undefined' && (window.__KREFT_LANG__)) {
+    addTranslations(window.__KREFT_LANG__);
   }
 
   function formatNumber(n, options, locale = currentLocaleRef.value) {
@@ -674,7 +674,7 @@
   // build many different templates (Kreftjs.render, the Template engine page) don't grow forever
   const fnCache = new Map();
   const FN_CACHE_MAX = 3000;
-  // `kreftjs build` fills this with ready-made functions, so built apps never need eval (strict CSP)
+  // `kreft build` fills this with ready-made functions, so built apps never need eval (strict CSP)
   const precompiled = Object.create(null);
   const FORBIDDEN_EXP_RE = /(?:^|[^$\w])(?:constructor|__proto__|prototype)(?:[^$\w]|$)/;
   function compileFn(code, params = '__s') {
@@ -1709,7 +1709,7 @@
   function addPresets() {
     if (presetsAdded || typeof document === 'undefined') return;
     presetsAdded = true;
-    if (document.querySelector('[data-kreft-presets]')) return; // `kreftjs build` put them in app.css
+    if (document.querySelector('[data-kreft-presets]')) return; // `kreft build` put them in app.css
     const st = document.createElement('style');
     st.setAttribute('data-kreft-presets', '');
     st.textContent = PRESET_CSS;
@@ -1898,9 +1898,9 @@
 
   /* ---------- <kreft-view>: the page for the current route (nested views show child routes) ----------
    * Layouts: the page is shown inside a layout component, in its <slot>.
-   *   Kreftjs.router({ layout: 'app', routes })            every page uses layouts/app.kreftjs
-   *   { path: '/admin', component: …, layout: 'admin' }  this route (and its children) use layouts/admin.kreftjs
-   *   layout admin                                       in a page's .kreftjs file: this page uses it
+   *   Kreftjs.router({ layout: 'app', routes })            every page uses layouts/app.kreft
+   *   { path: '/admin', component: …, layout: 'admin' }  this route (and its children) use layouts/admin.kreft
+   *   layout admin                                       in a page's .kreft file: this page uses it
    *   layout none / layout: false                        no layout
    * Moving between pages with the same layout keeps the layout on the page (its state stays).
    * ------------------------------------------------------------------------------------------- */
@@ -1953,7 +1953,7 @@
           const p = loadDef(def).then(() => { loaded.value++; }, (e) => {
             def.__failed = true;
             def.__failedError = e;
-            if (router.__errors) { console.error('[Kreft error] the page could not be loaded:', e); return router.abort(500, e && e.message); } // errors/500.kreftjs
+            if (router.__errors) { console.error('[Kreft error] the page could not be loaded:', e); return router.abort(500, e && e.message); } // errors/500.kreft
             loaded.value++; // the page reports its own error
           });
           if (first) waitFor(p);
@@ -2028,7 +2028,7 @@
 
   /* ---------- <kreft-wait>: show something else until everything inside has loaded ----------
    *   <kreft-wait>
-   *     <UserList />                          (its .kreftjs file, `load` data, async `on start`)
+   *     <UserList />                          (its .kreft file, `load` data, async `on start`)
    *     <p k-waiting>Loading…</p>
    *     <p k-failed="error">Could not load: {error.message}</p>
    *   </kreft-wait>
@@ -2234,20 +2234,7 @@
     if (open.length) throw new SyntaxError('A {for} block is missing its {/for}');
     return out;
   }
-  // Som.js names still work in a template: `s-if` is read as `k-if` and `<som-view>` as `<kreft-view>`.
-  // It runs on the finished markup, so the browser, `kreftjs build` and the Vite plugin all see the same names.
-  const LEGACY_TAGS = /^som-(?=(?:wait|view|component|yield|section|portal|link)$)/i;
-  const TAG_SCAN = /<(\/?)([A-Za-z][\w:.-]*)((?:\s+[^\s"'<>\/=]+(?:\s*=\s*(?:"[^"]*"|'[^']*'|[^\s"'>]+))?)*)(\s*\/?>)/g;
-  const ATTR_SCAN = /(\s+)([^\s"'<>\/=]+)(\s*=\s*(?:"[^"]*"|'[^']*'|[^\s"'>]+))?/g;
-  function legacyMarkup(html) {
-    if (!/s-[a-z]|<\/?som-/i.test(html)) return html;
-    return html.replace(TAG_SCAN, (m, slash, name, attrs, end) => {
-      const tag = LEGACY_TAGS.test(name) ? 'kreft-' + name.slice(4) : name;
-      const out = attrs ? attrs.replace(ATTR_SCAN, (a, sp, an, val) => (/^s-[a-z]/i.test(an) ? sp + 'k-' + an.slice(2) + (val || '') : a)) : attrs;
-      return tag === name && out === attrs ? m : '<' + slash + tag + out + end;
-    });
-  }
-  const prepareTemplate = (src) => legacyMarkup(quoteBraceAttrs(expandBlocks(expandSelfClosing(src))));
+  const prepareTemplate = (src) => quoteBraceAttrs(expandBlocks(expandSelfClosing(src)));
   function getTemplate(def) {
     if (def.__tpl) return def.__tpl;
     let src = def.template;
@@ -2380,7 +2367,7 @@
   }
 
   function mountComponent(el, def, parentScope, parentInst, options = {}) {
-    if (typeof def === 'string') def = kreftComponent(def); // 'components/Card.kreftjs'
+    if (typeof def === 'string') def = kreftComponent(def); // 'components/Card.kreft'
     if (def.__loader && def.__resolved) def = def.__resolved;
     if (isFunction(def)) def = { init: def };
     if (def.__loader || (def.templateUrl && !def.__tpl)) {
@@ -2574,11 +2561,16 @@
     if (refName && parentInst) setRef(parentInst, refName, inst.exposed ? reactive(inst.exposed) : inst.ctx);
     const mountedJob = () => {
       inst.isMounted = true;
-      // run inside the component's scope, so watchers and bus listeners made here are removed with it
-      inst.scope.run(() => {
-        inst.hooks.ready.forEach((h) => safeCall(h, inst.ctx));
-        if (inst.keep) inst.hooks.show.forEach((h) => safeCall(h, inst.ctx)); // a kept one is shown the first time too
-      });
+      // run inside the component's scope, so watchers and bus listeners made here are removed with it.
+      // The instance is current too, so `on ready { onDestroy(() => …) }` registers its cleanup on this component
+      const prevInstance = currentInstance;
+      currentInstance = inst;
+      try {
+        inst.scope.run(() => {
+          inst.hooks.ready.forEach((h) => safeCall(h, inst.ctx));
+          if (inst.keep) inst.hooks.show.forEach((h) => safeCall(h, inst.ctx)); // a kept one is shown the first time too
+        });
+      } finally { currentInstance = prevInstance; }
     };
     if (setupDone.length) {
       const waitCtx = currentWait, keepCtx = currentKeep;
@@ -2743,9 +2735,9 @@
         if (!container) return warn(`Failed to mount app: "${target}" not found.`);
         if (rootInst) return warn('App has already been mounted.');
         // copy with descriptors so getters stay getters (computed)
-        let def = rootComponent; // a .kreftjs path like 'App.kreftjs', or an object
+        let def = rootComponent; // a .kreft path like 'App.kreft', or an object
         let source = container.innerHTML;
-        if (container.hasAttribute('data-kreft-ssg')) { // a page made by `kreftjs build --prerender`: its first view came ready
+        if (container.hasAttribute('data-kreft-ssg')) { // a page made by `kreft build --prerender`: its first view came ready
           const t = document.querySelector('template[data-kreft-ssg-source]');
           source = t ? t.innerHTML : '';
           container.removeAttribute('data-kreft-ssg');
@@ -2846,14 +2838,13 @@
 
   /* ================================================================
    * Saved data — kept in localStorage, so it survives a page reload
-   *   .kreftjs:  saved todos = []            (key: "<Component>.todos")
+   *   .kreft:  saved todos = []            (key: "<Component>.todos")
    *          saved theme = 'dark' as 'settings.theme'
    *   JS:    const theme = Kreftjs.saved('theme', 'dark')   → a signal
    *          Kreftjs.storage.get / set / remove / clear
-   * Values are stored as JSON under "som:<key>". Changes in another tab show up here too.
+   * Values are stored as JSON under "kreft:<key>". Changes in another tab show up here too.
    * ================================================================ */
-  // TODO(3.1): the prefix keeps its Som.js spelling so saved data survives the rename; move it to 'kreft:' with a fallback read
-  const STORAGE_PREFIX = 'som:';
+  const STORAGE_PREFIX = 'kreft:';
   const ls = () => { try { return typeof localStorage !== 'undefined' ? localStorage : null; } catch (_) { return null; } };
   const storage = {
     has(key) { const s = ls(); try { return !!s && s.getItem(STORAGE_PREFIX + key) !== null; } catch (_) { return false; } },
@@ -3048,7 +3039,7 @@
 
   /* ================================================================
    * load — data from an async function, with loading and error built in
-   *   .kreftjs:  load users = api.get('/api/users')
+   *   .kreft:  load users = api.get('/api/users')
    *   JS:    const users = Kreftjs.resource(() => Kreftjs.api.get('/api/users'))
    *   →  users.data · users.loading · users.error · users.loaded · users.reload()
    * It loads again by itself when a value it reads changes:  load user = api.get('/api/users/' + id)
@@ -3158,7 +3149,7 @@
   }
 
   /* ================================================================
-   * The .kreftjs language
+   * The .kreft language
    *
    *   prop start = 0
    *   state count = start
@@ -3174,20 +3165,20 @@
    *
    *   <style scoped> button { color: red } </style>
    *
-   * Load with app.component('Counter', 'components/Counter.kreftjs'),
-   * a route { path: '/', component: 'pages/Home.kreftjs' } or Kreftjs.load(url).
+   * Load with app.component('Counter', 'components/Counter.kreft'),
+   * a route { path: '/', component: 'pages/Home.kreft' } or Kreftjs.load(url).
    * ================================================================ */
-  // Component files are `.kreftjs`. Older projects have `.kreft` (an early Kreft name) or `.som` (Som.js) files:
-  // all three are accepted, and a name that is not found with one extension is tried with the others.
-  const EXT = '.kreftjs';
-  const LEGACY_EXTS = ['.kreft', '.som'];
-  const EXT_RE = /\.(?:kreftjs|kreft|som)$/i;
-  const COMPONENT_RE = /\.(?:kreftjs|kreft|som)(?:[?#].*)?$/i;
+  // Component files are `.kreft`. Projects from the 0.0.x betas have `.kreftjs` files:
+  // both are accepted, and a name that is not found with one extension is tried with the other.
+  const EXT = '.kreft';
+  const LEGACY_EXTS = ['.kreftjs'];
+  const EXT_RE = /\.(?:kreftjs|kreft)$/i;
+  const COMPONENT_RE = /\.(?:kreftjs|kreft)(?:[?#].*)?$/i;
   const isComponent = (s) => COMPONENT_RE.test(s);
   const isKreftUrl = isComponent;
   // the same address under the other extensions
   const altExts = (url) => {
-    const m = /^(.*?)(\.(?:kreftjs|kreft|som))([?#].*)?$/i.exec(url);
+    const m = /^(.*?)(\.(?:kreftjs|kreft))([?#].*)?$/i.exec(url);
     return m ? [EXT, ...LEGACY_EXTS].filter((e) => e !== m[2].toLowerCase()).map((e) => m[1] + e + (m[3] || '')) : [];
   };
   // fetch() the file, or the first of its other-extension names that exists; also tells which address answered
@@ -3228,7 +3219,7 @@
   const hashString = (s) => { let h = 0; for (let i = 0; i < s.length; i++) h = (h * 31 + s.charCodeAt(i)) | 0; return (h >>> 0).toString(36); };
 
   /* ---------- a small scanner that understands strings, comments and brackets ---------- */
-  // the .kreftjs script part may hold regular expressions like /["']/g; views never do ({/for} must stay a block)
+  // the .kreft script part may hold regular expressions like /["']/g; views never do ({/for} must stay a block)
   let scanScript = false;
   const REGEX_BEFORE = /(?:^|[(,=:[!&|?{};+\-*%<>~^]|\b(?:return|typeof|instanceof|in|of|new|delete|void|throw|case|do|else|yield|await))\s*$/;
   function skipLiteral(src, i) {
@@ -3634,7 +3625,7 @@
     }
   }
 
-  /* ---------- the compiler: .kreftjs source → component definition ---------- */
+  /* ---------- the compiler: .kreft source → component definition ---------- */
   function parseKreftScript(src, url) {
     scanScript = true;
     try { return parseKreftScriptInner(src, url); } finally { scanScript = false; }
@@ -3677,7 +3668,7 @@
       if (m && (m[1] === 'watch' || m[1] === 'when') && /^\w+\s*\(/.test(src.slice(i))) m = null;
       if (m && m[1] === 'interface' && !/^interface\s+[A-Za-z_$][\w$]*/.test(src.slice(i, i + 120))) m = null;
       if (m && m[1] === 'type' && !/^type\s+[A-Za-z_$][\w$]*(?:\s*<[^>]*>)?\s*=(?!=)/.test(src.slice(i, i + 160))) m = null;
-      // `layout admin` / `layout 'layouts/admin.kreftjs'` / `layout none`: only like that, so `layout = …` stays code
+      // `layout admin` / `layout 'layouts/admin.kreft'` / `layout none`: only like that, so `layout = …` stays code
       const lm = m && m[1] === 'layout' && src.slice(i).match(/^layout[ \t]+(?:(['"])([^'"\n]+)\1|([\w./-]+))[ \t]*;?[ \t]*(?=\n|$|\/\/)/);
       if (m && m[1] === 'layout' && !lm) m = null;
       if (lm) { layout = lm[2] || lm[3]; if (layout === 'none' || layout === 'false') layout = false; i += lm[0].length; continue; }
@@ -3844,7 +3835,7 @@
     return { code: out.join('\n'), imports, props, events, layout };
   }
 
-  // a CSS file imported by a .kreftjs file: one <link> for the whole page, before the components' own styles
+  // a CSS file imported by a .kreft file: one <link> for the whole page, before the components' own styles
   function addStylesheet(href) {
     if (typeof document === 'undefined') return;
     const full = new URL(href, document.baseURI).href;
@@ -3857,14 +3848,14 @@
     document.head.insertBefore(link, first);
   }
 
-  // load `import` lines once per file; .kreftjs imports become local components
+  // load `import` lines once per file; .kreft imports become local components
   async function resolveImports(list, url) {
     const values = {}, components = {};
     for (const stmt of list) {
       const m = stmt.match(/^import\s+(?:([\s\S]+?)\s+from\s+)?(['"])(.+?)\2/);
       if (!m) { warn(`Can't read import: ${stmt}`); continue; }
       const [, what, , spec] = m;
-      if (/^(?:kreftjs|kreft|som)(\.js)?$/.test(spec)) continue; // Kreft's own functions are always available
+      if (/^(?:kreftjs|kreft)(\.js)?$/.test(spec)) continue; // Kreft's own functions are always available
       const abs = /^\.{0,2}\//.test(spec) ? new URL(spec, url).href : spec;
       if (isKreftUrl(spec)) {
         if (what && IDENT.test(what.trim())) components[what.trim()] = kreftComponent(abs);
@@ -3874,7 +3865,7 @@
         addStylesheet(abs === spec ? Kreftjs.__npmBase + spec : abs);
         continue;
       }
-      const mod = await Kreftjs.__import(abs); // one place to load modules (kreftjs build uses it too)
+      const mod = await Kreftjs.__import(abs); // one place to load modules (kreft build uses it too)
       if (!what) continue;
       what.split(/,(?![^{]*\})/).map((s) => s.trim()).forEach((part) => {
         if (part.startsWith('* as ')) values[part.slice(5).trim()] = mod;
@@ -4072,15 +4063,15 @@
     return st;
   }
 
-  // Pure text work, shared by the browser and `kreftjs build`: .kreftjs source → its parts
-  function splitKreft(source, url = 'inline.kreftjs') {
+  // Pure text work, shared by the browser and `kreft build`: .kreft source → its parts
+  function splitKreft(source, url = 'inline.kreft') {
     const name = (url.split('/').pop() || '').replace(/[?#].*$/, '').replace(EXT_RE, '');
     source = source.replace(/\r\n?/g, '\n');
     // Safe linear extraction of <view> ... </view> to prevent ReDoS catastrophic backtracking
     const viewOpenIdx = source.search(/<view(\s[^>]*)?>/i);
     const viewCloseIdx = source.toLowerCase().lastIndexOf('</view>');
     if (viewOpenIdx === -1 || viewCloseIdx === -1 || viewCloseIdx <= viewOpenIdx) {
-      throw new SyntaxError(`${name}.kreftjs has no <view> … </view>`);
+      throw new SyntaxError(`${name}.kreft has no <view> … </view>`);
     }
     const viewOpenTagMatch = source.slice(viewOpenIdx).match(/^<view(\s[^>]*)?>/i);
     const viewContentStart = viewOpenIdx + viewOpenTagMatch[0].length;
@@ -4105,7 +4096,7 @@
   }
   const propType = (sample) => (typeof sample === 'number' ? Number : typeof sample === 'boolean' ? Boolean : typeof sample === 'string' ? String : undefined);
 
-  // parts (from the browser compiler or from `kreftjs build`) → component definition
+  // parts (from the browser compiler or from `kreft build`) → component definition
   function makeKreftDef(parts, values) {
     const def = {
       __name: parts.name,
@@ -4120,12 +4111,12 @@
     return def;
   }
 
-  async function compileKreft(source, url = 'inline.kreftjs') {
+  async function compileKreft(source, url = 'inline.kreft') {
     const sp = splitKreft(source, url);
     const { values, components } = await resolveImports(sp.imports, url);
     let run;
     try { run = new Function('$scope', '$h', `with ($scope) {\n${sp.code}\n}`); }
-    catch (e) { throw new SyntaxError(`${sp.name}.kreftjs: ${e.message}`); }
+    catch (e) { throw new SyntaxError(`${sp.name}.kreft: ${e.message}`); }
 
     const props = {};
     for (const p in sp.props) {
@@ -4155,7 +4146,7 @@
     return makeKreftDef({ name: sp.name, template: sp.template, props, events: sp.events, layout: sp.layout, scopeId, components, run }, values);
   }
 
-  // Used by the app.js that `kreftjs build` writes: registers a component that is already compiled
+  // Used by the app.js that `kreft build` writes: registers a component that is already compiled
   function defineCompiled(path, parts) {
     const abs = new URL(path, document.baseURI).href;
     kreftCache.set(abs, parts.loadValues
@@ -4270,22 +4261,22 @@
 
   // mode 'history' (default): clean URLs like /users/5 — the server must send index.html for every path.
   // mode 'hash': URLs like #/users/5 — works with any server, even file://.
-  // Error pages: errors/404.kreftjs, errors/403.kreftjs, errors/500.kreftjs …
-  // (Kreftjs.router({ errors: 'errors' }) turns them on; `kreftjs make:errors` writes them into a project)
+  // Error pages: errors/404.kreft, errors/403.kreft, errors/500.kreft …
+  // (Kreftjs.router({ errors: 'errors' }) turns them on; `kreft make:errors` writes them into a project)
   const ERROR_PAGES = [401, 402, 403, 404, 419, 429, 500, 503];
   const ERROR_TITLES = { 400: 'Bad Request', 401: 'Unauthorized', 402: 'Payment Required', 403: 'Forbidden', 404: 'Not Found', 405: 'Method Not Allowed', 409: 'Conflict', 410: 'Gone', 419: 'Page Expired', 422: 'Unprocessable Content', 429: 'Too Many Requests', 500: 'Server Error', 502: 'Bad Gateway', 503: 'Service Unavailable', 504: 'Gateway Timeout' };
   let activeRouter = null;
 
-  /* ---------- route files: routes/web.kreftjs ----------
-   *   Route.view('/', 'pages/Home.kreftjs').name('home').title('Home')
-   *   Route.view('/users/:id', 'pages/User.kreftjs')                 // :id reaches the page as a prop
-   *   Route.middleware('auth').group(() => { Route.view('/dashboard', 'pages/Dashboard.kreftjs') })
-   *   Route.layout('guest').middleware('guest').group(() => { Route.view('/login', 'pages/auth/Login.kreftjs') })
+  /* ---------- route files: routes/web.kreft ----------
+   *   Route.view('/', 'pages/Home.kreft').name('home').title('Home')
+   *   Route.view('/users/:id', 'pages/User.kreft')                 // :id reaches the page as a prop
+   *   Route.middleware('auth').group(() => { Route.view('/dashboard', 'pages/Dashboard.kreft') })
+   *   Route.layout('guest').middleware('guest').group(() => { Route.view('/login', 'pages/auth/Login.kreft') })
    *   Route.prefix('/admin').name('admin.').group(() => { … })
    *   Route.redirect('/home', '/')
-   *   Route.view('/settings', 'pages/Settings.kreftjs').children(() => { Route.view('profile', 'pages/settings/Profile.kreftjs') })
+   *   Route.view('/settings', 'pages/Settings.kreft').children(() => { Route.view('profile', 'pages/settings/Profile.kreft') })
    */
-  const routeFiles = new Map(); // absolute URL → function (Route) { … }  (kreftjs build puts them in app.js)
+  const routeFiles = new Map(); // absolute URL → function (Route) { … }  (kreft build puts them in app.js)
   function defineRoutes(path, fn) { routeFiles.set(new URL(path, document.baseURI).href, fn); }
   function makeRouteBuilder() {
     const top = [];
@@ -4397,7 +4388,7 @@
   }
 
   function createRouter({ routes = [], mode = 'history', base, scrollToTop = true, layout = null, layouts = null, errors = null, middleware = {} } = {}) {
-    // routes: 'routes/web.kreftjs', or ['routes/web.kreftjs', 'routes/admin.kreftjs'], or the route objects themselves
+    // routes: 'routes/web.kreft', or ['routes/web.kreft', 'routes/admin.kreft'], or the route objects themselves
     const files = [].concat(routes).filter((r) => typeof r === 'string');
     const inline = [].concat(routes).filter((r) => r && typeof r === 'object');
     const middlewares = { ...middleware };
@@ -4539,7 +4530,7 @@
       if (!fromBrowser) setURL(target.fullPath, replace);
       Object.assign(route, target, { error: null });
       const rec = target.matched;
-      if (!rec && errorsDir) { // no route for this address: errors/404.kreftjs
+      if (!rec && errorsDir) { // no route for this address: errors/404.kreft
         showError(404, '');
         afterHooks.forEach((h) => { try { h(route, from); } catch (e) { console.error(e); } });
         return readyResolve();
@@ -4563,10 +4554,10 @@
       readyResolve();
     }
 
-    // shows errors/<status>.kreftjs in place of the page; the address stays as it is
+    // shows errors/<status>.kreft in place of the page; the address stays as it is
     function showError(status, message) {
       status = Number(status) || 500;
-      const file = ERROR_PAGES.includes(status) ? status : 'error'; // errors/error.kreftjs for any other status
+      const file = ERROR_PAGES.includes(status) ? status : 'error'; // errors/error.kreft for any other status
       const component = kreftComponent(`${errorsDir}/${file}${EXT}`);
       route.error = { status, message: message || '' };
       levels.value = [{ component, isError: true, props: { status, message: message || '', title: ERROR_TITLES[status] || 'Error' } }];
@@ -4635,7 +4626,7 @@
     };
     return router;
   }
-  // abort(404) in any .kreftjs file or in JavaScript
+  // abort(404) in any .kreft file or in JavaScript
   const abortPage = (status, message) => { if (activeRouter) activeRouter.abort(status, message); else warn('abort() needs a router.'); };
   const currentRouter = () => receive(ROUTER_KEY, null);
   const currentRoute = () => { const r = receive(ROUTER_KEY, null); return r && r.route; };
@@ -4687,6 +4678,7 @@
     same: 'The :attribute field must match :other.',
     different: 'The :attribute field and :other must be different.',
     confirmed: 'The :attribute field confirmation does not match.',
+    not_common_password: 'The :attribute is too common or too easy to guess. Choose another one.',
     regex: 'The :attribute field format is invalid.',
     digits: 'The :attribute field must be :digits digits.',
     min: { string: 'The :attribute field must be at least :min characters.', numeric: 'The :attribute field must be at least :min.', array: 'The :attribute field must have at least :min items.' },
@@ -4696,6 +4688,17 @@
   };
   const isEmptyValue = (v) => v === undefined || v === null || (typeof v === 'string' && v.trim() === '') || (isArray(v) && !v.length);
   const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+  // not_common_password: the passwords people choose most (8+ characters, so they pass `min:8`), one character repeated, a run like
+  // 12345678 or abcdefgh, or the same as the email address. Not a replacement for a long passphrase.
+  const COMMON_PASSWORDS = new Set('00000000 11111111 111111111 123123123 12345678 123456789 1234567890 12345678910 123456789a 123456abc 1q2w3e4r 1q2w3e4r5t 1qaz2wsx 88888888 987654321 abc12345 abcd1234 abcdefg1 abcdefgh admin123 admin1234 administrator asdfghjk asdfghjkl baseball1 changeme changeme1 dragon123 football1 freedom1 google123 hello123 hello1234 iloveyou iloveyou1 kreft123 kreftjs123 letmein1 letmein123 login123 master123 monkey123 p@ssw0rd p@ssword pass1234 passpass passw0rd password password1 password12 password123 password1234 princess1 qazwsxedc qwerty12 qwerty123 qwertyui qwertyuiop secret123 shadow123 starwars1 sunshine1 superman1 test1234 testing123 trustno1 welcome1 welcome123 whatever1 zxcvbnm1'.split(' '));
+  const isCommonPassword = (v, data) => {
+    const p = String(v).toLowerCase();
+    if (COMMON_PASSWORDS.has(p) || /^(.)\1+$/.test(p)) return true;
+    const runs = (s) => { let up = true, down = true; for (let i = 1; i < s.length; i++) { const d = s.charCodeAt(i) - s.charCodeAt(i - 1); if (d !== 1) up = false; if (d !== -1) down = false; } return up || down; };
+    if (p.length >= 6 && runs(p)) return true;
+    const email = data && typeof data.email === 'string' ? data.email.toLowerCase() : '';
+    return Boolean(email) && (p === email || p === email.split('@')[0]);
+  };
   const dateOf = (v, data) => { const d = new Date(hasOwn(data, v) ? data[v] : v === 'today' ? new Date().toDateString() : v); return isNaN(d) ? null : d; };
   function parseRules(rules) {
     return (isArray(rules) ? rules : String(rules || '').split('|')).filter(Boolean).map((r) => {
@@ -4755,6 +4758,7 @@
           case 'same': failed = value !== getPath(data, a); extra = { other: a.replace(/_/g, ' ') }; break;
           case 'different': failed = value === getPath(data, a); extra = { other: a.replace(/_/g, ' ') }; break;
           case 'confirmed': failed = value !== getPath(data, field + '_confirmation'); break;
+          case 'not_common_password': failed = isCommonPassword(value, data); break;
           case 'regex': { const m = r.arg.match(/^\/(.*)\/([a-z]*)$/); failed = !new RegExp(m ? m[1] : r.arg, m ? m[2] : '').test(String(value)); break; }
           case 'digits': failed = !new RegExp(`^\\d{${Number(a)}}$`).test(String(value)); extra = { digits: a }; break;
           case 'min': failed = sizeOf(value) < Number(a); extra = { min: a }; break;
@@ -4852,7 +4856,7 @@
   }
 
   /* ================================================================
-   * Kreftjs.table('posts') — the rows of a database table that `kreftjs dev --db` / `kreftjs serve --db` serve
+   * Kreftjs.table('posts') — the rows of a database table that `kreft dev --db` / `kreft serve --db` serve
    *   const posts = Kreftjs.table('posts')
    *   await posts.all({ userId: 3, _sort: '-id', _limit: 20 })   posts.find(1)   posts.count()
    *   await posts.create({ title })   posts.update(1, row)   posts.patch(1, { title })   posts.remove(1)
@@ -4876,7 +4880,7 @@
   }
 
   /* ================================================================
-   * Developer tools (used by `kreftjs dev`: hot reload and the DevTools panel)
+   * Developer tools (used by `kreft dev`: hot reload and the DevTools panel)
    * ================================================================ */
   const isInside = (i, o) => { for (let p = i.parent; p; p = p.parent) if (p === o) return true; return false; };
   /* ================================================================
@@ -4959,7 +4963,7 @@
       Object.keys(kept).forEach((k) => { if (hasOwn(raw, k) && keepable(raw[k])) s[k] = kept[k]; });
     });
   }
-  // a .kreftjs file changed: compile it again and swap every live copy (false = reload the page instead)
+  // a .kreft file changed: compile it again and swap every live copy (false = reload the page instead)
   async function hotUpdate(url, source) {
     const abs = new URL(url, document.baseURI).href;
     const entry = kreftCache.get(abs);
@@ -5032,38 +5036,38 @@
     stores, storeLog, busLog,
   };
 
-  const VERSION = '3.0.0';
+  const VERSION = '0.0.9-beta';
   const Kreftjs = {
     version: VERSION,
-    // PUBLIC_ values from .env (kreftjs dev and kreftjs build put them here); never secrets
-    get env() { return Object.freeze({ ...((typeof window !== 'undefined' && (window.__KREFT_ENV__ || window.__SOM_ENV__)) || {}) }); },
+    // PUBLIC_ values from .env (kreft dev and kreft build put them here); never secrets
+    get env() { return Object.freeze({ ...((typeof window !== 'undefined' && window.__KREFT_ENV__) || {}) }); },
     get isVite() {
-      return Boolean(typeof window !== 'undefined' && (window.__KREFT_VITE__ || window.__SOM_VITE__));
+      return Boolean(typeof window !== 'undefined' && window.__KREFT_VITE__);
     },
     get isElectron() {
       return Boolean(
         typeof window !== 'undefined' && (
-          window.kreftDesktop || window.somDesktop ||
+          window.kreftDesktop ||
           (window.process && window.process.type === 'renderer') ||
           (typeof navigator !== 'undefined' && /electron/i.test(navigator.userAgent))
         )
       );
     },
     get desktop() {
-      return (typeof window !== 'undefined' && (window.kreftDesktop || window.somDesktop)) || null;
+      return (typeof window !== 'undefined' && window.kreftDesktop) || null;
     },
     abort: abortPage,
     // apps & components
-    app: createApp, lazy, load, compile: compileKreft, compileSom: compileKreft, render, // compileSom: the Som.js name, kept as an alias
-    // used by `kreftjs build`, Vite plugin and the app.js it writes
+    app: createApp, lazy, load, compile: compileKreft, render,
+    // used by `kreft build`, Vite plugin and the app.js it writes
     __makeDef: makeKreftDef,
     __registerDef: registerDef,
     __hotDef: hotDef,
     __define: defineCompiled,
     __routes: defineRoutes,
     __fileHeaders: (url) => fileHeaders(new URL(url, document.baseURI).href),
-    __npmBase: '/__kreft/npm/', // where kreftjs dev serves files from node_modules (CSS imports)
-    __import: (url) => import(url), // how built apps load the .js modules a .kreftjs file imports
+    __npmBase: '/__kreft/npm/', // where kreft dev serves files from node_modules (CSS imports)
+    __import: (url) => import(url), // how built apps load the .js modules a .kreft file imports
     __precompiled: precompiled,
     __hot: hotUpdate,
     __devtools: devtools,
@@ -5098,11 +5102,10 @@
 
   // the text-only helpers the build tool reuses, so built code matches the browser exactly
   Object.defineProperty(Kreftjs, '__internal', {
-    value: { expandBlocks, prepareTemplate, legacyMarkup, splitKreft, splitInterp, exactBrace, stripBrace, interpToExpr, quoteBraceAttrs, expandSelfClosing, scopeCss, hashString, propType, simplePathRE, fnExpRE, forAliasRE, makeKreftDef, compileFn, evaluate, stripTypeScript, stripTsParams },
+    value: { expandBlocks, prepareTemplate, splitKreft, splitInterp, exactBrace, stripBrace, interpToExpr, quoteBraceAttrs, expandSelfClosing, scopeCss, hashString, propType, simplePathRE, fnExpRE, forAliasRE, makeKreftDef, compileFn, evaluate, stripTypeScript, stripTsParams },
   });
 
   if (typeof module !== 'undefined' && module.exports) module.exports = Kreftjs;
   global.Kreftjs = Kreftjs;
   global.Kreft = Kreftjs; // the shorter name, kept as an alias
-  global.Som = Kreftjs; // Som.js name, kept so older code keeps working (deprecated: use Kreftjs)
 })(typeof window !== 'undefined' ? window : globalThis);

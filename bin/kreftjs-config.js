@@ -1,6 +1,6 @@
 /*
  * kreftjs.config.json: { "db": "sqlite:database/app.db", "tables": { "posts": true, "users": { "write": false, "hidden": ["password"] } } }
- * Looked for in the folder being served, then its parents (so `kreftjs serve dist` finds the project's file).
+ * Looked for in the folder being served, then its parents (so `kreft serve dist` finds the project's file).
  * "${NAME}" in a value is replaced with that value from .env or the environment.
  */
 const fs = require('fs');
@@ -14,17 +14,12 @@ function readConfig(start) {
       path.join(dir, 'config', 'kreftjs.json'),
       path.join(dir, 'Config', 'kreftjs.config.json'),
       path.join(dir, 'Config', 'kreftjs.json'),
-      // the earlier names: kreft.config.json, then Som.js's som.config.json
+      // the earlier name: kreft.config.json
       path.join(dir, 'kreft.config.json'),
       path.join(dir, 'config', 'kreft.config.json'),
       path.join(dir, 'config', 'kreft.json'),
       path.join(dir, 'Config', 'kreft.config.json'),
       path.join(dir, 'Config', 'kreft.json'),
-      path.join(dir, 'som.config.json'),
-      path.join(dir, 'config', 'som.config.json'),
-      path.join(dir, 'config', 'som.json'),
-      path.join(dir, 'Config', 'som.config.json'),
-      path.join(dir, 'Config', 'som.json'),
     ];
     for (const file of candidates) {
       if (fs.existsSync(file)) {

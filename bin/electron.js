@@ -2,16 +2,16 @@
  * Electron.js Desktop Support for Kreft
  *
  * Commands:
- *   kreftjs electron:init     Add Electron files to an existing project (alias: kreftjs make:electron)
- *   kreftjs electron:dev      Run the app in an Electron desktop window with hot reload (alias: kreftjs electron)
- *   kreftjs electron:build    Build static bundle (kreftjs build) and package desktop installer (electron-builder)
+ *   kreft electron:init     Add Electron files to an existing project (alias: kreft make:electron)
+ *   kreft electron:dev      Run the app in an Electron desktop window with hot reload (alias: kreft electron)
+ *   kreft electron:build    Build static bundle (kreft build) and package desktop installer (electron-builder)
  *
  * CLI flag:
- *   kreftjs new my-app --electron
+ *   kreft new my-app --electron
  */
 const fs = require('fs');
 const path = require('path');
-const { spawn } = require('child_process');
+const { start: spawn } = require('./win-spawn.js');
 
 function getProjectRoot(start = process.cwd()) {
   const lay = require('./layout.js').layout(start);
@@ -38,7 +38,7 @@ function getDevToolsConfig() {
     (process.argv.includes('--devtools') ? 'right' : null) ||
     (process.argv.includes('--no-devtools') ? 'false' : null) ||
     process.env.ELECTRON_DEVTOOLS ||
-    (process.env.KREFT_ELECTRON_DEVTOOLS || process.env.SOM_ELECTRON_DEVTOOLS) ||
+    process.env.KREFT_ELECTRON_DEVTOOLS ||
     '';
   const val = String(raw).trim().toLowerCase();
   if (!val) return { show: false, mode: 'right' };
@@ -225,7 +225,7 @@ app.on('window-all-closed', () => {
 
   preload: () => `const { contextBridge, ipcRenderer } = require('electron');
 
-// Expose safe desktop bridge onto window.kreftDesktop (window.somDesktop is the same object: the Som.js name)
+// Expose safe desktop bridge onto window.kreftDesktop
 const desktop = {
   isElectron: true,
   getInfo: () => ipcRenderer.invoke('kreft:app-info'),
@@ -240,10 +240,8 @@ const desktop = {
   showSaveDialog: (options) => ipcRenderer.invoke('kreft:dialog:save', options),
 };
 contextBridge.exposeInMainWorld('kreftDesktop', desktop);
-contextBridge.exposeInMainWorld('somDesktop', desktop);
 
 contextBridge.exposeInMainWorld('__KREFT_ELECTRON__', true);
-contextBridge.exposeInMainWorld('__SOM_ELECTRON__', true);
 `,
 };
 
@@ -286,9 +284,9 @@ function init(args = []) {
   const pkg = JSON.parse(fs.readFileSync(pkgFile, 'utf8'));
   pkg.main = 'electron/main.js';
   pkg.scripts = pkg.scripts || {};
-  pkg.scripts['electron'] = 'kreftjs electron';
-  pkg.scripts['electron:dev'] = 'kreftjs electron:dev';
-  pkg.scripts['electron:build'] = 'kreftjs electron:build';
+  pkg.scripts['electron'] = 'kreft electron';
+  pkg.scripts['electron:dev'] = 'kreft electron:dev';
+  pkg.scripts['electron:build'] = 'kreft electron:build';
 
   pkg.devDependencies = pkg.devDependencies || {};
   if (!pkg.devDependencies['electron']) pkg.devDependencies['electron'] = '^34.2.0';
@@ -317,8 +315,8 @@ function init(args = []) {
 
   Next:
     npm install            (install electron & electron-builder)
-    kreftjs electron:dev       (start dev server & launch desktop window)
-    kreftjs electron:build     (build production installer)
+    kreft electron:dev       (start dev server & launch desktop window)
+    kreft electron:build     (build production installer)
 `);
 }
 
@@ -353,7 +351,28 @@ function resolveBuilderBinary(root) {
   return 'electron-builder';
 }
 
+// The first port from `start` that nothing listens on. The dev server would move to the next free port on its own, but the
+// window would not know it and could open another app that already uses 8000.
+function freePort(start) {
+  const net = require('net');
+  return new Promise((resolve) => {
+    const tryPort = (port, left) => {
+      const probe = net.createServer();
+      probe.once('error', () => (left > 0 ? tryPort(port + 1, left - 1) : resolve(start)));
+      probe.once('listening', () => probe.close(() => resolve(port)));
+      probe.listen(port, '127.0.0.1');
+    };
+    tryPort(start, 20);
+  });
+}
+
 function dev(args = []) {
+  const asked = args.findIndex((a) => a === '--port' || a === '-p');
+  if (asked >= 0 && Number(args[asked + 1])) return startDev(args, Number(args[asked + 1]));
+  return freePort(Number(process.env.PORT) || 8000).then((port) => startDev(args, port));
+}
+
+function startDev(args, port) {
   const root = getProjectRoot();
   const electronMain = path.join(root, 'electron', 'main.js');
   if (!fs.existsSync(electronMain)) {
@@ -367,7 +386,7 @@ function dev(args = []) {
   const bin = resolveElectronBinary(root);
 
   // Extract devtools settings from CLI args or environment
-  let devToolsEnv = process.env.ELECTRON_DEVTOOLS || (process.env.KREFT_ELECTRON_DEVTOOLS || process.env.SOM_ELECTRON_DEVTOOLS) || '';
+  let devToolsEnv = process.env.ELECTRON_DEVTOOLS || process.env.KREFT_ELECTRON_DEVTOOLS || '';
   const devToolsArg = args.find((a) => a === '--devtools' || a.startsWith('--devtools=') || a === '--no-devtools');
   if (devToolsArg) {
     if (devToolsArg === '--devtools') devToolsEnv = 'right';
@@ -376,14 +395,15 @@ function dev(args = []) {
   }
 
   const serverArgs = args.filter((a) => a !== '--devtools' && !a.startsWith('--devtools=') && a !== '--no-devtools');
+  if (!serverArgs.some((a) => a === '--port' || a === '-p')) serverArgs.push('--port', String(port));
 
   // 1. Start dev server child process
-  console.log('  Starting Kreft dev server & Electron desktop window…');
+  console.log(`  Starting Kreft dev server & Electron desktop window on port ${port}…`);
   const kreftCli = path.join(__dirname, 'kreftjs.js');
   const server = spawn(process.execPath, [kreftCli, 'dev', ...serverArgs], {
     cwd: root,
     stdio: 'inherit',
-    env: { ...process.env, PORT: process.env.PORT || '8000', KREFT_ELECTRON: 'true' },
+    env: { ...process.env, PORT: String(port), KREFT_ELECTRON: 'true' },
   });
 
   // 2. Launch Electron after small pause
@@ -397,7 +417,7 @@ function dev(args = []) {
       env: {
         ...process.env,
         NODE_ENV: 'development',
-        PORT: process.env.PORT || '8000',
+        PORT: String(port),
         ...(devToolsEnv ? { ELECTRON_DEVTOOLS: devToolsEnv } : {}),
       },
     });
@@ -411,7 +431,7 @@ function dev(args = []) {
 
     electronProcess.on('error', (err) => {
       if (err.code === 'ENOENT') {
-        console.error('\n  Electron is not installed locally. Run:  kreftjs add -D electron\n');
+        console.error('\n  Electron is not installed locally. Run:  kreft add -D electron\n');
       } else {
         console.error('  Electron launch error: ' + err.message);
       }
@@ -467,7 +487,7 @@ function build(args = []) {
 
     packProc.on('error', (err) => {
       if (err.code === 'ENOENT') {
-        console.error('\n  electron-builder is not installed. Run:  kreftjs add -D electron-builder\n');
+        console.error('\n  electron-builder is not installed. Run:  kreft add -D electron-builder\n');
       } else {
         console.error('  Packaging error: ' + err.message);
       }

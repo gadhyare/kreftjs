@@ -1,8 +1,8 @@
 /*
  * Kreft dev client — `kreftjs dev` adds this to every page while you work.
- *   • hot reload: a changed .kreftjs file is swapped in place and keeps its state;
+ *   • hot reload: a changed .kreft file is swapped in place and keeps its state;
  *     a changed .css file is reloaded; anything else reloads the page
- *   • error overlay: .kreftjs mistakes and runtime errors show on the page
+ *   • error overlay: .kreft mistakes and runtime errors show on the page
  *   • DevTools: the "K" button (or Alt+Shift+D) opens the Kreft DevTools panel
  * Not part of your app: `kreftjs build` never includes it.
  */

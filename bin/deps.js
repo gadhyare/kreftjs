@@ -1,14 +1,14 @@
 /*
  * npm packages in the browser.
  *
- *   import dayjs from 'dayjs'                        (in a .kreftjs file)
+ *   import dayjs from 'dayjs'                        (in a .kreft file)
  *   import { debounce } from 'lodash'
  *   import 'bootstrap/dist/css/bootstrap.min.css'
  *
- * kreftjs dev answers /__kreft/deps/<package> with the package as one browser-ready ES module, made by
+ * kreft dev answers /__kreft/deps/<package> with the package as one browser-ready ES module, made by
  * esbuild (npm i -D esbuild), and adds an import map so the browser knows where 'dayjs' is.
- * kreftjs build writes the same files into dist/deps/. Without esbuild, packages that already ship
- * ES modules still work in kreftjs dev; older CommonJS ones (like lodash) need esbuild.
+ * kreft build writes the same files into dist/deps/. Without esbuild, packages that already ship
+ * ES modules still work in kreft dev; older CommonJS ones (like lodash) need esbuild.
  */
 const fs = require('fs');
 const path = require('path');
@@ -57,14 +57,14 @@ function isEsm(root, spec) {
 
 const cache = new Map();
 // one package (or a file inside it) as a single ES module for the browser.
-// bundle() is async (kreftjs dev); bundleSync() is the same for kreftjs build.
+// bundle() is async (kreft dev); bundleSync() is the same for kreft build.
 function prepare(root, spec, minify) {
   const esbuild = loadEsbuild(root);
-  if (!esbuild) throw Object.assign(new Error(`To use "${spec}" in the browser, install esbuild once:  kreftjs add -D esbuild`), { code: 'NO_ESBUILD' });
+  if (!esbuild) throw Object.assign(new Error(`To use "${spec}" in the browser, install esbuild once:  kreft add -D esbuild`), { code: 'NO_ESBUILD' });
   // only packages by name: never a path that would bundle (and show) one of your own server files
   if (!isBare(spec) || spec.split('/').some((p) => p === '..' || p === '.')) throw Object.assign(new Error(`"${spec}" is not a package name.`), { code: 'MISSING' });
   const file = resolveFrom(root, spec);
-  if (!file) throw Object.assign(new Error(`The package "${spec}" is not installed. Run:  kreftjs add ${(spec.match(NAME) || [spec])[0]}`), { code: 'MISSING' });
+  if (!file) throw Object.assign(new Error(`The package "${spec}" is not installed. Run:  kreft add ${(spec.match(NAME) || [spec])[0]}`), { code: 'MISSING' });
   const key = spec + '|' + fs.statSync(file).mtimeMs + '|' + minify + '|' + root;
   const s = JSON.stringify(spec);
   let tries;

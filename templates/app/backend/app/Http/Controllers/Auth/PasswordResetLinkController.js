@@ -2,7 +2,7 @@ const { DB, Hash, Str } = require('kreftjs/server')
 const User = require('../../../Models/User')
 
 class PasswordResetLinkController {
-  // POST /api/forgot-password   (pages/auth/ForgotPassword.kreftjs)
+  // POST /api/forgot-password   (pages/auth/ForgotPassword.kreft)
   async store(req) {
     const { email } = await req.validate({ email: 'required|email' })
     const user = await User.where('email', email.toLowerCase()).first()

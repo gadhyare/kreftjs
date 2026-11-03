@@ -1,5 +1,5 @@
-// What runs on a schedule. kreftjs dev runs it while it is on;
-// on a server: kreftjs schedule:work (or `kreftjs schedule:run` from cron every minute). See them: kreftjs schedule:list
+// What runs on a schedule. kreft dev runs it while it is on;
+// on a server: kreft schedule:work (or `kreft schedule:run` from cron every minute). See them: kreft schedule:list
 const { Schedule } = require('kreftjs/server')
 
 // Schedule.call(async () => { … }).daily().name('clean-up')

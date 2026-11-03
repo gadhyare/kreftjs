@@ -1,7 +1,7 @@
 const User = require('../../../Models/User')
 const PersonalAccessToken = require('../../../Models/PersonalAccessToken')
 
-// GET /api/admin/stats   (frontend/pages/Dashboard.kreftjs)
+// GET /api/admin/stats   (frontend/pages/Dashboard.kreft)
 class DashboardController {
   async index(req) {
     if (!req.user || !req.user.is_admin) {
@@ -25,7 +25,7 @@ class DashboardController {
     }
   }
 
-  // GET /api/admin/me   (frontend/pages/Profile.kreftjs)
+  // GET /api/admin/me   (frontend/pages/Profile.kreft)
   async me(req) {
     return { user: req.user, devices: await PersonalAccessToken.where('user_id', req.user.id).count() }
   }

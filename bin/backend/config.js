@@ -145,8 +145,8 @@ class ConfigRepository {
     }
 
     // 2. Load and merge kreftjs.config.json if present
-    // (kreft.config.json and som.config.json are the earlier names, read when there is no kreftjs.config.json)
-    const kreftConfigPath = ['kreftjs.config.json', 'kreft.config.json', 'som.config.json'].map((n) => path.join(root, n)).find((p) => fs.existsSync(p)) || path.join(root, 'kreftjs.config.json');
+    // (kreft.config.json is the earlier name, read when there is no kreftjs.config.json)
+    const kreftConfigPath = ['kreftjs.config.json', 'kreft.config.json'].map((n) => path.join(root, n)).find((p) => fs.existsSync(p)) || path.join(root, 'kreftjs.config.json');
     if (fs.existsSync(kreftConfigPath)) {
       try {
         delete require.cache[require.resolve(kreftConfigPath)];

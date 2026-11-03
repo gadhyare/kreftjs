@@ -15,7 +15,7 @@
  *   await dispatch(new SendWelcomeEmail(user), { delay: 60 })        // in a minute
  *   await dispatchSync(new SendWelcomeEmail(user))                   // now
  *
- * QUEUE_CONNECTION in .env: database (the jobs table; kreftjs dev and `kreftjs queue:work` run them) or sync (at once).
+ * QUEUE_CONNECTION in .env: database (the jobs table; kreft dev and `kreft queue:work` run them) or sync (at once).
  */
 const crypto = require('crypto');
 const fs = require('fs');
@@ -219,13 +219,12 @@ async function push(kind, className, data, { delay = 0, queue } = {}) {
   const payload = payloadOf(kind, className, data);
 
   if (conn === 'redis') {
-    // TODO(3.1): the 'som:queue:' / 'som:delayed:' key names keep their Som.js spelling so waiting jobs survive the rename
     const { Redis } = require('./redis.js');
     const redis = Redis.connection('queue');
     if (delay > 0) {
-      await redis.zadd('som:delayed:' + qName, now() + Math.max(0, Number(delay) || 0), payload);
+      await redis.zadd('kreft:delayed:' + qName, now() + Math.max(0, Number(delay) || 0), payload);
     } else {
-      await redis.lpush('som:queue:' + qName, payload);
+      await redis.lpush('kreft:queue:' + qName, payload);
     }
     return true;
   }
@@ -291,17 +290,17 @@ async function workOne({ queues = ['default'], log = () => {} } = {}) {
     for (const qName of targetQueues) {
       // Move delayed jobs that became ready into the main list
       try {
-        const due = await redis.zrangebyscore('som:delayed:' + qName, '-inf', now());
+        const due = await redis.zrangebyscore('kreft:delayed:' + qName, '-inf', now());
         if (Array.isArray(due) && due.length > 0) {
           for (const item of due) {
-            const removed = await redis.zrem('som:delayed:' + qName, item);
-            if (removed) await redis.lpush('som:queue:' + qName, item);
+            const removed = await redis.zrem('kreft:delayed:' + qName, item);
+            if (removed) await redis.lpush('kreft:queue:' + qName, item);
           }
         }
       } catch (_) {}
 
       let raw = null;
-      try { raw = await redis.rpop('som:queue:' + qName); } catch (_) {}
+      try { raw = await redis.rpop('kreft:queue:' + qName); } catch (_) {}
       if (!raw) continue;
       const p = parseJson(raw);
       const C = require('./app.js').find(p.class);
@@ -317,8 +316,8 @@ async function workOne({ queues = ['default'], log = () => {} } = {}) {
           const backoff = [].concat((C && C.backoff) || 0);
           const waitSec = Number(backoff[Math.min(attempts - 1, backoff.length - 1)] || 0);
           const retryPayload = JSON.stringify({ ...p, attempts });
-          if (waitSec > 0) await redis.zadd('som:delayed:' + qName, now() + waitSec, retryPayload);
-          else await redis.lpush('som:queue:' + qName, retryPayload);
+          if (waitSec > 0) await redis.zadd('kreft:delayed:' + qName, now() + waitSec, retryPayload);
+          else await redis.lpush('kreft:queue:' + qName, retryPayload);
           log(`  ${new Date().toISOString().slice(11, 19)} ${p.class} ${'.'.repeat(Math.max(2, 40 - p.class.length))} RETRY (${attempts}/${tries}): ${e.message}`);
           return 'released';
         }
@@ -377,7 +376,7 @@ async function workOne({ queues = ['default'], log = () => {} } = {}) {
   }
 }
 
-// kreftjs queue:work — runs jobs as they come (stop with Ctrl+C)
+// kreft queue:work — runs jobs as they come (stop with Ctrl+C)
 async function work({ queues = ['default'], once = false, sleep = 1, maxJobs = Infinity, log = console.log, stopWhenEmpty = false } = {}) {
   const workerStartedAt = Date.now();
   let n = 0;

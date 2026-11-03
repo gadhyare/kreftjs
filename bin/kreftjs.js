@@ -2,15 +2,15 @@
 /*
  * The kreftjs command
  *
- *   kreftjs new my-app            create a new Kreft project
- *   kreftjs dev                   run the dev server in this folder (http://localhost:8000)
- *   kreftjs dev --port 3000       another port
- *   kreftjs dev ./site            another folder
- *   kreftjs build                 build this folder for production into ./dist
- *   kreftjs vscode                install colors and snippets for .kreftjs files in VS Code
- *   kreftjs serve dist            run the built app in production (with --db: its database API)
- *   kreftjs db migrate            run new database/migrations/*.sql   (also: seed, tables, sql "…")
- *   kreftjs help                  show this help
+ *   kreft new my-app            create a new Kreft project
+ *   kreft dev                   run the dev server in this folder (http://localhost:8000)
+ *   kreft dev --port 3000       another port
+ *   kreft dev ./site            another folder
+ *   kreft build                 build this folder for production into ./dist
+ *   kreft vscode                install colors and snippets for .kreft files in VS Code
+ *   kreft serve dist            run the built app in production (with --db: its database API)
+ *   kreft db migrate            run new database/migrations/*.sql   (also: seed, tables, sql "…")
+ *   kreft help                  show this help
  *
  * No dependencies — only Node.js.
  */
@@ -35,10 +35,6 @@ if (require.main === module && (process.argv.includes('--gc') || process.env.AUT
 }
 
 const rawArgs = process.argv.slice(2).filter((a) => a !== '--gc');
-// `som` (and `somjs`) still run this file, so an existing global install keeps working
-if (require.main === module && /^(som|somjs)(\.cmd|\.js)?$/i.test(path.basename(process.argv[1] || ''))) {
-  console.error('  The "som" command is now "kreftjs" (Som.js is now Kreft). "som" still works for now: use "kreftjs" from here on.');
-}
 const [command = 'help', ...rest] = rawArgs;
 
 const commands = {
@@ -75,7 +71,7 @@ guard.checkStart(command);
 if (['queue:work', 'queue:start', 'schedule:work'].includes(command)) guard.watch([process.cwd()]);
 if (commands[command]) commands[command](rest);
 else if (command && !command.startsWith('-')) {
-  // your own commands: app/Console/Commands (kreftjs make:command SendReport)
+  // your own commands: app/Console/Commands (kreft make:command SendReport)
   require('./artisan-more.js').runCustom(command, rest).then((found) => { if (!found) unknown(); }, (e) => { console.error('  ' + (e.stack || e)); process.exitCode = 1; });
 } else unknown();
 
@@ -85,16 +81,17 @@ function help() {
   Kreft ${pkg.version}
 
   Usage:
-    kreftjs new <name>      Create a new project in a folder called <name>, with login, register,
+    kreft new <name>        Create a new project in a folder called <name>, with login, register,
                             password reset, email verification and profile pages (on SQLite)
         --db <kind>         …on another database (sqlite, mysql or postgres), plus a Todos example
+        --no-auth           …without login, register, profile and users (--auth: with them, the default)
         --redis             …configure Redis for caching, background queues and pub/sub
         --ui <library>      …with a CSS library from a CDN: tailwind, bootstrap, bulma or pico
-        --ts                …use TypeScript across frontend (.kreftjs, .ts) and backend (.ts)
+        --ts                …use TypeScript across frontend (.kreft, .ts) and backend (.ts)
         --js                …use JavaScript (default when non-interactive)
         --electron          …with Electron desktop app support (main.js, preload.js, packaging)
         --vite              …with Vite.js bundling & instant HMR (vite.config.js, npm run vite)
-    kreftjs dev [folder]    Start the dev server (default: this folder)
+    kreft dev [folder]      Start the dev server (default: this folder)
         --port <number>     Port to use (default: 8000, or the next free one)
         --host <address>    Who may open it (default: 127.0.0.1, only this computer; 0.0.0.0: your network)
         --api <file.json>   Serve a REST API from a JSON file at /api (GET, POST, PUT, PATCH, DELETE)
@@ -107,83 +104,84 @@ function help() {
         --server <dir>      Your own Node.js code for /api (default: server/): server/hello.js → /api/hello
         --db <database>     Serve the tables of a database at /api (new migrations run first):
                               sqlite:database/app.db   (built in, nothing to install)
-                              mysql://user:pass@localhost:3306/shop   (kreftjs add mysql2)
-                              postgres://user:pass@localhost:5432/shop  (kreftjs add pg)
-    kreftjs serve [folder]  Run a built app for real users (folder: dist). Same --port and --db;
+                              mysql://user:pass@localhost:3306/shop   (kreft add mysql2)
+                              postgres://user:pass@localhost:5432/shop  (kreft add pg)
+    kreft serve [folder]    Run a built app for real users (folder: dist). Same --port and --db;
                             only the tables listed in kreftjs.config.json are served
 
   Bundler & Dev Server (Vite.js):
-    kreftjs vite            Start Vite dev server and proxy backend API (alias: kreftjs vite:dev)
-    kreftjs vite:dev        Start Vite dev server with instant HMR and backend proxy
-    kreftjs vite:build      Build production bundle with Vite and Rollup
-    kreftjs vite:preview    Preview production build locally with Vite
-    kreftjs vite:init       Add Vite configuration to an existing project (alias: kreftjs make:vite)
+    kreft vite              Start Vite dev server and proxy backend API (alias: kreft vite:dev)
+    kreft vite:dev          Start Vite dev server with instant HMR and backend proxy
+    kreft vite:build        Build production bundle with Vite and Rollup
+    kreft vite:preview      Preview production build locally with Vite
+    kreft vite:init         Add Vite configuration to an existing project (alias: kreft make:vite)
 
   Desktop (Electron.js):
-    kreftjs electron        Start dev server and launch desktop window (alias: kreftjs electron:dev)
-    kreftjs electron:dev    Start dev server and launch desktop window
-    kreftjs electron:build  Build static bundle and package desktop app with electron-builder
-    kreftjs electron:init   Add Electron support to an existing project (alias: kreftjs make:electron)
+    kreft electron          Start dev server and launch desktop window (alias: kreft electron:dev)
+    kreft electron:dev      Start dev server and launch desktop window
+    kreft electron:build    Build static bundle and package desktop app with electron-builder
+    kreft electron:init     Add Electron support to an existing project (alias: kreft make:electron)
 
-  The backend (kreftjs list shows every command, yours too):
-    kreftjs key:generate    Set the application encryption key in .env (--show: print only)
-    kreftjs migrate         Run new migrations in database/migrations (.js or .sql)
-    kreftjs migrate:rollback  Undo the last batch of migrations (--step 2: the last two)
-    kreftjs migrate:fresh   Drop every table and migrate again (--seed: then seed)
-    kreftjs migrate:status  Which migrations ran
-    kreftjs db:seed         Run database/seeders/DatabaseSeeder.js (--class PostSeeder: another one)
-    kreftjs route:list      The routes in routes/api.js
-    kreftjs storage:link    Connect public/storage to storage/app/public (--force) (alias: kreftjs link:storage)
-    kreftjs storage:unlink  Remove the storage link (alias: kreftjs unlink:storage)
-    kreftjs sitemap         Generate public/sitemap.xml and robots.txt
-    kreftjs log             Tail recent log entries from storage/logs/kreft.log (--lines 50, --level error)
-    kreftjs log:clear       Clear the log file
-    kreftjs make:model Post   app/Models/Post.js (-m -f -s -c -p -r, --route=file, --auth, --all)
-    kreftjs make:controller PostController (--api, --model Post, -r, --route=file, --auth)
-    kreftjs make:request StorePostRequest  app/Http/Requests/StorePostRequest.js (--model Post)
-    kreftjs make:resource PostResource   app/Http/Resources/PostResource.js
-    kreftjs make:rule Uppercase        app/Rules/Uppercase.js
-    kreftjs make:page Post  frontend/pages/Post.kreftjs (--model Post, -r, --route=file, --auth)
-    kreftjs make:factory PostFactory database/factories/PostFactory.js (--model Post)
-    kreftjs make:migration create_posts_table
-    kreftjs make:seeder PostSeeder
-    kreftjs make:middleware EnsureIsAdmin
-    kreftjs make:job SendWelcomeEmail  app/Jobs/SendWelcomeEmail.js
-    kreftjs make:event OrderShipped    app/Events/OrderShipped.js
-    kreftjs make:listener SendShipmentNotice app/Listeners/SendShipmentNotice.js (--event OrderShipped)
-    kreftjs make:mail WelcomeMail      app/Mail/WelcomeMail.js
-    kreftjs make:notification InvoicePaid  app/Notifications/InvoicePaid.js
-    kreftjs make:policy PostPolicy     app/Policies/PostPolicy.js (--model Post)
-    kreftjs make:observer PostObserver   app/Observers/PostObserver.js (--model Post)
-    kreftjs make:command SendReport    app/Console/Commands/SendReport.js (--command report:send)
-    kreftjs make:errors     The error pages in errors/ (401, 403, 404, 419, 429, 500, 503…)
-    kreftjs make:admin <email>  Let that user open the admin panel at /admin (--remove: take it away)
-    kreftjs make:routes admin   A new route file for pages: frontend/routes/admin.kreftjs (--api: backend/routes/admin.js)
-    kreftjs db tables       List tables and columns
-    kreftjs db sql "<SQL>"  Run one SQL statement and print the result
-    kreftjs build [folder]  Build for production (default: this folder)
+  The backend (kreft list shows every command, yours too):
+    kreft key:generate      Set the application encryption key in .env (--show: print only)
+    kreft migrate           Run new migrations in database/migrations (.js or .sql)
+    kreft migrate:rollback    Undo the last batch of migrations (--step 2: the last two)
+    kreft migrate:fresh     Drop every table and migrate again (--seed: then seed)
+    kreft migrate:status    Which migrations ran
+    kreft db:seed           Run database/seeders/DatabaseSeeder.js (--class PostSeeder: another one)
+    kreft route:list        The routes in routes/api.js
+    kreft storage:link      Connect public/storage to storage/app/public (--force) (alias: kreft link:storage)
+    kreft storage:unlink    Remove the storage link (alias: kreft unlink:storage)
+    kreft sitemap           Generate public/sitemap.xml and robots.txt
+    kreft log               Tail recent log entries from storage/logs/kreft.log (--lines 50, --level error)
+    kreft log:clear         Clear the log file
+    kreft make:model Post     app/Models/Post.js (-m -f -s -c -p -r, --route=file, --auth, --all)
+    kreft make:controller PostController (--api, --model Post, -r, --route=file, --auth)
+    kreft make:request StorePostRequest    app/Http/Requests/StorePostRequest.js (--model Post)
+    kreft make:resource PostResource     app/Http/Resources/PostResource.js
+    kreft make:rule Uppercase          app/Rules/Uppercase.js
+    kreft make:page Post    frontend/pages/Post.kreft (--model Post, -r, --route=file, --auth)
+    kreft make:factory PostFactory database/factories/PostFactory.js (--model Post)
+    kreft make:migration create_posts_table
+    kreft make:seeder PostSeeder
+    kreft make:middleware EnsureIsAdmin
+    kreft make:job SendWelcomeEmail    app/Jobs/SendWelcomeEmail.js
+    kreft make:event OrderShipped      app/Events/OrderShipped.js
+    kreft make:listener SendShipmentNotice app/Listeners/SendShipmentNotice.js (--event OrderShipped)
+    kreft make:mail WelcomeMail        app/Mail/WelcomeMail.js
+    kreft make:notification InvoicePaid    app/Notifications/InvoicePaid.js
+    kreft make:policy PostPolicy       app/Policies/PostPolicy.js (--model Post)
+    kreft make:observer PostObserver     app/Observers/PostObserver.js (--model Post)
+    kreft make:command SendReport      app/Console/Commands/SendReport.js (--command report:send)
+    kreft make:errors       The error pages in errors/ (401, 403, 404, 419, 429, 500, 503…)
+    kreft make:admin <email>    Let that user open the admin panel at /admin (--remove: take it away)
+    kreft make:routes admin     A new route file for pages: frontend/routes/admin.kreft (--api: backend/routes/admin.js)
+    kreft db tables         List tables and columns
+    kreft db sql "<SQL>"    Run one SQL statement and print the result
+    kreft build [folder]    Build for production (default: this folder)
         --out <folder>      Where to write it (default: dist)
         --base <path>       Change the <base href> (for example /)
         --prerender [paths] Also save every page as ready HTML (needs: npm i -D jsdom)
         --include <folder>  Also copy this folder into the output (for example docs)
-    kreftjs add <packages...>   Install npm packages with strict security gatekeeper (alias: kreftjs install, kreftjs i)
+        --no-htaccess       Do not write dist/.htaccess (page-address rules for Apache and Hostinger)
+    kreft add <packages...>     Install npm packages with strict security gatekeeper (alias: kreft install, kreft i)
         -D, --dev           Install as devDependency
         -y, --yes           Auto-confirm unverified community packages in CI/CD
         --dry-run, --check  Inspect package security report without installing
         --allow-scripts     Permit postinstall lifecycle scripts (default: sandboxed with --ignore-scripts)
         --force             Bypass redundancy blocks, typosquat traps and security warnings
-    kreftjs update [packages]   Update project packages (npm update) and Kreft runtime files
+    kreft update [packages]     Update project packages (npm update) and Kreft runtime files
         --latest            Upgrade packages to their latest versions
         --check             Check for outdated packages (npm outdated)
         --core              Update only Kreft runtime files (kreftjs.js, kreftjs.d.ts, server.d.ts)
         --npm               Update only npm dependencies
-    kreftjs vscode          Install .kreftjs colors and snippets in VS Code (also Cursor, VSCodium)
+    kreft vscode            Install .kreft colors and snippets in VS Code (also Cursor, VSCodium)
 
   Examples:
-    kreftjs new shop
+    kreft new shop
     cd shop
     npm run dev
-    kreftjs update
+    kreft update
     npm run build
 `);
 }
@@ -194,14 +192,16 @@ function unknown() {
   process.exit(1);
 }
 
-/* ------------------------------------------------------------------ kreftjs new */
+/* ------------------------------------------------------------------ kreft new */
 async function createProject(args) {
-  let name = null, dbKind = null, ui = null, ts = false, langChosen = false, electron = false, vite = false, redis = false;
+  let name = null, dbKind = null, ui = null, ts = false, langChosen = false, electron = false, vite = false, redis = false, auth = true, authChosen = false;
   for (let i = 0; i < args.length; i++) {
     if (args[i] === '--ts' || args[i] === '--typescript') { ts = true; langChosen = true; }
     else if (args[i] === '--js' || args[i] === '--javascript') { ts = false; langChosen = true; }
     else if (args[i] === '--electron' || args[i] === '--desktop') electron = true;
     else if (args[i] === '--vite') vite = true;
+    else if (args[i] === '--auth') { auth = true; authChosen = true; }
+    else if (args[i] === '--no-auth') { auth = false; authChosen = true; }
     else if (args[i] === '--redis') redis = true;
     else if (args[i] === '--db') dbKind = (args[++i] || 'sqlite').toLowerCase();
     else if (args[i] === '--ui') ui = (args[++i] || '').toLowerCase();
@@ -218,7 +218,7 @@ async function createProject(args) {
     process.exit(1);
   }
   if (!name) {
-    console.error('  Give the project a name:  kreftjs new my-app  (or: kreftjs new my-app --ts)');
+    console.error('  Give the project a name:  kreft new my-app  (or: kreft new my-app --ts)');
     process.exit(1);
   }
   const target = path.resolve(name);
@@ -237,6 +237,17 @@ async function createProject(args) {
     });
     if (answer === '2' || answer === 'ts' || answer === 'typescript') ts = true;
   }
+  if (!authChosen && process.stdin.isTTY && process.stdout.isTTY) {
+    const readline = require('readline');
+    const rl = readline.createInterface({ input: process.stdin, output: process.stdout });
+    const answer = await new Promise((resolve) => {
+      console.log(`\n  ${name} — authentication (login, register, password reset, profile, users):`);
+      console.log('    1) Yes, include it (default)');
+      console.log('    2) No, start without it (--no-auth)\n');
+      rl.question('  Authentication [1/2]: ', (ans) => { rl.close(); resolve(String(ans || '').trim().toLowerCase()); });
+    });
+    if (answer === '2' || answer === 'n' || answer === 'no') auth = false;
+  }
   const template = path.join(__dirname, '..', 'templates', 'app');
   copyFolder(template, target);
   // frontend/: everything the browser gets. backend/: routes/api.js, app/, database/ (never served)
@@ -245,7 +256,7 @@ async function createProject(args) {
   fs.copyFileSync(path.join(__dirname, '..', 'kreftjs.js'), path.join(front, 'kreftjs.js'));
   fs.copyFileSync(path.join(__dirname, '..', 'kreftjs.d.ts'), path.join(front, 'kreftjs.d.ts')); // editor hints
   fs.copyFileSync(path.join(__dirname, '..', 'server.d.ts'), path.join(target, 'backend', 'server.d.ts')); // hints for require('kreftjs/server')
-  // the documentation pages, in their own folder: docs/Docs.kreftjs, its Markdown reader and the README.md manual
+  // the documentation pages, in their own folder: docs/Docs.kreft, its Markdown reader and the README.md manual
   copyFolder(path.join(__dirname, '..', 'docs'), path.join(front, 'docs'));
 
   const projectName = path.basename(target).toLowerCase().replace(/[^a-z0-9-]+/g, '-');
@@ -254,8 +265,8 @@ async function createProject(args) {
     version: '0.1.0',
     private: true,
     scripts: {
-      dev: 'kreftjs dev --seed', start: 'kreftjs dev --seed', build: 'kreftjs build', preview: 'kreftjs dev dist', serve: 'kreftjs serve dist',
-      migrate: 'kreftjs migrate', 'db:seed': 'kreftjs db:seed', 'migrate:fresh': 'kreftjs migrate:fresh --seed',
+      dev: 'kreft dev --seed', start: 'kreft dev --seed', build: 'kreft build', preview: 'kreft dev dist', serve: 'kreft serve dist',
+      migrate: 'kreft migrate', 'db:seed': 'kreft db:seed', 'migrate:fresh': 'kreft migrate:fresh --seed',
     },
   };
   // .env: the project's own settings (from .env.example, with its name filled in)
@@ -272,6 +283,7 @@ async function createProject(args) {
   }
   fs.writeFileSync(path.join(target, '.env'), envContent);
   if (dbKind) addDatabase(target, dbKind, projectName);
+  if (!auth) require('./no-auth.js').removeAuth(target);
   if (ts) toTypeScript(target, projectPkg);
   if (ui) addUiKit(target, ui);
   // backend/ and .env are for this user only (on macOS and Linux): other accounts on the computer can't read them
@@ -287,15 +299,15 @@ async function createProject(args) {
   Created ${name}/
 
   Next:
-    cd ${name}${ts ? '\n    npm install            (TypeScript, its Node.js types and esbuild)' : ''}${vite ? '\n    npm install            (install vite)\n    kreftjs vite:dev           (launch Vite dev server with instant HMR)' : ''}${electron ? '\n    npm install            (install electron & electron-builder)\n    kreftjs electron:dev       (launch desktop window)' : ''}${dbKind === 'mysql' ? '\n    kreftjs add mysql2         (the MySQL driver, verified & sandboxed)' : dbKind === 'postgres' ? '\n    kreftjs add pg             (the PostgreSQL driver, verified & sandboxed)' : ''}${dbKind && dbKind !== 'sqlite' ? '\n    (set DATABASE_URL in .env to your database)' : ''}
+    cd ${name}${ts ? '\n    npm install            (TypeScript, its Node.js types and esbuild)' : ''}${vite ? '\n    npm install            (install vite)\n    kreft vite:dev           (launch Vite dev server with instant HMR)' : ''}${electron ? '\n    npm install            (install electron & electron-builder)\n    kreft electron:dev       (launch desktop window)' : ''}${dbKind === 'mysql' ? '\n    kreft add mysql2         (the MySQL driver, verified & sandboxed)' : dbKind === 'postgres' ? '\n    kreft add pg             (the PostgreSQL driver, verified & sandboxed)' : ''}${dbKind && dbKind !== 'sqlite' ? '\n    (set DATABASE_URL in .env to your database)' : ''}
     npm run dev
 
-  Then log in as test@example.com with the password "password", or register.
+${auth ? `  Then log in as test@example.com with the password "password", or register.
   Emails (verify email, reset password) are printed in the terminal until MAIL_URL is set in .env.
-`);
+` : '  Created without authentication (--no-auth): there is no login, registration or users table.\n'}`);
 }
 
-// kreftjs new my-app --ts  →  TypeScript across backend (.ts) and frontend (.kreftjs, .ts), tsconfig.json, and npm run typecheck
+// kreft new my-app --ts  →  TypeScript across backend (.ts) and frontend (.kreft, .ts), tsconfig.json, and npm run typecheck
 function toTypeScript(target, projectPkg) {
   const { toTs, TSCONFIG } = require('./to-ts.js');
   const walk = (dir) => {
@@ -311,8 +323,8 @@ function toTypeScript(target, projectPkg) {
   projectPkg.devDependencies = { esbuild: '^0.25.0', typescript: '^5.8.0', '@types/node': '^22.13.0' };
   projectPkg.allowScripts = { esbuild: true };
   // Shared TypeScript interfaces for the frontend
-  fs.writeFileSync(path.join(target, 'frontend', 'types.ts'), `// Shared TypeScript interfaces for your .kreftjs pages and frontend modules.
-// Import in any .kreftjs file or .ts module:  import type { User } from '../types.ts'
+  fs.writeFileSync(path.join(target, 'frontend', 'types.ts'), `// Shared TypeScript interfaces for your .kreft pages and frontend modules.
+// Import in any .kreft file or .ts module:  import type { User } from '../types.ts'
 
 export interface User {
   id: number
@@ -330,7 +342,7 @@ export interface ApiList<T> {
   // a typed helper for the frontend, used like any module: import { money } from '../logic/format.ts'
   fs.mkdirSync(path.join(target, 'frontend', 'logic'), { recursive: true });
   fs.writeFileSync(path.join(target, 'frontend', 'logic', 'format.ts'), `// A TypeScript module for the pages: import { money, ago } from '../logic/format.ts'
-// kreftjs dev turns it into JavaScript as it is sent; kreftjs build writes it as format.js
+// kreft dev turns it into JavaScript as it is sent; kreft build writes it as format.js
 
 export function money(amount: number, currency: string = 'USD'): string {
   return new Intl.NumberFormat('en', { style: 'currency', currency }).format(amount)
@@ -343,10 +355,10 @@ export function ago(date: string | Date): string {
   return 'just now'
 }
 `);
-  // Upgrade Counter.kreftjs to showcase TypeScript in .kreftjs components
-  const counterKreft = path.join(target, 'frontend', 'tests', 'components', 'Counter.kreftjs');
+  // Upgrade Counter.kreft to showcase TypeScript in .kreft components
+  const counterKreft = path.join(target, 'frontend', 'tests', 'components', 'Counter.kreft');
   if (fs.existsSync(counterKreft)) {
-    fs.writeFileSync(counterKreft, `<!-- A TypeScript .kreftjs component: a button that counts. Used by tests/pages/Test.kreftjs as <counter>. -->
+    fs.writeFileSync(counterKreft, `<!-- A TypeScript .kreft component: a button that counts. Used by tests/pages/Test.kreft as <counter>. -->
 prop start: number = 0
 
 state count: number = start
@@ -365,8 +377,8 @@ button { font-variant-numeric: tabular-nums; justify-self: start; }
 </style>
 `);
   }
-  // If --db created Todos.kreftjs, upgrade it with TypeScript interfaces & typed actions
-  const todosKreft = path.join(target, 'frontend', 'pages', 'Todos.kreftjs');
+  // If --db created Todos.kreft, upgrade it with TypeScript interfaces & typed actions
+  const todosKreft = path.join(target, 'frontend', 'pages', 'Todos.kreft');
   if (fs.existsSync(todosKreft)) {
     const src = fs.readFileSync(todosKreft, 'utf8');
     fs.writeFileSync(todosKreft, src
@@ -377,11 +389,11 @@ button { font-variant-numeric: tabular-nums; justify-self: start; }
   }
 }
 
-// kreftjs new my-app --ui bootstrap  →  the library's CDN links in index.html
+// kreft new my-app --ui bootstrap  →  the library's CDN links in index.html
 function uiKits() { return {
-  tailwind: ['<!-- Tailwind CSS: use its classes in any .kreftjs file -->', '<script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4"></script>'],
-  bootstrap: ['<!-- Bootstrap: its classes and components (data-bs-toggle…) work in any .kreftjs file -->', '<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css">', '<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js" defer></script>'],
-  bulma: ['<!-- Bulma: its classes work in any .kreftjs file -->', '<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bulma@1.0.2/css/bulma.min.css">'],
+  tailwind: ['<!-- Tailwind CSS: use its classes in any .kreft file -->', '<script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4"></script>'],
+  bootstrap: ['<!-- Bootstrap: its classes and components (data-bs-toggle…) work in any .kreft file -->', '<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css">', '<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js" defer></script>'],
+  bulma: ['<!-- Bulma: its classes work in any .kreft file -->', '<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bulma@1.0.2/css/bulma.min.css">'],
   pico: ['<!-- Pico CSS: plain HTML gets styled by itself -->', '<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@picocss/pico@2/css/pico.min.css">'],
 }; }
 function addUiKit(target, ui) {
@@ -400,14 +412,14 @@ function addUiKit(target, ui) {
   fs.writeFileSync(file, updated);
 }
 
-// kreftjs new my-app --db sqlite  →  database/migrations, a seed, kreftjs.config.json and a Todos page
+// kreft new my-app --db sqlite  →  database/migrations, a seed, kreftjs.config.json and a Todos page
 function addDatabase(target, kind, projectName) {
   const back = path.join(target, 'backend'), front = path.join(target, 'frontend');
   const file = (rel, text) => { fs.mkdirSync(path.dirname(path.join(back, rel)), { recursive: true }); fs.writeFileSync(path.join(back, rel), text); };
   const d = new Date(), p2 = (n) => String(n).padStart(2, '0');
   const stamp = `${d.getFullYear()}_${p2(d.getMonth() + 1)}_${p2(d.getDate())}_000001`;
   // A migration, a model, a controller, a seeder and a route
-  file(`database/migrations/${stamp}_create_todos_table.js`, `// kreftjs dev runs new migrations by itself (or: kreftjs migrate). kreftjs migrate:rollback runs down().
+  file(`database/migrations/${stamp}_create_todos_table.js`, `// kreft dev runs new migrations by itself (or: kreft migrate). kreft migrate:rollback runs down().
 module.exports = {
   up(schema) {
     schema.create('todos', (table) => {
@@ -473,7 +485,7 @@ module.exports = TodoController
   file('database/seeders/TodoSeeder.js', `const { Seeder } = require('kreftjs/server')
 const Todo = require('../../app/Models/Todo')
 
-// DatabaseSeeder calls this one (or on its own: kreftjs db:seed --class TodoSeeder)
+// DatabaseSeeder calls this one (or on its own: kreft db:seed --class TodoSeeder)
 class TodoSeeder extends Seeder {
   async run() {
     await Todo.create({ title: 'Learn Kreft', done: true })
@@ -496,7 +508,7 @@ module.exports = TodoSeeder
   const setUrl = (f, u) => fs.writeFileSync(f, fs.readFileSync(f, 'utf8').replace(/^DATABASE_URL=.*$/m, () => 'DATABASE_URL=' + u));
   setUrl(path.join(target, '.env'), url);
   setUrl(path.join(target, '.env.example'), url.replace(/\/\/[^:@\s]+:[^@\s]+@/, '//user:password@'));
-  fs.writeFileSync(path.join(front, 'pages', 'Todos.kreftjs'), `<!-- the todos table, through routes/api.js and app/Http/Controllers/TodoController.js -->
+  fs.writeFileSync(path.join(front, 'pages', 'Todos.kreft'), `<!-- the todos table, through routes/api.js and app/Http/Controllers/TodoController.js -->
 load todos = api.get('/api/todos')
 // rules are checked here first, so a todo with mistakes is never sent; the server's 422 errors land here too
 state draft = form({ title: '' }, { title: 'required|max:200' })
@@ -553,9 +565,9 @@ label { display: flex; align-items: center; gap: 10px; }
 .done { color: var(--muted); text-decoration: line-through; }
 </style>
 `);
-  const webFile = path.join(front, 'routes', 'web.kreftjs');
-  fs.writeFileSync(webFile, fs.readFileSync(webFile, 'utf8').replace(/(  Route\.view\('\/profile'[^\n]*\n)/, "$1  Route.view('/todos', 'pages/Todos.kreftjs').name('todos').title('Todos')\n"));
-  const layout = path.join(front, 'layouts', 'app.kreftjs');
+  const webFile = path.join(front, 'routes', 'web.kreft');
+  fs.writeFileSync(webFile, fs.readFileSync(webFile, 'utf8').replace(/(  Route\.view\('\/profile'[^\n]*\n)/, "$1  Route.view('/todos', 'pages/Todos.kreft').name('todos').title('Todos')\n"));
+  const layout = path.join(front, 'layouts', 'app.kreft');
   fs.writeFileSync(layout, fs.readFileSync(layout, 'utf8').replace(/(<kreft-link k-if="\$store\.auth\.token" to="\/dashboard"[^>]*>[^<]*<\/kreft-link>)/, '$1\n        <kreft-link k-if="$store.auth.token" to="/todos" exact-class="here">Todos</kreft-link>'));
 }
 function copyFolder(from, to) {
@@ -568,7 +580,7 @@ function copyFolder(from, to) {
   }
 }
 
-/* ------------------------------------------------------------------ kreftjs vscode */
+/* ------------------------------------------------------------------ kreft vscode */
 function installVscode() {
   const os = require('os');
   const from = path.join(__dirname, '..', 'editors', 'vscode');
@@ -579,11 +591,11 @@ function installVscode() {
   for (const home of homes) {
     const dir = path.join(home, 'extensions');
     fs.mkdirSync(dir, { recursive: true });
-    fs.readdirSync(dir).filter((n) => n.startsWith('kreft.kreftjs-') || n.startsWith('kreft.kreft-') || n.startsWith('somjs.som-')) /* the older extensions go too */.forEach((n) => fs.rmSync(path.join(dir, n), { recursive: true, force: true }));
+    fs.readdirSync(dir).filter((n) => n.startsWith('kreft.kreftjs-') || n.startsWith('kreft.kreft-')) /* the older extensions go too */.forEach((n) => fs.rmSync(path.join(dir, n), { recursive: true, force: true }));
     copyFolder(from, path.join(dir, `kreft.kreftjs-${ext.version}`));
     console.log(`  Installed in ${path.join(dir, `kreft.kreftjs-${ext.version}`)}`);
   }
-  // Ensure current project .vscode/settings.json maps .kreftjs files to Kreft and configures formatter
+  // Ensure current project .vscode/settings.json maps .kreft files to Kreft and configures formatter
   const settingsDir = path.join(process.cwd(), '.vscode');
   const settings = path.join(settingsDir, 'settings.json');
   fs.mkdirSync(settingsDir, { recursive: true });
@@ -591,19 +603,19 @@ function installVscode() {
   if (fs.existsSync(settings)) {
     try { cfg = JSON.parse(fs.readFileSync(settings, 'utf8')); } catch {}
   }
-  cfg['files.associations'] = { ...(cfg['files.associations'] || {}), '*.kreftjs': 'kreftjs' };
+  cfg['files.associations'] = { ...(cfg['files.associations'] || {}), '*.kreft': 'kreftjs', '*.kreftjs': 'kreftjs' };
   cfg['[kreftjs]'] = { ...(cfg['[kreftjs]'] || {}), 'editor.defaultFormatter': 'kreft.kreftjs' };
   fs.writeFileSync(settings, JSON.stringify(cfg, null, 2) + '\n');
-  console.log('  Updated .vscode/settings.json: .kreftjs files use Kreft language and kreft.kreftjs formatter');
-  console.log('\n  Restart VS Code (or run "Reload Window") to see updated colors and formatting in .kreftjs files.\n');
+  console.log('  Updated .vscode/settings.json: .kreft files use Kreft language and kreft.kreftjs formatter');
+  console.log('\n  Restart VS Code (or run "Reload Window") to see updated colors and formatting in .kreft files.\n');
 }
 
-/* ------------------------------------------------------------------ kreftjs dev */
+/* ------------------------------------------------------------------ kreft dev */
 async function devServer(args, { production = false } = {}) {
   const isProd = Boolean(production || process.env.APP_ENV === 'production' || process.env.NODE_ENV === 'production');
   let port = production ? Number(process.env.PORT) || 8000 : 8000, folder = production ? 'dist' : '.', apiFile = null, delay = 0, saveApi = true, hot = !production, dbUrl = null, migrations = null, serverFolder = null, backendFolder = null, seedNew = false;
-  // kreftjs dev only answers this computer; --host 0.0.0.0 shares it on your network.
-  // kreftjs serve answers everyone (HOST in the environment can narrow it).
+  // kreft dev only answers this computer; --host 0.0.0.0 shares it on your network.
+  // kreft serve answers everyone (HOST in the environment can narrow it).
   let host = production ? process.env.HOST || '0.0.0.0' : '127.0.0.1';
   for (let i = 0; i < args.length; i++) {
     if (args[i] === '--port' || args[i] === '-p') port = Number(args[++i]) || port;
@@ -624,7 +636,7 @@ async function devServer(args, { production = false } = {}) {
   const lay = require('./layout.js').layout(folder === 'dist' || folder === '.' ? '.' : folder);
   const root = !production && folder === '.' ? lay.frontend : path.resolve(folder);
   if (production && !fs.existsSync(root)) {
-    console.error(`  Nothing to serve in ${root}. Build first: kreftjs build`);
+    console.error(`  Nothing to serve in ${root}. Build first: kreft build`);
     process.exit(1);
   }
   const mockApi = apiFile && !production ? createMockApi(path.resolve(apiFile), delay, saveApi) : null;
@@ -643,7 +655,7 @@ async function devServer(args, { production = false } = {}) {
   const hasBackend = Boolean(apiRoutesFile);
   // kreftjs serve: the backend must not sit inside the folder that is served, or its files could be downloaded
   if (production && hasBackend && (backendDir === root || backendDir.startsWith(root + path.sep))) {
-    console.error(`  The backend (${backendDir}) is inside the folder being served (${root}).\n  Serve the built site instead: kreftjs build, then kreftjs serve dist`);
+    console.error(`  The backend (${backendDir}) is inside the folder being served (${root}).\n  Serve the built site instead: kreft build, then kreft serve dist`);
     process.exit(1);
   }
   if (production && hasBackend && !process.env.APP_KEY) console.warn('  Warning: no APP_KEY in .env. Signed links (email verification) stop working on every restart.');
@@ -653,12 +665,12 @@ async function devServer(args, { production = false } = {}) {
     const { createDbApi } = require('./db-api.js');
     try {
       db = await connect(dbUrl, { root: config.dir });
-      if (!production) { // kreftjs dev runs new migrations by itself; for kreftjs serve, run `kreftjs migrate`
+      if (!production) { // kreft dev runs new migrations by itself; for kreft serve, run `kreft migrate`
         const { migrator, installAlias } = require('./backend/index.js');
         installAlias(); // require('kreftjs/server') and .ts files work in migrations and seeders
         require('./backend/model.js').setBaseDir(backendDir);
         const dir = migrations || migrationsDir(backendDir, config.dir, root);
-        const isNew = !(await db.tables()).some((t) => t.name === 'som_migrations'); // nothing migrated yet
+        const isNew = !(await db.tables()).some((t) => t.name === 'kreft_migrations'); // nothing migrated yet
         const ran = dir ? await migrator.migrate(db, dir, (f) => console.log(`  migrated  ${f}`)) : [];
         // --seed: a brand-new database gets database/seeders/DatabaseSeeder.js
         if (seedNew && isNew && ran.length) await migrator.seed(db, backendDir, { log: (n) => console.log(`  seeded    ${n}`) });
@@ -682,7 +694,7 @@ async function devServer(args, { production = false } = {}) {
     const n = backend.routes().length;
     backendRoutesCount = n;
     // queued jobs, mails and notifications run in the background here, and routes/console.js runs on schedule
-    // (QUEUE_WORKER=off or SCHEDULER=off in .env when a separate `kreftjs queue:work` / cron does it)
+    // (QUEUE_WORKER=off or SCHEDULER=off in .env when a separate `kreft queue:work` / cron does it)
     if (db) {
       const queue = require('./backend/queue.js');
       const queues = String(process.env.QUEUE_NAMES || 'high,default,low').split(',').map((x) => x.trim());
@@ -698,7 +710,7 @@ async function devServer(args, { production = false } = {}) {
       }
       if (process.env.SCHEDULER !== 'off') require('./backend/schedule.js').startScheduler(backendDir);
     }
-    backendNote = `\n  Routes:  ${path.relative(process.cwd(), apiRoutesFile) || 'routes/api.js'} → ${n} route${n === 1 ? '' : 's'} at /api  (kreftjs route:list)`;
+    backendNote = `\n  Routes:  ${path.relative(process.cwd(), apiRoutesFile) || 'routes/api.js'} → ${n} route${n === 1 ? '' : 's'} at /api  (kreft route:list)`;
   }
 
   // ----- your own server code: server/hello.js → /api/hello (any Node.js package can be used there)
@@ -715,11 +727,11 @@ async function devServer(args, { production = false } = {}) {
     console.error(`  --server: ${serverFolder} does not exist.`);
     process.exit(1);
   }
-  // npm packages in the browser (kreftjs dev only; kreftjs build puts them in dist/deps)
+  // npm packages in the browser (kreft dev only; kreft build puts them in dist/deps)
   const npmMap = () => (production ? null : deps.importMap(project));
 
   const types = {
-    '.html': 'text/html', '.js': 'text/javascript', '.mjs': 'text/javascript', '.kreftjs': 'text/plain', '.kreft': 'text/plain', '.som': 'text/plain',
+    '.html': 'text/html', '.js': 'text/javascript', '.mjs': 'text/javascript', '.kreft': 'text/plain', '.kreftjs': 'text/plain',
     '.css': 'text/css', '.json': 'application/json', '.svg': 'image/svg+xml', '.png': 'image/png',
     '.jpg': 'image/jpeg', '.jpeg': 'image/jpeg', '.gif': 'image/gif', '.webp': 'image/webp',
     '.ico': 'image/x-icon', '.woff2': 'font/woff2', '.woff': 'font/woff', '.txt': 'text/plain', '.md': 'text/markdown',
@@ -728,7 +740,7 @@ async function devServer(args, { production = false } = {}) {
 
   const prodHeaders = isProd ? { 'Referrer-Policy': 'same-origin', 'X-Frame-Options': 'SAMEORIGIN', 'Strict-Transport-Security': 'max-age=31536000; includeSubDomains; preload' } : {};
   function send(res, file, opts = {}) { // opts.seo: tags for <head> (pages from seo.js), opts.status: 404 for a page that does not exist
-    // a TypeScript module for the browser: its JavaScript (kreftjs build writes it as .js)
+    // a TypeScript module for the browser: its JavaScript (kreft build writes it as .js)
     if (!production && /\.(m|c)?ts$/i.test(file) && !file.endsWith('.d.ts')) {
       const { transpileTs } = require('./backend/typescript.js');
       res.writeHead(200, { 'Content-Type': 'text/javascript; charset=utf-8', 'Cache-Control': 'no-store', 'X-Content-Type-Options': 'nosniff' });
@@ -748,7 +760,7 @@ async function devServer(args, { production = false } = {}) {
     });
     if (!production && type === 'text/html') {
       let html = fs.readFileSync(file, 'utf8');
-      // PUBLIC_ values from .env, as Kreftjs.env (kreftjs build puts them in app.js)
+      // PUBLIC_ values from .env, as Kreftjs.env (kreft build puts them in app.js)
       const envTag = `<script>${env.envScript(env.publicEnv())}</script>`;
       const langHelper = require('./lang.js');
       const langDirs = langHelper.findLangDirs(root);
@@ -818,8 +830,8 @@ async function devServer(args, { production = false } = {}) {
       if (!isFile(full)) return;
       const urlPath = '/' + rel.split(path.sep).join('/');
       const ext = path.extname(full).toLowerCase();
-      const isComp = ext === '.kreftjs' || ext === '.kreft' || ext === '.som'; // .kreft / .som: files of an older project
-      const routeFile = isComp && /^routes[\/\\]/.test(rel); // routes/web.kreftjs: the whole page loads again
+      const isComp = ext === '.kreft' || ext === '.kreftjs'; // .kreftjs: files of a project from the 0.0.x betas
+      const routeFile = isComp && /^routes[\/\\]/.test(rel); // routes/web.kreft: the whole page loads again
       const msg = { type: isComp && !routeFile ? 'kreft' : ext === '.css' ? 'css' : 'reload', path: urlPath };
       clients.forEach((c) => c.write(`data: ${JSON.stringify(msg)}\n\n`));
       if (clients.size) console.log(`  ${msg.type === 'reload' ? 'reload' : 'update'}  ${urlPath}`);
@@ -850,7 +862,7 @@ async function devServer(args, { production = false } = {}) {
         if (!isFile(full)) return;
         const urlPath = '/admin/' + rel.split(path.sep).join('/');
         const ext = path.extname(full).toLowerCase();
-        const isComp = ext === '.kreftjs' || ext === '.kreft' || ext === '.som';
+        const isComp = ext === '.kreft' || ext === '.kreftjs';
         const routeFile = /^routes[\/\\]/.test(rel);
         const msg = { type: isComp && !routeFile ? 'kreft' : ext === '.css' ? 'css' : 'reload', path: urlPath };
         clients.forEach((c) => c.write(`data: ${JSON.stringify(msg)}\n\n`));
@@ -888,11 +900,11 @@ async function devServer(args, { production = false } = {}) {
     if (cur.mtimeMs === prev.mtimeMs) return; // not a real change (the file may not exist at all)
     const before = process.env.DATABASE_URL;
     env.loadEnv(envDir);
-    console.log('  .env changed' + (process.env.DATABASE_URL !== before ? ' (restart kreftjs dev to use the new DATABASE_URL)' : ''));
+    console.log('  .env changed' + (process.env.DATABASE_URL !== before ? ' (restart kreft dev to use the new DATABASE_URL)' : ''));
     clients.forEach((c) => c.write(`data: ${JSON.stringify({ type: 'reload', path: '/.env' })}\n\n`));
   });
   // files a browser must never get: the database itself, its settings and password, hidden files, locks, dumps
-  const secret = (p) => /(^|\/)\.|\.(db|sqlite3?|db-wal|db-shm|sqlite-wal|sqlite-shm|sql|bak|dump|key|pem|crt)$|(^|\/)((?:kreftjs|kreft|som)\.config\.json|package(-lock)?\.json|pnpm-lock\.yaml|yarn\.lock|bun\.lockb|composer\.(json|lock)|docker-compose.*\.ya?ml|Dockerfile|node_modules|vendor)(\/|$)/i.test(p)
+  const secret = (p) => /(^|\/)\.|\.(db|sqlite3?|db-wal|db-shm|sqlite-wal|sqlite-shm|sql|bak|dump|key|pem|crt)$|(^|\/)((?:kreftjs|kreft)\.config\.json|package(-lock)?\.json|pnpm-lock\.yaml|yarn\.lock|bun\.lockb|composer\.(json|lock)|docker-compose.*\.ya?ml|Dockerfile|node_modules|vendor)(\/|$)/i.test(p)
     || (production && /(^|\/)(database|app|routes)\//i.test(p));
   setInterval(() => clients.forEach((c) => c.write(': ping\n\n')), 25000).unref();
   // a page of the app: index.html, with the SEO tags of backend/routes/seo.js for this address (and its status)
@@ -903,7 +915,7 @@ async function devServer(args, { production = false } = {}) {
       try { seo = await require('./backend/seo-pages.js').resolve(backendDir, urlPath, req); } catch (e) { console.log('  routes/seo.js: ' + (e && e.message || e)); }
     }
     // a crawler or link preview gets the page already drawn (and a 404 when the app shows its 404 page)
-    if (ssr.wants(req) && (!seo || seo.status === 200) && !fs.readFileSync(file, 'utf8').includes('data-kreft-ssg')) { // a page kreftjs build --prerender already drew is sent as it is
+    if (ssr.wants(req) && (!seo || seo.status === 200) && !fs.readFileSync(file, 'utf8').includes('data-kreft-ssg')) { // a page kreft build --prerender already drew is sent as it is
       const page = await ssr.render(urlPath, search);
       if (page) {
         res.writeHead(page.status, { 'Content-Type': 'text/html; charset=utf-8', 'Cache-Control': isProd ? 'no-cache' : 'no-store', 'Vary': 'User-Agent', 'X-Content-Type-Options': 'nosniff', ...prodHeaders });
@@ -949,7 +961,7 @@ async function devServer(args, { production = false } = {}) {
     }
     if (urlPath.startsWith('/__kreft/npm/')) {
       const file = deps.packageFile(project, urlPath.slice('/__kreft/npm/'.length));
-      if (!file) { res.writeHead(404, { 'Content-Type': 'text/plain; charset=utf-8' }); return res.end('Not in node_modules: ' + urlPath.slice(11) + '  (kreftjs add ' + (urlPath.slice(11).match(deps.NAME) || [''])[0] + ')'); }
+      if (!file) { res.writeHead(404, { 'Content-Type': 'text/plain; charset=utf-8' }); return res.end('Not in node_modules: ' + urlPath.slice(11) + '  (kreft add ' + (urlPath.slice(11).match(deps.NAME) || [''])[0] + ')'); }
       return send(res, file);
     }
     const spec = urlPath.slice('/__kreft/deps/'.length).replace(/\/$/, '');
@@ -962,7 +974,7 @@ async function devServer(args, { production = false } = {}) {
   const privateDirs = [serverDir, ...(hasBackend ? ['app', 'routes', 'database', 'config', 'storage'].map((d) => path.join(backendDir, d)) : []), path.join(root, 'config')];
   const insideServerDir = (file) => privateDirs.some((d) => file === d || file.startsWith(d + path.sep));
 
-  // kreftjs down: storage/framework/down.json → a 503 for everyone, except with the secret (kreftjs down --secret=…)
+  // kreftjs down: storage/framework/down.json → a 503 for everyone, except with the secret (kreft down --secret=…)
   const downPath = path.join(backendDir, 'storage', 'framework', 'down.json');
   let downCache = { at: 0, data: null };
   const downInfo = () => {
@@ -977,7 +989,7 @@ async function devServer(args, { production = false } = {}) {
     const down = downInfo();
     if (!down) return false;
     const { same, cookieSecure } = require('./backend/http.js');
-    const cookie = (req.headers.cookie || '').match(/(?:^|;\s*)(?:kreft|som)_bypass=([^;]+)/); // som_bypass: set before the rename, still accepted
+    const cookie = (req.headers.cookie || '').match(/(?:^|;\s*)kreft_bypass=([^;]+)/);
     let cookieVal = null;
     if (cookie) { try { cookieVal = decodeURIComponent(cookie[1]); } catch (_) { cookieVal = cookie[1]; } }
     if (down.secret && cookieVal && same(cookieVal, String(down.secret))) return false;
@@ -1002,11 +1014,11 @@ async function devServer(args, { production = false } = {}) {
   }
 
   // DNS rebinding: a web page can make its own name (evil.example) point at 127.0.0.1 and then read everything
-  // kreftjs dev serves, with the browser believing it is the same site. A server that only answers this computer
+  // kreft dev serves, with the browser believing it is the same site. A server that only answers this computer
   // therefore only answers the names of this computer (add more with KREFT_ALLOWED_HOSTS=my-tunnel.example).
   const hostOnly = (h) => String(h || '').toLowerCase().replace(/:\d+$/, '').replace(/^\[|\]$/g, '');
   const isLocalName = (n) => n === 'localhost' || n === '127.0.0.1' || n === '::1' || n.endsWith('.localhost');
-  const allowedHosts = new Set(String((process.env.KREFT_ALLOWED_HOSTS || process.env.SOM_ALLOWED_HOSTS) || '').split(',').map((x) => x.trim().toLowerCase()).filter(Boolean));
+  const allowedHosts = new Set(String(process.env.KREFT_ALLOWED_HOSTS || '').split(',').map((x) => x.trim().toLowerCase()).filter(Boolean));
   const loopbackBind = !production && (host === 'localhost' || host === '::1' || /^127\./.test(host));
   // a request from another web site (Origin) that changes data in the unauthenticated API (--api, --db)
   const crossSiteWrite = (req) => {
@@ -1056,7 +1068,6 @@ async function devServer(args, { production = false } = {}) {
       let urlPath;
       try { urlPath = decodeURIComponent(new URL(req.url, 'http://x').pathname); }
       catch (_) { res.writeHead(400); return res.end('Bad request'); }
-      if (urlPath.startsWith('/__som/')) urlPath = '/__kreft/' + urlPath.slice('/__som/'.length); // the Som.js address of the dev files
       // a backslash or a NUL in the path is never a real page, and on Windows a backslash would act as a folder separator
       if (/[\\\0]/.test(urlPath)) { res.writeHead(400); return res.end('Bad request'); }
       if (maintenance(req, res, urlPath)) return;
@@ -1086,7 +1097,7 @@ async function devServer(args, { production = false } = {}) {
       }
       if (hot && urlPath.startsWith('/__kreft/')) return devFiles(req, res, urlPath);
       if (adminDir && (urlPath === '/admin' || urlPath.startsWith('/admin/'))) return adminFiles(req, res, urlPath);
-      // /storage/…: files on the public disk (backend/storage/app/public), connected by kreftjs storage:link.
+      // /storage/…: files on the public disk (backend/storage/app/public), connected by kreft storage:link.
       // They are sent as downloads of plain data: an uploaded .html or .svg can't run scripts on your site.
       if (urlPath.startsWith('/storage/')) {
         const pub = path.join(backendDir, 'storage', 'app', 'public');
@@ -1174,7 +1185,7 @@ async function devServer(args, { production = false } = {}) {
 
 /* ------------------------------------------------------------------ settings: kreftjs.config.json
  * { "db": "sqlite:database/app.db", "tables": { "posts": true, "users": { "write": false, "hidden": ["password"] } } }
- * Looked for in the folder being served, then its parents (so `kreftjs serve dist` finds the project's file).
+ * Looked for in the folder being served, then its parents (so `kreft serve dist` finds the project's file).
  * DATABASE_URL in the environment wins over "db" — put real passwords there, not in the file.
  */
 function readConfig(start) { return require('./kreftjs-config.js').readConfig(start); }
@@ -1184,7 +1195,7 @@ function migrationsDir(...dirs) {
 }
 const describeDb = (url) => url.replace(/\/\/([^:@/]+):[^@/]*@/, '//$1:•••@');
 
-/* ------------------------------------------------------------------ kreftjs db */
+/* ------------------------------------------------------------------ kreft db */
 async function dbCommand(args) {
   const [sub = 'help', ...rest] = args;
   let dbUrl = null, folder = '.', migrations = null;
@@ -1200,10 +1211,10 @@ async function dbCommand(args) {
   dbUrl = dbUrl || process.env.DATABASE_URL || config.db;
   if (sub === 'help' || !['migrate', 'seed', 'tables', 'sql'].includes(sub)) {
     console.log(`
-  kreftjs db migrate          The same as kreftjs migrate
-  kreftjs db seed             The same as kreftjs db:seed
-  kreftjs db tables           List tables and columns
-  kreftjs db sql "<SQL>"      Run one statement and print the result
+  kreft db migrate          The same as kreft migrate
+  kreft db seed             The same as kreft db:seed
+  kreft db tables           List tables and columns
+  kreft db sql "<SQL>"      Run one statement and print the result
 
   The database comes from --db, DATABASE_URL or "db" in kreftjs.config.json.
 `);
@@ -1214,7 +1225,7 @@ async function dbCommand(args) {
   let db;
   try {
     db = await connect(dbUrl, { root: config.dir });
-    if (sub === 'migrate' || sub === 'seed') { // the same as kreftjs migrate and kreftjs db:seed
+    if (sub === 'migrate' || sub === 'seed') { // the same as kreft migrate and kreft db:seed
       await db.close(); db = null;
       return require('./artisan.js').commands[sub === 'migrate' ? 'migrate' : 'db:seed'](rest);
     } else if (sub === 'tables') {
@@ -1225,7 +1236,7 @@ async function dbCommand(args) {
       console.log('');
     } else if (sub === 'sql') {
       const sql = extra.join(' ');
-      if (!sql.trim()) { console.error('  kreftjs db sql "SELECT * FROM posts"'); process.exit(1); }
+      if (!sql.trim()) { console.error('  kreft db sql "SELECT * FROM posts"'); process.exit(1); }
       if (/^\s*(select|with|pragma|show|describe|explain)\b/i.test(sql)) console.table(await db.query(sql));
       else { const r = await db.run(sql); console.log(`  Done: ${r.changes} row${r.changes === 1 ? '' : 's'} changed.`); }
     }
@@ -1237,7 +1248,7 @@ async function dbCommand(args) {
   }
 }
 
-/* ------------------------------------------------------------------ kreftjs dev --api db.json
+/* ------------------------------------------------------------------ kreft dev --api db.json
  * A small REST API for trying things out, made from a JSON file:
  *   { "posts": [ { "id": 1, "title": "Hello" } ], "$required": { "posts": ["title"] } }
  *

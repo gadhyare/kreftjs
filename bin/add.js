@@ -1,5 +1,5 @@
 /*
- * kreftjs add <packages...>  /  kreftjs install <packages...>
+ * kreft add <packages...>  /  kreft install <packages...>
  *
  * Enterprise-Grade Security Gatekeeper & Package Installer for Kreft:
  *
@@ -43,7 +43,7 @@ const fs = require('fs');
 const path = require('path');
 const https = require('https');
 const readline = require('readline');
-const { spawnSync } = require('child_process');
+const { runSync } = require('./win-spawn.js');
 const { layout } = require('./layout.js');
 const pkg = require('../package.json');
 
@@ -63,7 +63,7 @@ const BUILTIN_ALTERNATIVES = {
   dotenv: 'Kreft automatically parses .env into process.env & Kreftjs.env natively out of the box.',
   'body-parser': 'Kreft natively parses JSON, form-data, and raw payloads in request.js.',
   cors: 'Kreft routes and dev server include built-in CORS origin and preflight validation.',
-  nodemon: 'Kreft includes built-in file watching, hot reloading, and dev tools (kreftjs dev).',
+  nodemon: 'Kreft includes built-in file watching, hot reloading, and dev tools (kreft dev).',
   sqlite3: 'Kreft includes a native zero-dependency SQLite driver (built-in). Use better-sqlite3 only if you need C-bindings.',
   'cookie-parser': 'Kreft natively parses, signs, and sets cookies on request/response objects.',
   multer: 'Kreft natively handles multipart file uploads via request.file() and request.files().',
@@ -449,7 +449,7 @@ module.exports = async function add(args = []) {
   installArgs.push(...targets);
 
   console.log(`  ${cyan('Executing:')} npm ${installArgs.join(' ')}\n`);
-  const res = spawnSync(npmCmd, installArgs, { stdio: 'inherit', cwd: project });
+  const res = runSync(npmCmd, installArgs, { stdio: 'inherit', cwd: project });
 
   if (res.status !== 0) {
     console.error(`\n  ${red('✖ Failed to install packages.')}`);
@@ -739,7 +739,7 @@ function getInstalledPackageJson(projectDir, pkgName) {
 
 function getAuditReport(npmCmd, projectDir) {
   try {
-    const res = spawnSync(npmCmd, ['audit', '--json'], { cwd: projectDir, encoding: 'utf8' });
+    const res = runSync(npmCmd, ['audit', '--json'], { cwd: projectDir, encoding: 'utf8' });
     if (res.stdout) {
       return JSON.parse(res.stdout);
     }
@@ -889,7 +889,7 @@ function displayPackageInfoCards(projectDir, evaluationReports, auditData) {
         type: 'update',
         icon: yellow('🔔 Update Available:'),
         message: `Version v${latestVersion} is out! (Installed: v${installedVersion})`,
-        action: `Run "kreftjs update ${name}" to upgrade to the latest version.`,
+        action: `Run "kreft update ${name}" to upgrade to the latest version.`,
       });
     } else {
       notifications.push({
@@ -1029,18 +1029,18 @@ function runSecurityAudit(npmCmd, project, auditData) {
 
 function printHelp() {
   console.log(`
-  ${bold('kreftjs add <packages...>') }  (alias: ${dim('kreftjs install')}, ${dim('kreftjs i')})
+  ${bold('kreft add <packages...>') }  (alias: ${dim('kreft install')}, ${dim('kreft i')})
 
   Enterprise-Grade Security Gatekeeper & Package Installer for Kreft.
 
   Usage:
-    kreftjs add <packages...>           Install package(s) with full security gatekeeper verification
-    kreftjs add pg mysql2               Install verified database drivers
-    kreftjs add -D vitest               Install as devDependency
-    kreftjs add --check <pkg>           Inspect package security report without installing (alias: --dry-run)
-    kreftjs add -y <pkg>                Auto-confirm unverified packages in CI/CD (alias: --yes)
-    kreftjs add --allow-scripts <pkg>   Allow lifecycle scripts (postinstall/build)
-    kreftjs add --force <pkg>           Bypass security warnings & redundancy checks
+    kreft add <packages...>           Install package(s) with full security gatekeeper verification
+    kreft add pg mysql2               Install verified database drivers
+    kreft add -D vitest               Install as devDependency
+    kreft add --check <pkg>           Inspect package security report without installing (alias: --dry-run)
+    kreft add -y <pkg>                Auto-confirm unverified packages in CI/CD (alias: --yes)
+    kreft add --allow-scripts <pkg>   Allow lifecycle scripts (postinstall/build)
+    kreft add --force <pkg>           Bypass security warnings & redundancy checks
 
   Security Protections & Verification Rules:
     1. Zero-Dependency Redundancy Guard:

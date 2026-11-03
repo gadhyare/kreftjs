@@ -5,7 +5,7 @@ const PersonalAccessToken = require('../../../Models/PersonalAccessToken')
 // the roles a user can have ('role:editor' in the routes); add your own
 const ROLES = ['user', 'editor']
 
-// /api/admin/users   (frontend/pages/Users.kreftjs)
+// /api/admin/users   (frontend/pages/Users.kreft)
 class UserController {
   // GET /api/admin/users?q=ali&page=2
   async index(req) {

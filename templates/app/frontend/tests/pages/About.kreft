@@ -1,0 +1,12 @@
+<!-- /tests/about: a second test page. Add more: a .kreft file here, then one line in the routes in index.html. -->
+<view>
+  <section class="page">
+    <h1>About</h1>
+    <p class="lead">Edit <code>tests/pages/About.kreft</code> and save: the page updates by itself.</p>
+    <p><kreft-link to="/tests">Back to the test pages</kreft-link></p>
+  </section>
+</view>
+
+<style scoped>
+.page { padding: 40px 0; max-width: 40em; }
+</style>

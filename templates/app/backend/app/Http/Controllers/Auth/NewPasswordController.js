@@ -5,12 +5,12 @@ const PersonalAccessToken = require('../../../Models/PersonalAccessToken')
 const MINUTES = 60 // how long a reset link works
 
 class NewPasswordController {
-  // POST /api/reset-password   (pages/auth/ResetPassword.kreftjs)
+  // POST /api/reset-password   (pages/auth/ResetPassword.kreft)
   async store(req) {
     const data = await req.validate({
       token: 'required',
       email: 'required|email',
-      password: 'required|min:8|confirmed',
+      password: 'required|min:8|confirmed|not_common_password',
     })
     const email = data.email.toLowerCase()
     const row = await DB.table('password_reset_tokens').where('email', email).first()

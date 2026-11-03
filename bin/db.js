@@ -33,7 +33,7 @@ function parseUrl(url) {
 function driver(name, root) {
   const paths = [root || process.cwd(), process.cwd(), __dirname];
   try { return require(require.resolve(name, { paths })); }
-  catch (_) { throw new Error(`To use this database, install its driver in your project:\n\n    kreftjs add ${name}\n`); }
+  catch (_) { throw new Error(`To use this database, install its driver in your project:\n\n    kreft add ${name}\n`); }
 }
 
 const TEXT = /char|text|clob|string|uuid|enum|json/i;
@@ -250,14 +250,14 @@ function splitSql(sql) {
 
 /* ---------------------------------------------------------------- migrations
  * database/migrations/001_create_posts.sql, 002_add_likes.sql …  run once each, in name order,
- * remembered in the table som_migrations (TODO 3.1: rename to kreft_migrations, reading the old name as a fallback).
+ * remembered in the table kreft_migrations .
  * database/seed.sql fills in starting data.
  */
 async function migrate(db, dir, log = () => {}) {
   if (!fs.existsSync(dir)) return [];
   const idType = db.kind === 'postgres' ? 'TEXT' : 'VARCHAR(255)';
-  await db.exec(`CREATE TABLE IF NOT EXISTS som_migrations (name ${idType} PRIMARY KEY, ran_at ${idType} NOT NULL)`);
-  const done = new Set((await db.query('SELECT name FROM som_migrations')).map((r) => r.name));
+  await db.exec(`CREATE TABLE IF NOT EXISTS kreft_migrations (name ${idType} PRIMARY KEY, ran_at ${idType} NOT NULL)`);
+  const done = new Set((await db.query('SELECT name FROM kreft_migrations')).map((r) => r.name));
   const files = fs.readdirSync(dir).filter((f) => f.endsWith('.sql')).sort();
   const ran = [];
   for (const f of files) {
@@ -265,7 +265,7 @@ async function migrate(db, dir, log = () => {}) {
     const sql = fs.readFileSync(path.join(dir, f), 'utf8');
     try { await db.exec(sql); }
     catch (e) { throw new Error(`Migration ${f} failed: ${e.message}`); }
-    await db.run('INSERT INTO som_migrations (name, ran_at) VALUES (?, ?)', [f, new Date().toISOString()]);
+    await db.run('INSERT INTO kreft_migrations (name, ran_at) VALUES (?, ?)', [f, new Date().toISOString()]);
     log(f);
     ran.push(f);
   }

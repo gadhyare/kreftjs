@@ -5,8 +5,7 @@
   "main": "index.js",
   "bin": {
     "kreftjs": "bin/safe-add.js",
-    "kreft": "bin/safe-add.js",
-    "som": "bin/safe-add.js"
+    "kreft": "bin/safe-add.js"
   },
   "scripts": {
     "test": "node bin/safe-add.js --help"

@@ -5,7 +5,7 @@ const { EventEmitter } = require('node:events');
 const path = require('node:path');
 
 const ROOT = path.join(__dirname, '..');
-const ENV_KEYS = ['NODE_ENV', 'APP_ENV', 'MCP_TOKEN', 'KREFT_MCP_TOKEN', 'SOM_MCP_TOKEN', 'APP_KEY', 'MCP_ALLOWED_ORIGIN'];
+const ENV_KEYS = ['NODE_ENV', 'APP_ENV', 'MCP_TOKEN', 'KREFT_MCP_TOKEN', 'APP_KEY', 'MCP_ALLOWED_ORIGIN'];
 
 function request({ remote = '127.0.0.1', headers = {} } = {}) {
   const req = new EventEmitter();

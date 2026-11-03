@@ -159,16 +159,15 @@ class McpServer {
       };
     });
 
-    // 4. Resource: kreft://routes   (som://routes is the Som.js address, still answered)
+    // 4. Resource: kreft://routes
     const routesResource = async () => {
       const { Route } = require('./index.js');
       const routes = Route.list();
       return JSON.stringify(routes, null, 2);
     };
     this.registerResource('kreft://routes', 'Active Kreft Routes', 'application/json', routesResource);
-    this.registerResource('som://routes', 'Active Kreft Routes (Som.js address)', 'application/json', routesResource);
 
-    // 5. Resource: kreft://schema   (som://schema likewise)
+    // 5. Resource: kreft://schema
     const schemaResource = async () => {
       try {
         const migrator = require('./migrator.js');
@@ -179,7 +178,6 @@ class McpServer {
       }
     };
     this.registerResource('kreft://schema', 'Database Schema', 'application/json', schemaResource);
-    this.registerResource('som://schema', 'Database Schema (Som.js address)', 'application/json', schemaResource);
   }
 
   async handleMessage(reqObj) {
@@ -324,7 +322,7 @@ class McpServer {
     const hostName = String(req.headers.host || '').replace(/:\d+$/, '').replace(/^\[|\]$/g, '').toLowerCase();
     const isLocalHost = hostName === 'localhost' || hostName === '127.0.0.1' || hostName === '::1';
     const isProd = process.env.NODE_ENV === 'production' || process.env.APP_ENV === 'production';
-    const requiredToken = process.env.MCP_TOKEN || (process.env.KREFT_MCP_TOKEN || process.env.SOM_MCP_TOKEN) || null;
+    const requiredToken = process.env.MCP_TOKEN || process.env.KREFT_MCP_TOKEN || null;
     const deny = (status, message) => {
       res.writeHead(status, { 'Content-Type': 'application/json' });
       return res.end(JSON.stringify({ jsonrpc: '2.0', id: null, error: { code: -32000, message } }));

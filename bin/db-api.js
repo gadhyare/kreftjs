@@ -1,8 +1,8 @@
 /*
- * A REST API made from the tables of a database (used by `kreftjs dev --db` and `kreftjs serve --db`).
+ * A REST API made from the tables of a database (used by `kreft dev --db` and `kreft serve --db`).
  *
  *   GET    /api                    the tables you can use
- *   GET    /api/posts              rows   ?userId=3  ?title_like=som  ?likes_gte=5  ?q=text
+ *   GET    /api/posts              rows   ?userId=3  ?title_like=news  ?likes_gte=5  ?q=text
  *                                         ?_sort=-created_at,title  ?_limit=20&_page=2   (header X-Total-Count)
  *   GET    /api/posts/1            one row
  *   POST   /api/posts              create (201, the new row)
@@ -15,7 +15,7 @@
  *
  * Which tables, and what each allows, comes from `tables` (kreftjs.config.json):
  *   { "posts": true, "users": { "write": false, "hidden": ["password"] }, "logs": false }
- * `kreftjs dev` shows every table unless you list them; `kreftjs serve` shows only the tables you list.
+ * `kreft dev` shows every table unless you list them; `kreft serve` shows only the tables you list.
  */
 const { validate } = require('../kreftjs.js'); // the same rules as Kreftjs.validate in the browser
 const MAX_BODY = 1024 * 1024;
@@ -28,7 +28,7 @@ function createDbApi(db, { tables: allow = null, production = false, prefix = '/
     const all = await db.tables();
     const out = new Map();
     for (const t of all) {
-      if (t.name === 'som_migrations') continue;
+      if (t.name === 'kreft_migrations') continue;
       let rules = allow ? allow[t.name] : true;
       if (rules == null || rules === false) continue;
       if (rules === true) rules = {};
@@ -48,7 +48,7 @@ function createDbApi(db, { tables: allow = null, production = false, prefix = '/
     }
     return out;
   };
-  // `kreftjs serve` reads the tables once; `kreftjs dev` looks again every 2 s, so a new table shows up by itself
+  // `kreft serve` reads the tables once; `kreft dev` looks again every 2 s, so a new table shows up by itself
   let loadedAt = 0;
   const tables = async () => {
     if (schema && (production || Date.now() - loadedAt < 2000)) return schema;

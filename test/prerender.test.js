@@ -30,14 +30,14 @@ const INDEX = `<!doctype html>
     const router = Kreftjs.router({
       errors: 'errors',
       routes: [
-        { path: '/', component: 'pages/Home.kreftjs', meta: { title: 'Home', seo: { description: 'Home page', canonical: 'https://example.com/', lang: 'ar', dir: 'rtl',
+        { path: '/', component: 'pages/Home.kreft', meta: { title: 'Home', seo: { description: 'Home page', canonical: 'https://example.com/', lang: 'ar', dir: 'rtl',
           alternates: { en: 'https://example.com/en', ar: 'https://example.com/' },
           og: { image: 'https://example.com/a.png' }, schema: { '@type': 'WebSite', name: 'x<\\/script><b>' } } } },
-        { path: '/about', component: 'pages/About.kreftjs', meta: { title: 'About', description: 'About us' } },
-        { path: '/plain', component: 'pages/Plain.kreftjs' },
+        { path: '/about', component: 'pages/About.kreft', meta: { title: 'About', description: 'About us' } },
+        { path: '/plain', component: 'pages/Plain.kreft' },
       ],
     })
-    Kreftjs.app('App.kreftjs').use(router).mount('#app')
+    Kreftjs.app('App.kreft').use(router).mount('#app')
   </script>
 </body>
 </html>
@@ -51,10 +51,10 @@ function writeSite(tmp) {
   fs.mkdirSync(path.join(site, 'pages'), { recursive: true });
   fs.copyFileSync(path.join(ROOT, 'kreftjs.js'), path.join(site, 'kreftjs.js'));
   fs.writeFileSync(path.join(site, 'index.html'), INDEX);
-  fs.writeFileSync(path.join(site, 'App.kreftjs'), '<view><kreft-view></kreft-view></view>\n');
+  fs.writeFileSync(path.join(site, 'App.kreft'), '<view><kreft-view></kreft-view></view>\n');
   fs.mkdirSync(path.join(site, 'errors'));
-  fs.writeFileSync(path.join(site, 'errors', '404.kreftjs'), '<view><h1>Not found</h1></view>\n');
-  for (const name of ['Home', 'About', 'Plain']) fs.writeFileSync(path.join(site, 'pages', name + '.kreftjs'), `<view><h1>${name}</h1></view>\n`);
+  fs.writeFileSync(path.join(site, 'errors', '404.kreft'), '<view><h1>Not found</h1></view>\n');
+  for (const name of ['Home', 'About', 'Plain']) fs.writeFileSync(path.join(site, 'pages', name + '.kreft'), `<view><h1>${name}</h1></view>\n`);
   return site;
 }
 

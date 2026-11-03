@@ -1,0 +1,100 @@
+<!-- Your own Node.js code: every file in demo/server/ answers one address under /api -->
+load time = api.get('/api/time')
+load stats = api.get('/api/notes/stats')
+
+state draft = form({ text: 'Kreft', algorithm: 'sha256' }, { text: 'required|max:500' })
+state result = null
+
+action hash() {
+  // the server checks the same rules again (ctx.validate); its 422 errors show under the field
+  const answer = await draft.$submit((values) => api.post('/api/hash', values))
+  if (answer) result = answer
+}
+
+<view>
+  <section class="card">
+    <h1>Server code</h1>
+    <p class="lead">Put a <code>.js</code> file in <code>server/</code> and it answers an address: <code>server/time.js</code> is <code>/api/time</code>. It runs in Node.js, so it can use any npm package and the database.</p>
+
+    <div class="cols">
+      <div>
+        <h2>server/time.js</h2>
+        <p k-if="time.loading" class="muted">Asking the server…</p>
+        <p k-elif="time.error" class="bad">{time.error.message}</p>
+        <dl k-else>
+          <dt>Server clock</dt><dd>{new Date(time.data.now).toLocaleTimeString()}</dd>
+          <dt>Node.js</dt><dd>{time.data.node} on {time.data.platform}</dd>
+          <dt>Running for</dt><dd>{time.data.uptime} s</dd>
+        </dl>
+        <button @click="time.reload()">Ask again</button>
+      </div>
+      <div>
+        <h2>server/notes/stats.js</h2>
+        <p k-if="stats.loading" class="muted">Counting…</p>
+        <p k-elif="stats.error" class="bad">{stats.error.message}</p>
+        <p k-else class="big">{stats.data.total} <span>notes in the database</span></p>
+        <button @click="stats.reload()">Count again</button>
+      </div>
+    </div>
+  </section>
+
+  <section class="card">
+    <h2>server/hash.js</h2>
+    <form @submit.prevent={hash}>
+      <input k-model="draft.text" aria-label="Text to hash">
+      <select k-model="draft.algorithm" aria-label="Algorithm">
+        <option>sha256</option><option>sha1</option><option>md5</option>
+      </select>
+      <button class="primary" disabled={draft.$busy}>Hash it</button>
+    </form>
+    <p k-if="draft.$error('text')" class="bad">{draft.$error('text')}</p>
+    <p k-if="result" class="hash"><strong>{result.algorithm}</strong> <code>{result.hash}</code></p>
+    <p class="muted">Empty the field and press the button: the page stops you first. The server would answer 422 with the same message.</p>
+  </section>
+
+  <section class="card">
+    <h2>How a file looks</h2>
+    <pre>// server/hash.js  →  POST /api/hash
+const crypto = require('crypto')        // Node's own packages, or any from npm
+
+exports.post = (ctx) => \{
+  const \{ text, algorithm } = ctx.validate(ctx.body, \{
+    text: 'required|max:500',
+    algorithm: 'required|in:sha256,sha1,md5',
+  })
+  return \{ algorithm, hash: crypto.createHash(algorithm).update(text).digest('hex') }
+}</pre>
+    <p>Export <code>get</code>, <code>post</code>, <code>put</code>, <code>patch</code> or <code>del</code>. <code>server/users/[id].js</code> answers <code>/api/users/5</code> with <code>ctx.params.id</code>. What you return is sent as JSON.</p>
+  </section>
+
+  <section class="card">
+    <h2>npm packages and CSS libraries in .kreft files</h2>
+    <pre>import dayjs from 'dayjs'                         // kreft add dayjs
+import \{ nanoid } from 'nanoid'
+import 'bootstrap/dist/css/bootstrap.min.css'     // a CSS file becomes a &lt;link&gt;</pre>
+    <p>Install packages safely with <code>kreft add</code> (blocks untrusted lifecycle scripts and checks for typosquatting), then import them. <code>kreft dev</code> prepares them for the browser (with <code>kreft add -D esbuild</code>), and <code>kreft build</code> puts them in <code>dist/deps</code>. A library from a CDN is one line in <code>index.html</code>, or start with <code>kreft new my-app --ui bootstrap</code> (also <code>tailwind</code>, <code>bulma</code>, <code>pico</code>).</p>
+  </section>
+
+  <section class="card">
+    <h2>AI Agent Integration (Model Context Protocol — <code>/mcp</code>)</h2>
+    <p class="muted">Kreft includes a built-in JSON-RPC 2.0 MCP server at <code>/mcp</code> so AI assistants (Cursor, Claude Desktop, Windsurf) can inspect routes, database schemas, and components or scaffold files directly.</p>
+    <pre>// Connect any MCP client to http://localhost:8000/mcp
+// Resources: kreft://routes · kreft://schema · kreft://components · kreft://docs
+// Tools:     list_routes · query_database (read-only) · make_resource · read_component</pre>
+  </section>
+</view>
+
+<style scoped>
+.cols { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 24px; }
+h2 { font-size: 15px; font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; margin: 8px 0 10px; }
+dl { display: grid; grid-template-columns: auto 1fr; gap: 4px 16px; margin: 0 0 12px; }
+dt { color: var(--muted); }
+dd { margin: 0; font-variant-numeric: tabular-nums; }
+.big { font-size: 40px; font-weight: 700; margin: 0 0 12px; line-height: 1; }
+.big span { font-size: 15px; font-weight: 400; color: var(--muted); }
+form { display: flex; gap: 8px; flex-wrap: wrap; }
+form input { flex: 1; min-width: 180px; }
+select { font: inherit; padding: 5px 8px; }
+.hash { margin: 12px 0 0; overflow-wrap: anywhere; }
+.bad { color: var(--destructive); background: var(--destructive-bg); padding: 8px 12px; margin: 8px 0 0; }
+</style>

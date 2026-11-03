@@ -1,7 +1,7 @@
 {
   "name": "kreftjs",
-  "displayName": "Kreft (.kreftjs files)",
-  "description": "Colors, brackets, formatting and snippets for Kreft .kreftjs component files (and .kreft and .som files from older projects).",
+  "displayName": "Kreft (.kreft files)",
+  "description": "Colors, brackets, formatting and snippets for Kreft .kreft component files (and .kreftjs files from the 0.0.x betas).",
   "version": "2.3.0",
   "publisher": "kreft",
   "license": "MIT",
@@ -26,9 +26,8 @@
           "kreftjs"
         ],
         "extensions": [
-          ".kreftjs",
           ".kreft",
-          ".som"
+          ".kreftjs"
         ],
         "configuration": "./language-configuration.json"
       }

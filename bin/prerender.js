@@ -1,8 +1,8 @@
 /*
- * kreftjs build --prerender — saves every page of the router as ready HTML (static site generation).
+ * kreft build --prerender — saves every page of the router as ready HTML (static site generation).
  *
- *   kreftjs build --prerender                    every route without :params
- *   kreftjs build --prerender /users/1,/users/2  also these addresses
+ *   kreft build --prerender                    every route without :params
+ *   kreft build --prerender /users/1,/users/2  also these addresses
  *
  * Each page opens in a simulated browser (jsdom), waits until its data has loaded, and the result
  * is written to dist/<path>/index.html. Visitors and search engines get the content at once;
@@ -131,7 +131,7 @@ function createRenderer({ jsdom, origin, basePath, maxWait = 10000, userAgent, e
       return {
         problems,
         path: router ? router.route.path : route,
-        errorStatus: router && router.route.error ? Number(router.route.error.status) || 500 : 0, // the app showed errors/404.kreftjs (or another)
+        errorStatus: router && router.route.error ? Number(router.route.error.status) || 500 : 0, // the app showed errors/404.kreft (or another)
         title: w.document.title,
         tags: seoTags(w.document, origin),
         htmlAttrs: ['lang', 'dir', 'data-kreft-orig-lang', 'data-kreft-orig-dir'].filter((a) => w.document.documentElement.hasAttribute(a)).map((a) => [a, w.document.documentElement.getAttribute(a)]),
@@ -176,7 +176,7 @@ module.exports = async function prerender(dist, root, extra) {
   try {
     jsdom = loadJsdom(root);
   } catch (_) {
-    throw new Error('it needs jsdom. Install it once in your project:\n\n    kreftjs add -D jsdom\n');
+    throw new Error('it needs jsdom. Install it once in your project:\n\n    kreft add -D jsdom\n');
   }
   const { JSDOM } = jsdom;
   if (typeof fetch !== 'function') throw new Error('it needs Node.js 18 or newer.');

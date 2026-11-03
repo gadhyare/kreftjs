@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <!-- the folder this app lives in: the router and the .kreftjs paths start from here -->
+  <!-- the folder this app lives in: the router and the .kreft paths start from here -->
   <base href="/demo/">
   <title>Kreft Demo</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -45,63 +45,63 @@
       find(id) { return this.list.find((u) => u.id == id) },
     })
 
-    // 2) Routes — each page is a .kreftjs file, shown inside a layout (layouts/*.kreftjs)
+    // 2) Routes — each page is a .kreft file, shown inside a layout (layouts/*.kreft)
     const router = Kreftjs.router({
-      layout: 'main',       // every page: layouts/main.kreftjs (menu on the left)…
-      errors: 'errors',     // error pages: errors/404.kreftjs for unknown addresses, abort(403) → errors/403.kreftjs
+      layout: 'main',       // every page: layouts/main.kreft (menu on the left)…
+      errors: 'errors',     // error pages: errors/404.kreft for unknown addresses, abort(403) → errors/403.kreft
       routes: [
         // Basics
-        { path: '/', component: 'pages/Start.kreftjs', meta: { title: 'Kreft · components in plain words' } },
-        // …unless a route names another one (Start.kreftjs says `layout plain` itself)
-        { path: '/docs', component: '../docs/Docs.kreftjs', layout: 'plain', meta: { title: 'Documentation · Kreft' } },
-        { path: '/basics', component: 'pages/Home.kreftjs', meta: { title: 'Basics · Kreft' } },
-        { path: '/lifecycle', component: 'pages/Lifecycle.kreftjs', meta: { title: 'Lifecycle · Kreft' } },
+        { path: '/', component: 'pages/Start.kreft', meta: { title: 'Kreft · components in plain words' } },
+        // …unless a route names another one (Start.kreft says `layout plain` itself)
+        { path: '/docs', component: '../docs/Docs.kreft', layout: 'plain', meta: { title: 'Documentation · Kreft' } },
+        { path: '/basics', component: 'pages/Home.kreft', meta: { title: 'Basics · Kreft' } },
+        { path: '/lifecycle', component: 'pages/Lifecycle.kreft', meta: { title: 'Lifecycle · Kreft' } },
         // Views
-        { path: '/loops', component: 'pages/Loops.kreftjs', meta: { title: 'Loops · Kreft' } },
-        { path: '/forms', component: 'pages/Forms.kreftjs', meta: { title: 'Forms · Kreft' } },
-        { path: '/directives', component: 'pages/Directives.kreftjs', meta: { title: 'Directives · Kreft' } },
-        { path: '/animations', component: 'pages/Animations.kreftjs', meta: { title: 'Animations · Kreft' } },
-        { path: '/fast', component: 'pages/Fast.kreftjs', meta: { title: 'Fast views · Kreft' } },
-        { path: '/layouts', component: 'pages/Layouts.kreftjs', meta: { title: 'Layouts · Kreft' } },
-        { path: '/print', component: 'pages/Print.kreftjs', layout: false, meta: { title: 'Print · Kreft' } },
+        { path: '/loops', component: 'pages/Loops.kreft', meta: { title: 'Loops · Kreft' } },
+        { path: '/forms', component: 'pages/Forms.kreft', meta: { title: 'Forms · Kreft' } },
+        { path: '/directives', component: 'pages/Directives.kreft', meta: { title: 'Directives · Kreft' } },
+        { path: '/animations', component: 'pages/Animations.kreft', meta: { title: 'Animations · Kreft' } },
+        { path: '/fast', component: 'pages/Fast.kreft', meta: { title: 'Fast views · Kreft' } },
+        { path: '/layouts', component: 'pages/Layouts.kreft', meta: { title: 'Layouts · Kreft' } },
+        { path: '/print', component: 'pages/Print.kreft', layout: false, meta: { title: 'Print · Kreft' } },
         // Components
-        { path: '/components', component: 'pages/Components.kreftjs', meta: { title: 'Components · Kreft' } },
-        { path: '/keep', component: 'pages/KeepWait.kreftjs', meta: { title: 'Keep and wait · Kreft' } },
+        { path: '/components', component: 'pages/Components.kreft', meta: { title: 'Components · Kreft' } },
+        { path: '/keep', component: 'pages/KeepWait.kreft', meta: { title: 'Keep and wait · Kreft' } },
         // Data
-        { path: '/saved', component: 'pages/Saved.kreftjs', meta: { title: 'Saved data · Kreft' } },
-        { path: '/sharing', component: 'pages/Sharing.kreftjs', meta: { title: 'Sharing · Kreft' } },
-        { path: '/shop', component: 'pages/Shop.kreftjs', meta: { title: 'Shop · Kreft' } },
-        { path: '/posts', component: 'pages/Posts.kreftjs', meta: { title: 'Posts · Kreft' } },
-        { path: '/logic', component: 'pages/Logic.kreftjs', meta: { title: 'Shared logic · Kreft' } },
-        { path: '/online', component: 'pages/Online.kreftjs', meta: { title: 'Online API · Kreft' } },
-        { path: '/database', component: 'pages/Database.kreftjs', meta: { title: 'Database · Kreft' } },
-        { path: '/backend', component: 'pages/Backend.kreftjs', meta: { title: 'Backend · Kreft' } },
-        { path: '/server', component: 'pages/Server.kreftjs', meta: { title: 'Server code · Kreft' } },
+        { path: '/saved', component: 'pages/Saved.kreft', meta: { title: 'Saved data · Kreft' } },
+        { path: '/sharing', component: 'pages/Sharing.kreft', meta: { title: 'Sharing · Kreft' } },
+        { path: '/shop', component: 'pages/Shop.kreft', meta: { title: 'Shop · Kreft' } },
+        { path: '/posts', component: 'pages/Posts.kreft', meta: { title: 'Posts · Kreft' } },
+        { path: '/logic', component: 'pages/Logic.kreft', meta: { title: 'Shared logic · Kreft' } },
+        { path: '/online', component: 'pages/Online.kreft', meta: { title: 'Online API · Kreft' } },
+        { path: '/database', component: 'pages/Database.kreft', meta: { title: 'Database · Kreft' } },
+        { path: '/backend', component: 'pages/Backend.kreft', meta: { title: 'Backend · Kreft' } },
+        { path: '/server', component: 'pages/Server.kreft', meta: { title: 'Server code · Kreft' } },
         // Router
-        { path: '/users', component: 'pages/Users.kreftjs', meta: { title: 'Users · Kreft' } },
-        { path: '/users/:id', name: 'user', component: 'pages/User.kreftjs', props: true },
-        { path: '/router', component: 'pages/Router.kreftjs', meta: { title: 'Router · Kreft' } },
-        { path: '/secret', component: 'pages/Router.kreftjs', guard: () => '/router?blocked=1' },
+        { path: '/users', component: 'pages/Users.kreft', meta: { title: 'Users · Kreft' } },
+        { path: '/users/:id', name: 'user', component: 'pages/User.kreft', props: true },
+        { path: '/router', component: 'pages/Router.kreft', meta: { title: 'Router · Kreft' } },
+        { path: '/secret', component: 'pages/Router.kreft', guard: () => '/router?blocked=1' },
         { path: '/old-page', redirect: '/router?from=old-page' },
         // nested routes: Settings is the frame, its own <kreft-view> shows the child
-        { path: '/settings', component: 'pages/Settings.kreftjs', meta: { title: 'Settings · Kreft', area: 'settings' }, children: [
-          { path: '', component: 'pages/settings/General.kreftjs' },
-          { path: 'account', component: 'pages/settings/Account.kreftjs', meta: { title: 'Account · Kreft' } },
-          { path: 'look', component: 'pages/settings/Look.kreftjs', meta: { title: 'Look · Kreft' } },
+        { path: '/settings', component: 'pages/Settings.kreft', meta: { title: 'Settings · Kreft', area: 'settings' }, children: [
+          { path: '', component: 'pages/settings/General.kreft' },
+          { path: 'account', component: 'pages/settings/Account.kreft', meta: { title: 'Account · Kreft' } },
+          { path: 'look', component: 'pages/settings/Look.kreft', meta: { title: 'Look · Kreft' } },
         ] },
         // Tools
-        { path: '/security', component: 'pages/Security.kreftjs', meta: { title: 'HTML Security · Kreft' } },
-        { path: '/error-monitor', component: 'pages/ErrorMonitor.kreftjs', meta: { title: 'Error Monitor · Kreft' } },
-        { path: '/render', component: 'pages/Render.kreftjs', meta: { title: 'Template engine · Kreft' } },
-        { path: '/tools', component: 'pages/Tools.kreftjs', meta: { title: 'Dev tools · Kreft' } },
+        { path: '/security', component: 'pages/Security.kreft', meta: { title: 'HTML Security · Kreft' } },
+        { path: '/error-monitor', component: 'pages/ErrorMonitor.kreft', meta: { title: 'Error Monitor · Kreft' } },
+        { path: '/render', component: 'pages/Render.kreft', meta: { title: 'Template engine · Kreft' } },
+        { path: '/tools', component: 'pages/Tools.kreft', meta: { title: 'Dev tools · Kreft' } },
       ],
     })
 
-    // 3) The app itself is a .kreftjs file too
-    Kreftjs.app('App.kreftjs')
-      .component('SiteHeader', 'components/SiteHeader.kreftjs') // the bar both layouts use
-      .component('Counter', 'components/Counter.kreftjs')
-      .component('TodoList', 'components/TodoList.kreftjs')
+    // 3) The app itself is a .kreft file too
+    Kreftjs.app('App.kreft')
+      .component('SiteHeader', 'components/SiteHeader.kreft') // the bar both layouts use
+      .component('Counter', 'components/Counter.kreft')
+      .component('TodoList', 'components/TodoList.kreft')
       // a custom directive: <input k-focus> gets the focus when it appears
       .directive('focus', { ready(el) { el.focus() } })
       .use(router)

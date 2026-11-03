@@ -5,8 +5,8 @@
  *   app/Http/Controllers/PostController.js
  *   app/Http/Middleware/Authenticate.js   'auth' in a route finds Authenticate.js (or Auth.js)
  *   app/Models/Post.js
- *   database/migrations/*.js              kreftjs migrate, kreftjs migrate:rollback, kreftjs migrate:fresh --seed
- *   database/seeders/DatabaseSeeder.js    kreftjs db:seed
+ *   database/migrations/*.js              kreft migrate, kreft migrate:rollback, kreft migrate:fresh --seed
+ *   database/seeders/DatabaseSeeder.js    kreft db:seed
  *
  * In your files:  const { Route, Model, DB, abort, response } = require('kreftjs/server')
  */
@@ -31,8 +31,8 @@ function installAlias() {
   const original = Module._resolveFilename;
   require('./typescript.js').registerTypeScript(process.cwd()); // .ts files in routes/, app/, database/
   Module._resolveFilename = function (request, ...rest) {
-    // kreft/server and @kreft/server are the earlier Kreft names; somjs/server, som/server and @somjs/server the Som.js ones: older projects still require them
-    if (['kreftjs/server', '@kreftjs/server', 'kreft/server', '@kreft/server', 'somjs/server', 'som/server', '@somjs/server'].includes(request)) return SERVER_ENTRY;
+    // kreft/server and @kreft/server are the earlier Kreft names: older projects still require them
+    if (['kreftjs/server', '@kreftjs/server', 'kreft/server', '@kreft/server'].includes(request)) return SERVER_ENTRY;
     return original.call(this, request, ...rest);
   };
 }
@@ -90,6 +90,10 @@ const loadModuleAsync = async (file) => {
 function createBackend(baseDir, { db = null, production = false, log = console, prefix = '/api' } = {}) {
   const isProd = Boolean(production || process.env.APP_ENV === 'production' || process.env.NODE_ENV === 'production');
   const isDebug = process.env.APP_DEBUG !== undefined ? (process.env.APP_DEBUG === 'true' || process.env.APP_DEBUG === '1') : !isProd;
+  // .env from an older template says SESSION_SECURE_COOKIE=false: in production that sends the session cookie over plain HTTP too
+  if (isProd && process.env.SESSION_SECURE_COOKIE === 'false') {
+    log.warn('  SECURITY: SESSION_SECURE_COOKIE=false in production. The login cookie is also sent over plain http://. Remove that line from .env (cookies are Secure in production by default).');
+  }
   const { startAutoGarbageCollector } = require('./gc.js');
   startAutoGarbageCollector({ thresholdMB: Number(process.env.AUTO_GC_THRESHOLD_MB) || 200, log: !isProd && process.env.VERBOSE_GC === '1' });
   installAlias();
@@ -171,7 +175,7 @@ function createBackend(baseDir, { db = null, production = false, log = console, 
     const known = { auth: 'Authenticate', guest: 'RedirectIfAuthenticated', verified: 'EnsureEmailIsVerified', 'password.confirm': 'RequirePassword', admin: 'EnsureIsAdmin', role: 'EnsureHasRole', abilities: 'CheckAbilities', ability: 'CheckForAnyAbility' }[name];
     const names = [name, p, p + 'Middleware', known].filter(Boolean);
     const file = names.map((n) => findFile(path.join(dir, n))).find(Boolean);
-    if (!file) throw new Error(`No middleware "${name}". Make it with:  kreftjs make:middleware ${p}`);
+    if (!file) throw new Error(`No middleware "${name}". Make it with:  kreft make:middleware ${p}`);
     if (!isInsideDir(file, path.resolve(baseDir, 'app'))) throw new Error(`Forbidden middleware path.`);
     return { fn: await loadModuleAsync(file), args };
   }

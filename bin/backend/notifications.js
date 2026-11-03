@@ -16,7 +16,7 @@
  *
  *   await user.notify(new InvoicePaid(invoice))
  *   await Notification.send(users, new InvoicePaid(invoice))
- *   const list = await user.notifications().get()           // the notifications table (kreftjs notifications:table)
+ *   const list = await user.notifications().get()           // the notifications table (kreft notifications:table)
  *   await user.unreadNotifications().update({ read_at: new Date() })
  */
 const crypto = require('crypto');

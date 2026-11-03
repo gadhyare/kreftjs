@@ -91,8 +91,8 @@ test('remove:model and kreft:remove: cleans up generated files, routes, and side
     fs.writeFileSync(path.join(tmp, 'package.json'), JSON.stringify({ name: 'test-app' }));
     fs.writeFileSync(path.join(tmp, 'frontend', 'index.html'), '<html><body></body></html>');
     fs.writeFileSync(path.join(tmp, 'backend', 'routes', 'api.js'), "const { Route } = require('kreftjs/server')\n");
-    fs.writeFileSync(path.join(tmp, 'frontend', 'routes', 'web.kreftjs'), "// web routes\n");
-    fs.writeFileSync(path.join(tmp, 'frontend', 'layouts', 'app.kreftjs'), `
+    fs.writeFileSync(path.join(tmp, 'frontend', 'routes', 'web.kreft'), "// web routes\n");
+    fs.writeFileSync(path.join(tmp, 'frontend', 'layouts', 'app.kreft'), `
       <sidebar>
         { label: 'Management', links: [
           { to: 'dashboard', label: 'Dashboard', icon: 'home' },
@@ -110,7 +110,7 @@ test('remove:model and kreft:remove: cleans up generated files, routes, and side
     const controllerFile = path.join(tmp, 'backend', 'app', 'Http', 'Controllers', 'Admin', 'CategoryController.js');
     const storeReqFile = path.join(tmp, 'backend', 'app', 'Http', 'Requests', 'Admin', 'StoreCategoryRequest.js');
     const updateReqFile = path.join(tmp, 'backend', 'app', 'Http', 'Requests', 'Admin', 'UpdateCategoryRequest.js');
-    const pageFile = path.join(tmp, 'frontend', 'pages', 'Admin', 'Category.kreftjs');
+    const pageFile = path.join(tmp, 'frontend', 'pages', 'Admin', 'Category.kreft');
     const factoryFile = path.join(tmp, 'backend', 'database', 'factories', 'CategoryFactory.js');
     const seederFile = path.join(tmp, 'backend', 'database', 'seeders', 'CategorySeeder.js');
 
@@ -125,10 +125,10 @@ test('remove:model and kreft:remove: cleans up generated files, routes, and side
     const apiRoutes = fs.readFileSync(path.join(tmp, 'backend', 'routes', 'api.js'), 'utf8');
     assert.ok(apiRoutes.includes('CategoryController'), 'api route references CategoryController');
 
-    const webRoutes = fs.readFileSync(path.join(tmp, 'frontend', 'routes', 'web.kreftjs'), 'utf8');
+    const webRoutes = fs.readFileSync(path.join(tmp, 'frontend', 'routes', 'web.kreft'), 'utf8');
     assert.ok(webRoutes.includes('admin/categories'), 'web route registered');
 
-    const appKreft = fs.readFileSync(path.join(tmp, 'frontend', 'layouts', 'app.kreftjs'), 'utf8');
+    const appKreft = fs.readFileSync(path.join(tmp, 'frontend', 'layouts', 'app.kreft'), 'utf8');
     assert.ok(appKreft.includes('admin.categories'), 'sidebar link registered');
 
     // 2. Test dry-run: nothing is deleted
@@ -165,11 +165,11 @@ test('remove:model and kreft:remove: cleans up generated files, routes, and side
     const apiRoutesClean = fs.readFileSync(path.join(tmp, 'backend', 'routes', 'api.js'), 'utf8');
     assert.ok(!apiRoutesClean.includes('CategoryController'), 'controller import and route removed from routes/api.js');
 
-    const webRoutesClean = fs.readFileSync(path.join(tmp, 'frontend', 'routes', 'web.kreftjs'), 'utf8');
-    assert.ok(!webRoutesClean.includes('admin/categories'), 'route removed from web.kreftjs');
+    const webRoutesClean = fs.readFileSync(path.join(tmp, 'frontend', 'routes', 'web.kreft'), 'utf8');
+    assert.ok(!webRoutesClean.includes('admin/categories'), 'route removed from web.kreft');
 
-    const appKreftClean = fs.readFileSync(path.join(tmp, 'frontend', 'layouts', 'app.kreftjs'), 'utf8');
-    assert.ok(!appKreftClean.includes('admin.categories'), 'sidebar link removed from app.kreftjs');
+    const appKreftClean = fs.readFileSync(path.join(tmp, 'frontend', 'layouts', 'app.kreft'), 'utf8');
+    assert.ok(!appKreftClean.includes('admin.categories'), 'sidebar link removed from app.kreft');
 
     // 5. Test positional tokens without leading dashes
     commands['make:model'](['Product', '--all']);

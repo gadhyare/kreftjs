@@ -1,13 +1,13 @@
 /*
  * .env files and environment management.
  *
- *   # .env  (never sent to the browser, never copied by kreftjs build)
+ *   # .env  (never sent to the browser, never copied by kreft build)
  *   APP_NAME="My shop"
  *   DATABASE_URL=sqlite:database/app.db
  *   MAIL_PASSWORD=secret
  *   PUBLIC_APP_NAME=${APP_NAME}            ← PUBLIC_ values also reach the browser: env.PUBLIC_APP_NAME
  *
- * Read by kreftjs dev, kreftjs serve, kreftjs build and kreftjs db. Values already set in the real environment win,
+ * Read by kreft dev, kreft serve, kreft build and kreft db. Values already set in the real environment win,
  * so a server can override the file. In server/*.js: process.env.MAIL_PASSWORD (or ctx.env).
  */
 const fs = require('fs');

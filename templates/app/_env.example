@@ -8,9 +8,11 @@ APP_KEY=
 # Where the app runs: links in emails start with this
 APP_URL=http://localhost:8000
 
-# Only values that start with PUBLIC_ also reach the browser: {env.PUBLIC_APP_NAME} in any .kreftjs file.
+# Only values that start with PUBLIC_ also reach the browser: {env.PUBLIC_APP_NAME} in any .kreft file.
 # Never put a password or a secret key in a PUBLIC_ value.
 PUBLIC_APP_NAME="${APP_NAME}"
+# Where the "Documentation" links of the pages go
+PUBLIC_DOCS_URL="http://kreftjs.com"
 
 # The database: sqlite:file.db, mysql://user:password@host:3306/name or postgres://user:password@host:5432/name
 DATABASE_URL=sqlite:backend/database/app.db
@@ -28,16 +30,17 @@ FILESYSTEM_DISK=local
 # REDIS_PORT=6379
 # REDIS_PASSWORD=
 # REDIS_DB=0
-# REDIS_PREFIX=som:
+# REDIS_PREFIX=kreft:
 # Environment & Debugging:
 # - local: plain HTTP allowed on localhost, interactive bug diagnostics & stack traces shown
 # - production: plain HTTP disallowed for security (enforces HTTPS & HSTS), bug details & stack traces hidden
 APP_ENV=local
 APP_DEBUG=true
 
-# Force all traffic over secure HTTPS in production (auto-redirects HTTP -> HTTPS with HSTS)
-FORCE_HTTPS=false
-SESSION_SECURE_COOKIE=false
+# Redirect plain HTTP to HTTPS in production (with HSTS). Turn it on once the site has HTTPS:
+# FORCE_HTTPS=true
+# The login cookie is Secure in production and on an https:// APP_URL by itself. Do not set this to false in production:
+# SESSION_SECURE_COOKIE=true
 
 # Security & Sessions
 # A login token nobody used for this many days stops working
@@ -52,7 +55,7 @@ SESSION_EXPIRE_ON_CLOSE=false
 SESSION_DRIVER=file
 
 # Frontend Inactivity Timer in minutes (auto-redirect to /login after inactivity)
-# Values starting with PUBLIC_ are sent to the browser and readable as {env.PUBLIC_...} in .kreftjs files
+# Values starting with PUBLIC_ are sent to the browser and readable as {env.PUBLIC_...} in .kreft files
 PUBLIC_SESSION_TIMEOUT=15
 PUBLIC_SESSION_WARNING=2
 

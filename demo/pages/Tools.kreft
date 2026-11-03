@@ -1,0 +1,62 @@
+<!-- what `kreft dev` gives you while you work, and what `kreft build` gives you when you ship -->
+state devServer = !!window.__KREFT_DEV__
+state count = 0
+
+action openTools() { if (window.__kreftOpenDevtools) window.__kreftOpenDevtools() }
+
+<view>
+  <section class="card">
+    <h1>Dev tools &amp; Ecosystem</h1>
+    <p class="lead">Everything here comes built into Kreft v2.4. Zero external plugins required.</p>
+
+    <h2>Hot reload (State-Preserving HMR)</h2>
+    <p>While <code>npm run dev</code> runs, save a <code>.kreft</code> file and only that component is swapped on the page. Its state stays intact. Try it: count up, then change this file's text and save.</p>
+    <button class="primary" @click="count++">Count: {count}</button>
+    <p class="muted">A <code>.css</code> file reloads its styles only; other files reload the page. Mistakes show in an interactive overlay on the page.</p>
+
+    <h2>Kreft DevTools &amp; Interactive Error Monitor</h2>
+    <p>The <b>K</b> button (or <kbd>Alt</kbd>+<kbd>Shift</kbd>+<kbd>D</kbd>) opens a panel with the component tree, props, state, derived values, stores, current route, and a timeline of store actions and bus messages.</p>
+    <div class="row">
+      <button @click={openTools} disabled={!devServer}>Open Kreft DevTools</button>
+      <kreft-link to="/error-monitor" class="btn secondary">Launch Interactive Error Monitor</kreft-link>
+      <span class="muted" k-if="!devServer"> (DevTools panel requires <code>kreft dev</code>)</span>
+    </div>
+  </section>
+
+  <section class="card">
+    <h2>Security-Hardened Package Manager (<code>kreft add</code>)</h2>
+    <p class="muted">Sandboxes lifecycle scripts (<code>--ignore-scripts</code>), blocks typosquatting, checks package age on the npm registry, and warns when a capability is already built into Kreft.</p>
+    <pre>kreft add dayjs nanoid       # installs with exact version lock &amp; script sandboxing
+kreft add --dry-run lodash   # inspect security &amp; redundancy report without installing
+kreft update --check         # check outdated packages &amp; refresh embedded kreftjs.js</pre>
+  </section>
+
+  <section class="card">
+    <h2>Auto Garbage Collector &amp; Memory Watchdog</h2>
+    <p class="muted">Keeps long-running Node.js servers at a lean 40–60 MB footprint by pruning stale caches and triggering V8 major GC cycles when heap usage crosses your threshold.</p>
+    <pre>kreft dev --gc                      # enable V8 --expose-gc &amp; memory watchdog in dev
+AUTO_GC=1 kreft serve dist          # enable in production (default threshold: 250 MB)</pre>
+  </section>
+
+  <section class="card">
+    <h2>Desktop Apps (Electron) &amp; Vite Bundling</h2>
+    <pre>kreft electron:init &amp;&amp; kreft electron:dev   # run your .kreft app as a native desktop window
+kreft electron:build                      # package .dmg, .exe, and .AppImage installers
+kreft vite:init &amp;&amp; kreft vite:dev           # optional Vite HMR + Rollup build pipeline</pre>
+  </section>
+
+  <section class="card">
+    <h2>In your editor &amp; When you ship</h2>
+    <ul>
+      <li><code>kreft vscode</code> adds syntax highlighting, folding and snippets for <code>.kreft</code> files to VS Code, Cursor and VSCodium.</li>
+      <li><code>kreftjs.d.ts</code> and <code>server.d.ts</code> provide full TypeScript and IntelliSense definitions.</li>
+    </ul>
+    <pre>kreft build               # .kreft files compiled ahead of time, works under strict CSP
+kreft build --prerender   # prerenders every route as static HTML for SEO</pre>
+  </section>
+</view>
+
+<style scoped>
+kbd { padding: 1px 6px; border: 1px solid var(--input); border-bottom-width: 2px; font-size: 0.9em; }
+.row { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
+</style>

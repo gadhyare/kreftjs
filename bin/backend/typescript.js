@@ -1,8 +1,8 @@
 /*
  * TypeScript support across backend and frontend:
  *   - Backend: routes/api.ts, config/*.ts, server/*.ts, and every .ts file in app/ and database/ load like .js files.
- *   - Frontend: .ts modules (e.g. frontend/logic/*.ts) and .kreftjs components with TypeScript syntax work natively in
- *     both `kreftjs dev` and `kreftjs build`.
+ *   - Frontend: .ts modules (e.g. frontend/logic/*.ts) and .kreft components with TypeScript syntax work natively in
+ *     both `kreft dev` and `kreft build`.
  *
  * Uses `esbuild` when installed in the project, or falls back to Kreft's built-in zero-dependency TypeScript
  * compiler (`Kreftjs.stripTypeScript` + ESM-to-CJS transform) so TypeScript projects work out of the box with zero setup.

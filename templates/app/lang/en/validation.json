@@ -12,6 +12,7 @@
     "array": "The :attribute field must not have more than :max items."
   },
   "confirmed": "The :attribute confirmation does not match.",
+  "not_common_password": "The :attribute is too common or too easy to guess. Choose another one.",
   "attributes": {
     "email": "email address",
     "password": "password",
@@ -19,4 +20,3 @@
     "title": "title"
   }
 }
-

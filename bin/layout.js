@@ -1,8 +1,8 @@
 /*
  * Where a project's parts are.
  *
- * New projects (kreftjs new) keep frontend and backend apart:
- *   frontend/   the only folder a browser can reach: index.html, pages, components, routes/web.kreftjs …
+ * New projects (kreft new) keep frontend and backend apart:
+ *   frontend/   the only folder a browser can reach: index.html, pages, components, routes/web.kreft …
  *   backend/    never served: routes/api.js, app/, database/ (and server/)
  *   .env, package.json, node_modules/   at the top, next to both
  *

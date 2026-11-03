@@ -1,16 +1,17 @@
 /*
- * kreftjs build — turns a Kreft app into production files.
+ * kreft build — turns a Kreft app into production files.
  *
- *   kreftjs build                  build this folder into ./dist
- *   kreftjs build ./site           build another folder
- *   kreftjs build --out public     choose the output folder
- *   kreftjs build --base /         change <base href> in index.html
- *   kreftjs build --prerender      also save every page as ready HTML (needs: npm i -D jsdom)
- *   kreftjs build --prerender --urls urls.js   ... and the addresses in that file (pages that come from your data)
- *   kreftjs build --include docs   also copy another folder into the output
+ *   kreft build                  build this folder into ./dist
+ *   kreft build ./site           build another folder
+ *   kreft build --out public     choose the output folder
+ *   kreft build --base /         change <base href> in index.html
+ *   kreft build --prerender      also save every page as ready HTML (needs: npm i -D jsdom)
+ *   kreft build --prerender --urls urls.js   ... and the addresses in that file (pages that come from your data)
+ *   kreft build --include docs   also copy another folder into the output
+ *   kreft build --no-htaccess    do not write dist/.htaccess (the Apache / Hostinger page-address rules)
  *
  * What it does:
- *   1. Compiles every .kreftjs file ahead of time into app.js (no .kreftjs files are downloaded in production).
+ *   1. Compiles every .kreft file ahead of time into app.js (no .kreft files are downloaded in production).
  *   2. Turns every expression in the views into a real function, so the app runs without
  *      eval / new Function — it works under a strict Content-Security-Policy.
  *   3. Collects all <style> blocks (scoped ones already scoped) into app.css.
@@ -27,17 +28,18 @@ const { expandBlocks, prepareTemplate, splitKreft, splitInterp, exactBrace, stri
   scopeCss, hashString, propType, simplePathRE, fnExpRE, forAliasRE, stripTypeScript } = Kreftjs.__internal;
 
 const deps = require('./deps.js');
-// component files: .kreftjs, or .kreft / .som in an older project
-const isComp = (f) => /\.(?:kreftjs|kreft|som)$/i.test(f);
+// component files: .kreft, or .kreftjs in a project from the 0.0.x betas
+const isComp = (f) => /\.(?:kreftjs|kreft)$/i.test(f);
 const SERVER_DIRS = new Set();
-const SKIP = new Set(['node_modules', '.git', '.vscode', '.idea', 'package.json', 'package-lock.json', '.DS_Store']);
+const SKIP = new Set(['node_modules', 'dist', 'dist-electron', '.git', '.vscode', '.idea', 'package.json', 'package-lock.json', '.DS_Store']);
 
 module.exports = function build(args) {
-  let folder = null, out = null, base = null, prerender = null, urlsFile = null;
+  let folder = null, out = null, base = null, prerender = null, urlsFile = null, htaccess = true;
   const include = [];
   for (let i = 0; i < args.length; i++) {
     if (args[i] === '--out' || args[i] === '-o') out = args[++i];
     else if (args[i] === '--base') base = args[++i];
+    else if (args[i] === '--no-htaccess') htaccess = false;
     else if (args[i] === '--include') include.push(args[++i]); // another folder to copy in, like the docs
     else if (args[i] === '--prerender') prerender = args[i + 1] && !args[i + 1].startsWith('-') && args[i + 1].includes('/') ? args[++i].split(',') : [];
     else if (args[i] === '--urls') urlsFile = args[++i]; // a file with more addresses to prerender (pages from your data)
@@ -57,9 +59,9 @@ module.exports = function build(args) {
   // server code never goes into the built site: server/, backend app/ and routes/
   if (!lay.split) for (const dir of [root, project]) ['server', 'app', 'routes'].forEach((d) => SERVER_DIRS.add(path.join(dir, d)));
   SERVER_DIRS.add(lay.backend === lay.project ? path.join(project, 'server') : lay.backend);
-  const bare = new Set(), cssLinks = [];    // npm packages used by the .kreftjs files, and imported CSS files
+  const bare = new Set(), cssLinks = [];    // npm packages used by the .kreft files, and imported CSS files
 
-  // ---- 1. find and compile every .kreftjs file
+  // ---- 1. find and compile every .kreft file
   const kreftFiles = walk(root, dist).filter((f) => isComp(f));
   const fns = new Map();             // precompiled expression functions: key → source
   const components = [];
@@ -68,7 +70,7 @@ module.exports = function build(args) {
 
   addRouterTemplates(fns);           // the router's own <kreft-link> and <kreft-view> templates
 
-  // .kreftjs files in --include folders too: they land in the output as <folder>/…, so that is their path there
+  // .kreft files in --include folders too: they land in the output as <folder>/…, so that is their path there
   const jobs = kreftFiles.map((file) => [file, toUrlPath(path.relative(root, file)), root]);
   for (const dir of include) {
     const from = path.resolve(dir);
@@ -82,7 +84,7 @@ module.exports = function build(args) {
   const templateBar = createProgressBar(jobs.length, { label: 'Compiling templates' });
   for (const [file, rel, base] of jobs) {
     templateBar.tick(rel);
-    // routes/web.kreftjs and other route files: plain JavaScript with Route in scope, kept as a function
+    // routes/web.kreft and other route files: plain JavaScript with Route in scope, kept as a function
     if (/^routes\//.test(rel)) {
       const src = stripTypeScript(fs.readFileSync(file, 'utf8'));
       try { new Function('Route', src); } catch (e) { errors.push(`  ${rel}: ${e.message}`); continue; }
@@ -113,7 +115,7 @@ module.exports = function build(args) {
   const langInject = Object.keys(langData).length ? `Kreftjs.translations(${JSON.stringify(langData)});\n` : '';
 
   const precompiled = [...fns].map(([key, src]) => `F[${JSON.stringify(key)}] = ${src};`).join('\n');
-  const appJs = `/* Built by kreftjs build — do not edit. Rebuild from your .kreftjs files instead. */
+  const appJs = `/* Built by kreft build — do not edit. Rebuild from your .kreft files instead. */
 ${env.envScript(env.publicEnv())}
 (function (Kreftjs) {
   if (!Kreftjs) throw new Error('Load kreftjs.js before app.js');
@@ -166,7 +168,7 @@ ${indent(components.join('\n\n'))}
 
   // ---- 3. index.html: kreftjs.js + app.js + app.css, inline scripts moved to main.js
   let html = fs.readFileSync(path.join(root, 'index.html'), 'utf8');
-  // an included folder that sits next to the app ('../docs/Docs.kreftjs') is inside the output: 'docs/Docs.kreftjs'
+  // an included folder that sits next to the app ('../docs/Docs.kreft') is inside the output: 'docs/Docs.kreft'
   for (const dir of include) {
     const up = toUrlPath(path.relative(root, path.resolve(dir)));
     if (up.startsWith('../')) html = html.split(`'${up}/`).join(`'${path.basename(up)}/`).split(`"${up}/`).join(`"${path.basename(up)}/`);
@@ -175,7 +177,7 @@ ${indent(components.join('\n\n'))}
   let sawKreft = false, placedMain = false;
   html = html.replace(/<script\b([^>]*)>([\s\S]*?)<\/script>/gi, (tag, attrs, body) => {
     const src = (attrs.match(/\bsrc\s*=\s*["']([^"']+)["']/i) || [])[1];
-    if (src && /(^|\/)(?:kreftjs|kreft|som)(\.min)?\.js$/i.test(src)) {
+    if (src && /(^|\/)(?:kreftjs|kreft)(\.min)?\.js$/i.test(src)) {
       sawKreft = true;
       return '<script src="kreftjs.js"></script>\n  <script src="app.js"></script>';
     }
@@ -204,7 +206,7 @@ ${indent(components.join('\n\n'))}
   const links = cssLinks.map(({ spec, local }) => {
     if (local) return spec;
     const file = deps.packageFile(project, spec);
-    if (!file) fail(`The CSS file "${spec}" was not found in node_modules. Run:  kreftjs add ${(spec.match(deps.NAME) || [spec])[0]}`);
+    if (!file) fail(`The CSS file "${spec}" was not found in node_modules. Run:  kreft add ${(spec.match(deps.NAME) || [spec])[0]}`);
     const info = deps.packageJson(project, spec);
     copyCss(file, info.dir, path.join(dist, 'vendor', info.name));
     return toUrlPath(path.join('vendor', info.name, path.relative(info.dir, file)));
@@ -227,6 +229,7 @@ ${indent(components.join('\n\n'))}
       : html.replace(/<head>/i, `<head>\n  <base href="${b}">`);
   }
   write(dist, 'index.html', html);
+  if (htaccess) writeHtaccess(dist, html);
 
   const report = () => {
     const files = walk(dist, null).map((f) => [path.relative(dist, f), fs.statSync(f).size]);
@@ -237,7 +240,7 @@ ${indent(components.join('\n\n'))}
       ...files.sort().map(([f, n]) => `  ${cyan(kb(n))}  ${toUrlPath(f)}`),
       '---',
       `  ${bold('Output:')}  ${dist}`,
-      `  ${bold('Preview:')} kreftjs dev ${path.relative(process.cwd(), dist) || '.'}`,
+      `  ${bold('Preview:')} kreft dev ${path.relative(process.cwd(), dist) || '.'}`,
     ];
     console.log('\n' + renderBox(lines, { width: 66, borderColor: green }) + '\n');
   };
@@ -249,6 +252,30 @@ ${indent(components.join('\n\n'))}
   report();
 };
 
+// Apache (Hostinger, cPanel …) answers /docs with a 404, because only index.html exists on disk. These rules send every page address
+// (no file extension, not under /api/) that is not a real file, or a folder with its own index.html (a prerendered page), to index.html,
+// so reloading a page works even when a folder has the page's name (the docs/ folder next to the /docs page). A missing file such as
+// app.js, or an /api/ address the host cannot answer, stays a real 404: sending it index.html would hand the page's HTML to code
+// that expects data (a list, JSON). An .htaccess you keep in public/ is left alone;
+// a relative base (./, as the desktop build uses) has no server and gets no file.
+function writeHtaccess(dist, html) {
+  const m = /<base\b[^>]*\bhref="([^"]*)"/i.exec(html);
+  const base = m ? m[1] : '/';
+  if (!base.startsWith('/') || fs.existsSync(path.join(dist, '.htaccess'))) return;
+  write(dist, '.htaccess', `# Written by kreft build: every address that is not a file or a folder opens index.html (turn off: kreft build --no-htaccess)
+<IfModule mod_rewrite.c>
+  RewriteEngine On
+  RewriteBase ${base}
+  RewriteRule ^index\\.html$ - [L]
+  RewriteCond %{REQUEST_FILENAME} !-f
+  RewriteCond %{REQUEST_FILENAME}/index.html !-f
+  RewriteCond %{REQUEST_URI} !^${base}api/
+  RewriteCond %{REQUEST_URI} !\\.[A-Za-z0-9]+$
+  RewriteRule . ${base}index.html [L]
+</IfModule>
+`);
+}
+
 // a frontend .ts file → the browser's JavaScript (types removed); its own './x.ts' imports become './x.js'
 function tsToJs(file, project) {
   const { transpileTs } = require('./backend/typescript.js');
@@ -256,12 +283,12 @@ function tsToJs(file, project) {
   return code.replace(/((?:from|import)\s*\(?\s*['"])(\.{1,2}\/[^'"]+?)\.ts(['"])/g, '$1$2.js$3');
 }
 
-/* ------------------------------------------------------------------ one .kreftjs file → JS */
+/* ------------------------------------------------------------------ one .kreft file → JS */
 function compileFile(file, rel, root) {
   const sp = splitKreft(fs.readFileSync(file, 'utf8'), rel);
   const name = sp.name;
 
-  // the script must parse; report the .kreftjs line if it doesn't
+  // the script must parse; report the .kreft line if it doesn't
   const run = `function ($scope, $h) { with ($scope) {\n${sp.code}\n} }`;
   try { new Function('return ' + run); } catch (e) { throw new Error(`script error: ${e.message}`); }
 
@@ -275,13 +302,13 @@ function compileFile(file, rel, root) {
     return `${JSON.stringify(p)}: { ${type ? `type: ${type.name}, ` : ''}default: function () { return (${expr}); } }`;
   });
 
-  // imports: other .kreftjs files become component references; .js modules load with import()
+  // imports: other .kreft files become component references; .js modules load with import()
   const comps = [], values = [], bare = [], cssImports = [];
   for (const stmt of sp.imports) {
     const m = stmt.match(/^import\s+(?:([\s\S]+?)\s+from\s+)?(['"])(.+?)\2/);
     if (!m) throw new Error(`can't read import: ${stmt}`);
     const [, what, , spec] = m;
-    if (/^(?:kreftjs|kreft|som)(\.js)?$/.test(spec)) continue;
+    if (/^(?:kreftjs|kreft)(\.js)?$/.test(spec)) continue;
     let target = /^\.{1,2}\//.test(spec) ? toUrlPath(path.relative(root, path.resolve(path.dirname(file), spec))) : spec;
     if (/^\.{1,2}\//.test(spec) && /\.ts$/i.test(spec)) target = target.replace(/\.ts$/i, '.js'); // TypeScript files are built into .js
     if (isComp(spec)) {
@@ -329,7 +356,7 @@ function compileFile(file, rel, root) {
 // `import { a, b as c } from './x.js'` → loaded with import() when the component is first used
 function loadValuesSource(values) {
   const lines = values.map(({ what, target, local }, i) => {
-    // files in the app resolve from <base href>, like .kreftjs paths; URLs and package names stay as written
+    // files in the app resolve from <base href>, like .kreft paths; URLs and package names stay as written
     const url = local ? `new URL(${JSON.stringify(target)}, document.baseURI).href` : JSON.stringify(target);
     const picks = [];
     if (what) what.split(/,(?![^{]*\})/).map((s) => s.trim()).forEach((part) => {
@@ -518,7 +545,7 @@ function walk(dir, exclude) {
     if (SKIP.has(entry.name)) continue;
     if (entry.name === 'storage' && (entry.isSymbolicLink() || entry.isDirectory())) continue;
     // the database, its settings and its migrations stay on the server, never in the built site
-    if (/\.(db|sqlite3?)(-wal|-shm)?$/i.test(entry.name) || entry.name === 'kreftjs.config.json' || entry.name === 'kreft.config.json' || entry.name === 'som.config.json' || (entry.isDirectory() && entry.name === 'database')) continue;
+    if (/\.(db|sqlite3?)(-wal|-shm)?$/i.test(entry.name) || entry.name === 'kreftjs.config.json' || entry.name === 'kreft.config.json' || (entry.isDirectory() && entry.name === 'database')) continue;
     const full = path.join(dir, entry.name);
     if (exclude && full === exclude) continue;
     if (SERVER_DIRS.has(full)) continue; // server/ code runs on the server only

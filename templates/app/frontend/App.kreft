@@ -1,0 +1,4 @@
+<!-- The app: the page for the current route, inside its layout (layouts/app.kreft) -->
+<view>
+  <kreft-view k-animate.after="fade"></kreft-view>
+</view>

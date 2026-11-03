@@ -8,7 +8,7 @@ const LoginRequest = require('../../Requests/Auth/LoginRequest')
 const { signIn, signOut, pendingTwoFactor } = require('../../../Auth/Session')
 
 class AuthenticatedSessionController {
-  // POST /api/login  { email, password, remember }   (pages/auth/Login.kreftjs)
+  // POST /api/login  { email, password, remember }   (pages/auth/Login.kreft)
   // with two-factor on, the answer is { two_factor: true } and the code goes to /api/two-factor-challenge
   async store(req) {
     const data = await LoginRequest.validate(req)

@@ -1,7 +1,7 @@
 const { Seeder, Hash } = require('kreftjs/server')
 const User = require('../../app/Models/User')
 
-// kreftjs db:seed  (kreftjs dev --seed fills a new database). Sign in as test@example.com / password;
+// kreft db:seed  (kreft dev --seed fills a new database). Sign in as test@example.com / password;
 // that user is an admin too, so /admin opens for it
 class DatabaseSeeder extends Seeder {
   async run() {

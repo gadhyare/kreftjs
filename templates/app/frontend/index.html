@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <!-- where the app lives: routes and .kreftjs paths start here -->
+  <!-- where the app lives: routes and .kreft paths start here -->
   <base href="/">
   <title>My Kreft app</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -31,9 +31,9 @@
     }, { saved: ['user'] })
 
     const router = Kreftjs.router({
-      routes: ['routes/web.kreftjs'], // the pages are in routes/web.kreftjs; add more files: kreftjs make:routes admin
-      layout: 'app',              // every page goes inside layouts/app.kreftjs…
-      errors: 'errors',           // error pages: errors/404.kreftjs for unknown addresses, abort(403) → errors/403.kreftjs
+      routes: ['routes/web.kreft'], // the pages are in routes/web.kreft; add more files: kreft make:routes admin
+      layout: 'app',              // every page goes inside layouts/app.kreft…
+      errors: 'errors',           // error pages: errors/404.kreft for unknown addresses, abort(403) → errors/403.kreft
       // the names routes use in .middleware(…): return an address to send the visitor there instead
       middleware: {
         auth: (to) => (auth.user ? true : '/login?redirect=' + encodeURIComponent(to.fullPath)),
@@ -68,10 +68,10 @@
       )
     }
 
-    Kreftjs.app('App.kreftjs')
-      .component('Field', 'components/Field.kreftjs')
-      .component('StatCard', 'components/StatCard.kreftjs')
-      .component('Counter', 'tests/components/Counter.kreftjs')
+    Kreftjs.app('App.kreft')
+      .component('Field', 'components/Field.kreft')
+      .component('StatCard', 'components/StatCard.kreft')
+      .component('Counter', 'tests/components/Counter.kreft')
       .use(router)
       .mount('#app')
   </script>

@@ -1,4 +1,4 @@
-// Type definitions for Kreft 3.0.0
+// Type definitions for Kreft 0.0.9-beta
 // Use from TypeScript or for editor hints in plain JavaScript (// @ts-check).
 
 export interface Signal<T> { value: T }
@@ -212,7 +212,7 @@ export interface ComponentDef {
   destroyed?(): void
   [key: string]: any
 }
-/** A component: an object, an init function, a lazy() loader or the address of a .kreftjs file */
+/** A component: an object, an init function, a lazy() loader or the address of a .kreft file */
 export type Component = ComponentDef | ((props: any, ctx: Context) => object | void) | LazyComponent | string
 export interface LazyComponent { __loader: () => Promise<any> }
 
@@ -248,7 +248,7 @@ export interface RouteRecord {
   guard?: Guard
   /** Child routes, shown in the page's own <kreft-view> */
   children?: RouteRecord[]
-  /** The layout for this route and its children: 'admin' → layouts/admin.kreftjs, a .kreftjs path, a component, or false for none */
+  /** The layout for this route and its children: 'admin' → layouts/admin.kreft, a .kreft path, a component, or false for none */
   layout?: string | Component | false
 }
 export interface Route {
@@ -266,7 +266,7 @@ export type RouteTarget = string | { path?: string; name?: string; params?: Reco
 export type Guard = (to: Route, from: Route) => boolean | void | RouteTarget | Promise<boolean | void | RouteTarget>
 export interface Router {
   readonly route: Route
-  /** shows errors/<status>.kreftjs for this address: abort(403, 'Only the owner can see this.') */
+  /** shows errors/<status>.kreft for this address: abort(403, 'Only the owner can see this.') */
   abort(status?: number, message?: string): void
   readonly routes: RouteRecord[]
   go(to: RouteTarget | number): Promise<void> | void
@@ -282,7 +282,7 @@ export interface Router {
   ready(): Promise<void>
   install(app: App): void
 }
-/** routes/web.kreftjs: `Route` is there without an import */
+/** routes/web.kreft: `Route` is there without an import */
 export interface RouteEntry {
   name(name: string): RouteEntry
   title(title: string): RouteEntry
@@ -307,7 +307,7 @@ export interface RouteGroup {
   group(fn: (route: RouteFile) => void): RouteFile
 }
 export interface RouteFile {
-  /** a page: Route.view('/posts/:id', 'pages/Post.kreftjs') — :id reaches the page as a prop */
+  /** a page: Route.view('/posts/:id', 'pages/Post.kreft') — :id reaches the page as a prop */
   view(path: string, component: string | Component): RouteEntry
   get(path: string, component: string | Component): RouteEntry
   redirect(from: string, to: string): void
@@ -325,25 +325,25 @@ export interface RouteFile {
 export type RouteMiddleware = (to: Route, from: Route, ...args: string[]) => boolean | string | object | void | Promise<boolean | string | object | void>
 
 export interface RouterOptions {
-  /** route objects, or route files: 'routes/web.kreftjs' / ['routes/web.kreftjs', 'routes/admin.kreftjs'] (both can be mixed) */
+  /** route objects, or route files: 'routes/web.kreft' / ['routes/web.kreft', 'routes/admin.kreft'] (both can be mixed) */
   routes: RouteRecord[] | string | (string | RouteRecord)[]
   /** the names routes use in .middleware(…): { auth: (to) => auth.token ? true : '/login' } */
   middleware?: Record<string, RouteMiddleware>
   mode?: 'history' | 'hash'
   base?: string
   scrollToTop?: boolean
-  /** The layout every page goes in: 'app' → layouts/app.kreftjs (a page's `layout x`, or a route's `layout`, wins) */
+  /** The layout every page goes in: 'app' → layouts/app.kreft (a page's `layout x`, or a route's `layout`, wins) */
   layout?: string | Component | false
-  /** Names for layouts that live elsewhere: { admin: 'views/AdminShell.kreftjs' } */
+  /** Names for layouts that live elsewhere: { admin: 'views/AdminShell.kreft' } */
   layouts?: Record<string, string | Component>
-  /** The folder with the error pages (errors/404.kreftjs, 403, 500…): unknown addresses show 404.kreftjs, abort(…) the others */
+  /** The folder with the error pages (errors/404.kreft, 403, 500…): unknown addresses show 404.kreft, abort(…) the others */
   errors?: string | boolean
 }
 
 /* ---------------- Kreft ---------------- */
 export interface KreftStatic {
   readonly version: string
-  /** PUBLIC_ values from .env (also `env` in .kreftjs files). Never secrets: those stay in server code */
+  /** PUBLIC_ values from .env (also `env` in .kreft files). Never secrets: those stay in server code */
   readonly env: Readonly<Record<string, string>>
   /** true when running inside an Electron desktop window */
   readonly isElectron: boolean
@@ -354,15 +354,13 @@ export interface KreftStatic {
   __makeDef(parts: any, values?: any): ComponentDef
   __registerDef(path: string, def: any): any
   __hotDef(id: string, newDef: any): boolean
-  /** the error page for this address: abort(404), abort(403, 'Only the owner can see this.') (also `abort` in .kreftjs files) */
+  /** the error page for this address: abort(404), abort(403, 'Only the owner can see this.') (also `abort` in .kreft files) */
   abort(status?: number, message?: string): void
   app(root?: Component, props?: Record<string, any>): App
   lazy(loader: () => Promise<any>): LazyComponent
   load(url: string): Promise<ComponentDef>
-  /** Compiles the text of a .kreftjs file into a component */
+  /** Compiles the text of a .kreft file into a component */
   compile(source: string, url?: string): Promise<ComponentDef>
-  /** @deprecated the Som.js name of `compile` */
-  compileSom(source: string, url?: string): Promise<ComponentDef>
   /** Strips TypeScript type annotations, interfaces, type aliases and enums from source code while preserving line numbers */
   stripTypeScript(source: string): string
   /** The template engine: a view and data → an HTML string */
@@ -552,28 +550,18 @@ declare global {
   var Kreftjs: KreftStatic
   /** the shorter name of `Kreftjs` */
   var Kreft: KreftStatic
-  /** @deprecated the Som.js name of `Kreftjs` */
-  var Som: KreftStatic
   interface Window {
     kreftDesktop?: DesktopBridge
-    /** @deprecated the Som.js name of `kreftDesktop` */
-    somDesktop?: DesktopBridge
   }
 }
 
-declare module '*.kreftjs' {
-  const component: import('./kreftjs.js').ComponentDef
-  export default component
-}
-
-// files from older projects (.kreft, then Som.js's .som)
 declare module '*.kreft' {
   const component: import('./kreftjs.js').ComponentDef
   export default component
 }
 
-declare module '*.som' {
+// files from the 0.0.x betas (.kreftjs)
+declare module '*.kreftjs' {
   const component: import('./kreftjs.js').ComponentDef
   export default component
 }
-

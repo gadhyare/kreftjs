@@ -198,7 +198,7 @@ class Request {
       return this._locale;
     }
     // 2. Cookie locale / lang / kreft_locale
-    const c = this.cookie('locale') || this.cookie('lang') || this.cookie('kreft_locale') || this.cookie('som_locale'); // som_*: the Som.js cookie names, still read
+    const c = this.cookie('locale') || this.cookie('lang') || this.cookie('kreft_locale'); 
     if (c && typeof c === 'string') {
       this._locale = c.toLowerCase().trim();
       return this._locale;
@@ -231,7 +231,7 @@ class Request {
   // CSRF token helpers
   csrfToken() {
     if (this._csrfToken) return this._csrfToken;
-    const cookieToken = this.cookie('XSRF-TOKEN') || this.cookie('kreft_xsrf') || this.cookie('som_xsrf');
+    const cookieToken = this.cookie('XSRF-TOKEN') || this.cookie('kreft_xsrf');
     if (cookieToken) {
       this._csrfToken = cookieToken;
       return this._csrfToken;
@@ -247,7 +247,7 @@ class Request {
       || this.header('csrf-token')
       || this.input('_token')
       || this.input('csrf_token');
-    const expected = this.cookie('XSRF-TOKEN') || this.cookie('kreft_xsrf') || this.cookie('som_xsrf') || this._csrfToken;
+    const expected = this.cookie('XSRF-TOKEN') || this.cookie('kreft_xsrf') || this._csrfToken;
     return same(candidate, expected);
   }
 
@@ -538,9 +538,9 @@ class VerifyCsrfToken {
         || req.header('csrf-token')
         || req.input('_token')
         || req.input('csrf_token');
-      const expected = req.cookie('XSRF-TOKEN') || req.cookie('kreft_xsrf') || req.cookie('som_xsrf') || req._csrfToken;
+      const expected = req.cookie('XSRF-TOKEN') || req.cookie('kreft_xsrf') || req._csrfToken;
       const bearer = req.bearerToken();
-      const hasCookieAuth = Boolean(req.cookie('kreft_session') || req.cookie('som_session') || req.cookie('XSRF-TOKEN') || req.cookie('kreft_xsrf') || req.cookie('som_xsrf')); // som_*: Som.js cookies still count as cookie auth
+      const hasCookieAuth = Boolean(req.cookie('kreft_session') || req.cookie('XSRF-TOKEN') || req.cookie('kreft_xsrf'))
 
       // If accessing via session/cookies or standard browser form requests, enforce CSRF:
       if (hasCookieAuth || !bearer) {

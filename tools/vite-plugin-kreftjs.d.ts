@@ -3,7 +3,7 @@ import type { Plugin } from 'vite';
 export interface KreftPluginOptions {
   /**
    * Include filter pattern (RegExp, glob or string).
-   * @default /\.kreftjs$/
+   * @default /\.kreft$/
    */
   include?: string | RegExp | (string | RegExp)[];
 
@@ -21,7 +21,7 @@ export interface KreftPluginOptions {
   precompile?: boolean;
 
   /**
-   * Enable Hot Module Replacement (HMR) for .kreftjs components while preserving component state.
+   * Enable Hot Module Replacement (HMR) for .kreft components while preserving component state.
    * @default true
    */
   hmr?: boolean;
@@ -29,7 +29,7 @@ export interface KreftPluginOptions {
 
 /**
  * Official Vite plugin for Kreft.
- * Provides compilation of .kreftjs Single File Components, scoped CSS extraction,
+ * Provides compilation of .kreft Single File Components, scoped CSS extraction,
  * route file transformation, and state-preserving Hot Module Replacement.
  *
  * @example
@@ -47,6 +47,4 @@ export function kreftjs(options?: KreftPluginOptions): Plugin;
 /** the earlier name of `kreftjs` */
 export function kreft(options?: KreftPluginOptions): Plugin;
 export function kreftPlugin(options?: KreftPluginOptions): Plugin;
-/** @deprecated the Som.js name of `kreftjs` */
-export function som(options?: KreftPluginOptions): Plugin;
 export default kreftjs;

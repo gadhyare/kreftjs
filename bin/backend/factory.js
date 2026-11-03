@@ -144,7 +144,7 @@ class Factory {
         }
       }
     }
-    if (!def) throw new Error(`No factory for ${Model && Model.name ? Model.name : 'Model'}. Make one: kreftjs make:factory ${(Model && Model.name) || 'Model'}Factory`);
+    if (!def) throw new Error(`No factory for ${Model && Model.name ? Model.name : 'Model'}. Make one: kreft make:factory ${(Model && Model.name) || 'Model'}Factory`);
     return new Factory(def);
   }
   constructor(def) {

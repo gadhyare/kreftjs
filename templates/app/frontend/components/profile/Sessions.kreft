@@ -1,0 +1,42 @@
+<!-- Browser sessions: the devices signed in to this account (pages/Profile.kreft, /api/user/sessions) -->
+load sessions = api.get('/api/user/sessions')
+state problem = ''
+
+action logout(s) {
+  problem = ''
+  try { await api.delete('/api/user/sessions/' + s.id); sessions.data = sessions.data.filter((x) => x.id !== s.id) }
+  catch (e) { problem = e.message }
+}
+action logoutOthers() {
+  problem = ''
+  try { await api.delete('/api/user/sessions'); sessions.reload() }
+  catch (e) { if (e.status !== 423) problem = e.message }
+}
+
+<view>
+  <div class="card">
+    <h2>Browser sessions</h2>
+    <p class="muted">The devices signed in to your account. Log out any you don't know, then change your password.</p>
+    <p k-if="problem" class="alert danger" role="alert">{problem}</p>
+    <p k-if="sessions.loading" class="muted">Loading…</p>
+    <ul k-elif="sessions.data" class="list">
+      {for s in sessions.data key s.id}
+        <li>
+          <div>
+            <strong>{s.name}</strong> <span k-if="s.current" class="badge solid">This device</span>
+            <div class="muted small">{s.ip_address || 'unknown address'} · last active {s.last_used_at ? new Date(s.last_used_at).toLocaleString() : ''}</div>
+          </div>
+          <button k-if="!s.current" class="ghost sm" @click="logout(s)">Log out</button>
+        </li>
+      {/for}
+    </ul>
+    <button k-if="sessions.data && sessions.data.length > 1" @click={logoutOthers}>Log out other devices</button>
+  </div>
+</view>
+
+<style scoped>
+.list { list-style: none; padding: 0; margin: 12px 0; border: 1px solid var(--border); }
+.list li { display: flex; justify-content: space-between; align-items: center; gap: 12px; padding: 10px 14px; border-bottom: 1px solid var(--border); }
+.list li:last-child { border-bottom: 0; }
+.small { font-size: 13px; }
+</style>

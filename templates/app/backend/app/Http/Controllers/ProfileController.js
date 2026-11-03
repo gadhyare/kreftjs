@@ -1,7 +1,7 @@
 const { Hash, ValidationError, noContent, abort } = require('kreftjs/server')
 const PersonalAccessToken = require('../../Models/PersonalAccessToken')
 
-// pages/Profile.kreftjs
+// pages/Profile.kreft
 class ProfileController {
   // GET /api/user: who is signed in
   async show(req) {
@@ -42,7 +42,7 @@ class ProfileController {
     if (req.accessToken && req.accessToken.type !== 'session' && !req.accessToken.can('*')) {
       abort(403, 'Changing the account password requires a browser session.')
     }
-    const data = await req.validate({ current_password: 'required|string|max:255', password: 'required|string|min:8|max:255|confirmed' })
+    const data = await req.validate({ current_password: 'required|string|max:255', password: 'required|string|min:8|max:255|confirmed|not_common_password' })
     if (!Hash.check(data.current_password, req.user.password)) {
       throw new ValidationError({ current_password: ['The password is incorrect.'] })
     }

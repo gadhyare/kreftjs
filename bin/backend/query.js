@@ -216,7 +216,7 @@ class Builder {
     const { sql, params } = this.toSql();
     const rows = await this.db.query(sql, params);
     const maxWarn = Number(process.env.MAX_QUERY_ROWS) || 10000;
-    const isCliOrMigrate = (process.env.KREFT_CLI || process.env.SOM_CLI) === '1' || process.argv.some((a) => /artisan|migrate|seed/i.test(a));
+    const isCliOrMigrate = process.env.KREFT_CLI === '1' || process.argv.some((a) => /artisan|migrate|seed/i.test(a));
     const hardLimit = this._unlimited || isCliOrMigrate ? 0 : (Number(process.env.HARD_QUERY_LIMIT) || (process.env.NODE_ENV === 'production' ? 50000 : 0));
     if (rows && rows.length >= maxWarn && this._limit == null && !this._unlimited) {
       console.warn(`[Kreft Query Warning] Query on "${this._table}" returned ${rows.length} rows without an explicit limit(). Consider using paginate(), chunk(), or limit() to prevent high memory usage.`);

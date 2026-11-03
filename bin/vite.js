@@ -2,13 +2,13 @@
  * Vite.js Bundler & Dev Server Integration for Kreft
  *
  * Commands:
- *   kreftjs vite:init       Add Vite configuration and dependencies to an existing project (alias: kreftjs make:vite)
- *   kreftjs vite:dev        Start ultra-fast Vite dev server with instant HMR and backend proxy (alias: kreftjs vite)
- *   kreftjs vite:build      Build optimized static frontend with Rollup and code-splitting
- *   kreftjs vite:preview    Preview production bundle locally using Vite
+ *   kreft vite:init       Add Vite configuration and dependencies to an existing project (alias: kreft make:vite)
+ *   kreft vite:dev        Start ultra-fast Vite dev server with instant HMR and backend proxy (alias: kreft vite)
+ *   kreft vite:build      Build optimized static frontend with Rollup and code-splitting
+ *   kreft vite:preview    Preview production bundle locally using Vite
  *
  * CLI flag:
- *   kreftjs new my-app --vite
+ *   kreft new my-app --vite
  */
 const fs = require('fs');
 const path = require('path');
@@ -80,10 +80,10 @@ function init(args = [], opts = {}) {
   // Update package.json
   const pkg = JSON.parse(fs.readFileSync(pkgFile, 'utf8'));
   pkg.scripts = pkg.scripts || {};
-  pkg.scripts['vite'] = 'kreftjs vite';
-  pkg.scripts['vite:dev'] = 'kreftjs vite:dev';
-  pkg.scripts['vite:build'] = 'kreftjs vite:build';
-  pkg.scripts['vite:preview'] = 'kreftjs vite:preview';
+  pkg.scripts['vite'] = 'kreft vite';
+  pkg.scripts['vite:dev'] = 'kreft vite:dev';
+  pkg.scripts['vite:build'] = 'kreft vite:build';
+  pkg.scripts['vite:preview'] = 'kreft vite:preview';
 
   pkg.devDependencies = pkg.devDependencies || {};
   if (!pkg.devDependencies['vite']) {
@@ -99,8 +99,8 @@ function init(args = [], opts = {}) {
 
   Next:
     npm install            (install vite)
-    kreftjs vite:dev           (start ultra-fast Vite dev server with instant HMR)
-    kreftjs vite:build         (build production bundle with Rollup)
+    kreft vite:dev           (start ultra-fast Vite dev server with instant HMR)
+    kreft vite:build         (build production bundle with Rollup)
 `);
 }
 

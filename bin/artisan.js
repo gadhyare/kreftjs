@@ -1,24 +1,29 @@
 /*
  * The backend commands:
  *
- *   kreftjs migrate                      run new migrations
- *   kreftjs migrate:rollback [--step 2]  undo the last batch (or the last 2 migrations)
- *   kreftjs migrate:fresh [--seed]       drop every table, migrate again (and seed)
- *   kreftjs migrate:status               which migrations ran
- *   kreftjs db:seed [--class PostSeeder] run database/seeders/DatabaseSeeder.js (or another seeder)
- *   kreftjs route:list                   the routes in routes/api.js
- *   kreftjs make:model Post [-m -f -s -c -p -r] [--route=file] [--auth] [--all]
- *   kreftjs make:controller PostController [--api] [--model Post] [--route=file] [--auth]
- *   kreftjs make:page Post [--model Post] [--route=file] [--auth]
- *   kreftjs make:migration create_posts_table
- *   kreftjs make:seeder PostSeeder
- *   kreftjs make:factory PostFactory
- *   kreftjs make:middleware EnsureIsAdmin
+ *   kreft migrate                      run new migrations
+ *   kreft migrate:rollback [--step 2]  undo the last batch (or the last 2 migrations)
+ *   kreft migrate:fresh [--seed]       drop every table, migrate again (and seed)
+ *   kreft migrate:status               which migrations ran
+ *   kreft db:seed [--class PostSeeder] run database/seeders/DatabaseSeeder.js (or another seeder)
+ *   kreft route:list                   the routes in routes/api.js
+ *   kreft make:model Post [-m -f -s -c -p -r] [--route=file] [--auth] [--all]
+ *   kreft make:controller PostController [--api] [--model Post] [--route=file] [--auth]
+ *   kreft make:page Post [--model Post] [--route=file] [--auth]
+ *   kreft make:migration create_posts_table
+ *   kreft make:seeder PostSeeder
+ *   kreft make:factory PostFactory
+ *   kreft make:middleware EnsureIsAdmin
  *
  * Every command takes --db <url> (or DATABASE_URL in .env) and --backend <folder> (default: the project).
  */
 const fs = require('fs');
 const path = require('path');
+
+// Component files are .kreft; projects from the 0.0.x betas have .kreftjs. A path asked for as .kreft
+// also tries .kreftjs, so every command keeps working in an older project.
+const altExts = (f) => (/\.kreft$/.test(f) ? [f, f.replace(/\.kreft$/, '.kreftjs')] : [f]);
+const existingKreft = (f) => altExts(f).find((x) => fs.existsSync(x)) || f;
 
 function options(args) {
   const flatArgs = (Array.isArray(args) ? args.flat(Infinity) : []).map((x) => (typeof x === 'string' ? x : String(x ?? '')));
@@ -168,13 +173,13 @@ async function runSeed(db, b, ctx, className) {
   // an older project: database/seed.sql
   const sql = path.join(ctx.base, 'database', 'seed.sql');
   if (!className && fs.existsSync(sql)) { await db.exec(fs.readFileSync(sql, 'utf8')); return console.log('  Seeded from database/seed.sql'); }
-  console.log(`  No database/seeders/${className || 'DatabaseSeeder'}.js. Make one with:  kreftjs make:seeder ${className || 'DatabaseSeeder'}`);
+  console.log(`  No database/seeders/${className || 'DatabaseSeeder'}.js. Make one with:  kreft make:seeder ${className || 'DatabaseSeeder'}`);
 }
 
 /* ------------------------------------------------------------------ make:… */
 const pascal = (s) => s.replace(/(^|[-_\s])(\w)/g, (_, __, c) => c.toUpperCase()).replace(/[^\w]/g, '');
 // 'User/ProfileController', 'user\\profile-controller' or 'User.ProfileController' → { dirs: ['User'], name: 'ProfileController' }
-// (folders are made when they don't exist yet, e.g. kreftjs make:controller User/ProfileController)
+// (folders are made when they don't exist yet, e.g. kreft make:controller User/ProfileController)
 function nested(raw) {
   const parts = String(raw || '').split(/[\\/]+/).map((p) => pascal(p)).filter(Boolean);
   const name = parts.pop() || '';
@@ -214,11 +219,11 @@ function write(file, content, base) {
 }
 
 const stubs = {
-  webRoutes: (name) => `// The ${name} pages. index.html loads it: Kreftjs.router({ routes: ['routes/web.kreftjs', 'routes/${name}.kreftjs'] })
-// Route.view(address, page) · .name() · .title() · .layout() · .middleware()   — see routes/web.kreftjs
+  webRoutes: (name) => `// The ${name} pages. index.html loads it: Kreftjs.router({ routes: ['routes/web.kreft', 'routes/${name}.kreft'] })
+// Route.view(address, page) · .name() · .title() · .layout() · .middleware()   — see routes/web.kreft
 
 Route.prefix('/${name}').name('${name}.').middleware('auth').group(() => {
-  // Route.view('/', 'pages/${name}/Index.kreftjs').name('index').title('${name[0].toUpperCase() + name.slice(1)}')
+  // Route.view('/', 'pages/${name}/Index.kreft').name('index').title('${name[0].toUpperCase() + name.slice(1)}')
 })
 `,
   apiRoutes: (name) => `// The ${name} API, a route file of its own. routes/api.js loads it with require('./${name}'), so every address starts with /api.
@@ -298,7 +303,7 @@ module.exports = ${name}
   migration: (name) => {
     const create = name.match(/^create_(\w+?)_table$/);
     const change = name.match(/^\w+_(?:to|from|in)_(\w+?)_table$/);
-    if (create) return `// kreftjs migrate runs up(); kreftjs migrate:rollback runs down()
+    if (create) return `// kreft migrate runs up(); kreft migrate:rollback runs down()
 module.exports = {
   up(schema) {
     schema.create('${create[1]}', (table) => {
@@ -313,7 +318,7 @@ module.exports = {
 }
 `;
     const t = change ? change[1] : 'table_name';
-    return `// kreftjs migrate runs up(); kreftjs migrate:rollback runs down()
+    return `// kreft migrate runs up(); kreft migrate:rollback runs down()
 module.exports = {
   up(schema) {
     schema.table('${t}', (table) => {
@@ -331,7 +336,7 @@ module.exports = {
   },
   seeder: (name, model, modelReq) => `const { Seeder, DB } = require('kreftjs/server')
 ${model ? `const ${model} = require('${modelReq || '../../app/Models/' + model}')\n` : ''}
-// kreftjs db:seed --class ${name}  (or this.call(${name}) from DatabaseSeeder)
+// kreft db:seed --class ${name}  (or this.call(${name}) from DatabaseSeeder)
 class ${name} extends Seeder {
   async run() {
 ${model ? `    // await ${model}.factory().count(10).create()\n    // await ${model}.create({ … })\n` : name === 'DatabaseSeeder' ? '    // await this.call([UserSeeder, PostSeeder])\n' : "    // await DB.table('posts').insert({ … })\n"}  }
@@ -526,8 +531,8 @@ ${fields}
 }))
 `;
   },
-  page: (name, endpoint, dirs = [], isTs = false) => `<!-- frontend/pages/${[...dirs, name].join('/')}.kreftjs -->
-layout 'layouts/app.kreftjs'
+  page: (name, endpoint, dirs = [], isTs = false) => `<!-- frontend/pages/${[...dirs, name].join('/')}.kreft -->
+layout 'layouts/app.kreft'
 ${isTs ? `
 interface ${name}Item {
   id: number
@@ -856,7 +861,7 @@ function addApiRoute(ctx, name, dirs, { route, auth }) {
 
   if (!text.includes(controllerName)) {
     if (text.includes("require('kreftjs/server')") || text.includes("from 'kreftjs/server'")) {
-      text = text.replace(/((?:const \{[^}]+\} = require\('(?:kreftjs|kreft|somjs|som)\/server'\)|import \{[^}]+\} from '(?:kreftjs|kreft|somjs|som)\/server')[^\n]*\n)/, `$1${requireLine}`);
+      text = text.replace(/((?:const \{[^}]+\} = require\('(?:kreftjs|kreft)\/server'\)|import \{[^}]+\} from '(?:kreftjs|kreft)\/server')[^\n]*\n)/, `$1${requireLine}`);
     } else {
       text = requireLine + text;
     }
@@ -869,7 +874,7 @@ function addApiRoute(ctx, name, dirs, { route, auth }) {
 }
 
 function addSidebarLink(ctx, routeNameTag, label) {
-  const layoutFile = path.join(ctx.frontend, 'layouts', 'app.kreftjs');
+  const layoutFile = existingKreft(path.join(ctx.frontend, 'layouts', 'app.kreft'));
   if (!fs.existsSync(layoutFile)) return;
   let text = fs.readFileSync(layoutFile, 'utf8');
   if (text.includes(`'${routeNameTag}'`) || text.includes(`"${routeNameTag}"`)) return;
@@ -884,17 +889,17 @@ function addSidebarLink(ctx, routeNameTag, label) {
 }
 
 function addWebRoute(ctx, name, dirs, { route, auth }) {
-  const routeName = route ? String(route).replace(/\.(kreftjs|kreft|som|js)$/, '').replace(/^[\\/]+/, '') : 'web';
+  const routeName = route ? String(route).replace(/\.(kreftjs|kreft|js)$/, '').replace(/^[\\/]+/, '') : 'web';
   const routeBaseName = routeName.split(/[\\/]/).pop();
   const fileTargetName = routeBaseName === 'api' ? 'web' : routeBaseName;
-  const routeFile = path.join(ctx.frontend, 'routes', fileTargetName + '.kreftjs');
+  const routeFile = existingKreft(path.join(ctx.frontend, 'routes', fileTargetName + '.kreft'));
 
   if (!fs.existsSync(routeFile)) {
     write(routeFile, stubs.webRoutes(fileTargetName));
   }
 
   const endpoint = '/' + [...(dirs.length ? dirs.map((d) => snake(d).replace(/_/g, '-')) : []), plural(snake(name)).replace(/_/g, '-')].join('/');
-  const pageRel = `pages/${[...dirs, name].join('/')}.kreftjs`;
+  const pageRel = `pages/${[...dirs, name].join('/')}.kreft`;
   let text = fs.readFileSync(routeFile, 'utf8');
 
   if (text.includes(`'${endpoint}'`) || text.includes(`"${endpoint}"`)) {
@@ -1007,29 +1012,29 @@ function removeApiRoute(ctx, name, dirs, { route, dryRun = false }) {
 }
 
 function removeWebRoute(ctx, name, dirs, { route, dryRun = false }) {
-  const routeName = route ? String(route).replace(/\.(kreftjs|kreft|som|js)$/, '').replace(/^[\\/]+/, '') : 'web';
+  const routeName = route ? String(route).replace(/\.(kreftjs|kreft|js)$/, '').replace(/^[\\/]+/, '') : 'web';
   const routeBaseName = routeName.split(/[\\/]/).pop();
   const fileTargetName = routeBaseName === 'api' ? 'web' : routeBaseName;
   const routeFiles = [
-    path.join(ctx.frontend, 'routes', fileTargetName + '.kreftjs'),
-    path.join(ctx.project, 'frontend', 'routes', fileTargetName + '.kreftjs'),
-    path.join(ctx.frontend, 'routes', 'web.kreftjs'),
-    path.join(ctx.project, 'frontend', 'routes', 'web.kreftjs'),
-    path.join(ctx.project, 'routes', fileTargetName + '.kreftjs'),
-    path.join(ctx.project, 'routes', 'web.kreftjs')
-  ];
+    path.join(ctx.frontend, 'routes', fileTargetName + '.kreft'),
+    path.join(ctx.project, 'frontend', 'routes', fileTargetName + '.kreft'),
+    path.join(ctx.frontend, 'routes', 'web.kreft'),
+    path.join(ctx.project, 'frontend', 'routes', 'web.kreft'),
+    path.join(ctx.project, 'routes', fileTargetName + '.kreft'),
+    path.join(ctx.project, 'routes', 'web.kreft')
+  ].flatMap(altExts);
 
   const seenFiles = new Set();
   const removals = [];
 
   const ep1 = '/' + [...(dirs.length ? dirs.map((d) => snake(d).replace(/_/g, '-')) : []), plural(snake(name)).replace(/_/g, '-')].join('/');
   const ep2 = '/' + plural(snake(name)).replace(/_/g, '-');
-  const pageRel1 = `pages/${[...dirs, name].join('/')}.kreftjs`;
-  const pageRel2 = `pages/${name}.kreftjs`;
+  const pageRel1 = `pages/${[...dirs, name].join('/')}.kreft`;
+  const pageRel2 = `pages/${name}.kreft`;
   const routeNameTag1 = [...dirs.map(snake), plural(snake(name)).replace(/_/g, '-')].join('.');
   const routeNameTag2 = plural(snake(name)).replace(/_/g, '-');
 
-  const matchTargets = [ep1, ep2, ep1.replace(/^\//, ''), ep2.replace(/^\//, ''), pageRel1, pageRel2, routeNameTag1, routeNameTag2];
+  const matchTargets = [ep1, ep2, ep1.replace(/^\//, ''), ep2.replace(/^\//, ''), ...altExts(pageRel1), ...altExts(pageRel2), routeNameTag1, routeNameTag2];
 
   for (const f of routeFiles) {
     if (!f || seenFiles.has(f) || !fs.existsSync(f)) continue;
@@ -1064,10 +1069,10 @@ function removeWebRoute(ctx, name, dirs, { route, dryRun = false }) {
 
 function removeSidebarLink(ctx, name, dirs, { dryRun = false }) {
   const layoutFiles = [
-    path.join(ctx.frontend, 'layouts', 'app.kreftjs'),
-    path.join(ctx.project, 'frontend', 'layouts', 'app.kreftjs'),
-    path.join(ctx.project, 'layouts', 'app.kreftjs')
-  ];
+    path.join(ctx.frontend, 'layouts', 'app.kreft'),
+    path.join(ctx.project, 'frontend', 'layouts', 'app.kreft'),
+    path.join(ctx.project, 'layouts', 'app.kreft')
+  ].flatMap(altExts);
 
   const seenFiles = new Set();
   const removals = [];
@@ -1186,15 +1191,15 @@ const make = {
   model(args) {
     const o = options(args), ctx = context(o);
     let { dirs, name, rel } = nested(o._[0]);
-    if (!name) return console.error('  kreftjs make:model Post [-m -f -s -c -p -r] [--route=file] [--auth] [--all] [--folder=Admin]   (Shop/Product: app/Models/Shop/Product.js)');
+    if (!name) return console.error('  kreft make:model Post [-m -f -s -c -p -r] [--route=file] [--auth] [--all] [--folder=Admin]   (Shop/Product: app/Models/Shop/Product.js)');
     const all = o.flags.has('a') || o.flags.has('all');
     const auth = o.flags.has('auth');
     const hasRoute = all || o.flags.has('r') || o.flags.has('route') || Boolean(o.route);
 
     // Support placing all auxiliary files (controllers, pages, routes) in a specific folder [except model]:
-    // e.g. kreftjs make:model Post --all --folder=Admin
-    //      kreftjs make:model Post --all Admin
-    //      kreftjs make:model Admin/Post --all --flat-model
+    // e.g. kreft make:model Post --all --folder=Admin
+    //      kreft make:model Post --all Admin
+    //      kreft make:model Admin/Post --all --flat-model
     const targetFolder = o.folder || o.subfolder || o['in'] || o.group || o.path || (o._[1] && !o._[1].startsWith('-') ? o._[1] : null);
     const flatModel = o.flags.has('flat-model') || o.flags.has('except-model') || o.flags.has('no-model-dir') || Boolean(targetFolder);
 
@@ -1222,7 +1227,7 @@ const make = {
   controller(args) {
     const o = options(args), ctx = context(o);
     let { dirs, name } = nested(o._[0]);
-    if (!name) return console.error('  kreftjs make:controller PostController [--api] [--model Post] [--route=file] [--auth]');
+    if (!name) return console.error('  kreft make:controller PostController [--api] [--model Post] [--route=file] [--auth]');
     if (!/Controller$/.test(name)) name += 'Controller';
     const m = o.model ? nested(o.model) : o.flags.has('api') || o.flags.has('resource') ? { dirs: [], name: name.replace(/Controller$/, '') } : null;
     const model = m ? m.name : null;
@@ -1250,27 +1255,27 @@ const make = {
   page(args) {
     const o = options(args), ctx = context(o);
     let { dirs, name } = nested(o._[0]);
-    if (!name) return console.error('  kreftjs make:page Post [--model Post] [--route=file] [--auth]');
+    if (!name) return console.error('  kreft make:page Post [--model Post] [--route=file] [--auth]');
     const m = o.model ? nested(o.model) : { dirs, name };
     const modelDirs = m.dirs && m.dirs.length ? m.dirs : dirs;
     const endpoint = [...(modelDirs.length ? modelDirs.map((d) => snake(d).replace(/_/g, '-')) : []), plural(snake(m.name)).replace(/_/g, '-')].join('/');
     const auth = o.flags.has('auth');
     const hasRoute = o.flags.has('r') || o.flags.has('route') || Boolean(o.route);
 
-    const pageFile = path.join(ctx.frontend, 'pages', ...dirs, name + '.kreftjs');
+    const pageFile = path.join(ctx.frontend, 'pages', ...dirs, name + '.kreft');
     const isTs = isTsProject(pageFile);
     if (write(pageFile, stubs.page(name, endpoint, dirs, isTs))) {
       if (hasRoute) {
         addWebRoute(ctx, name, dirs, { route: o.route, auth });
       } else {
-        console.log(dim(`  Add to frontend/routes/web.kreftjs:  Route.view('/${endpoint}', 'pages/${[...dirs, name].join('/')}.kreftjs')${auth ? ".middleware('auth')" : ''}`));
+        console.log(dim(`  Add to frontend/routes/web.kreft:  Route.view('/${endpoint}', 'pages/${[...dirs, name].join('/')}.kreft')${auth ? ".middleware('auth')" : ''}`));
       }
     }
   },
   factory(args) {
     const o = options(args), ctx = context(o);
     let { dirs, name } = nested(o._[0]);
-    if (!name) return console.error('  kreftjs make:factory PostFactory [--model Post]');
+    if (!name) return console.error('  kreft make:factory PostFactory [--model Post]');
     if (!name.endsWith('Factory')) name += 'Factory';
     const m = o.model ? nested(o.model) : { dirs: [], name: name.replace(/Factory$/, '') };
     const modelReq = '../../app/Models/' + [...m.dirs, m.name].join('/');
@@ -1279,14 +1284,14 @@ const make = {
   migration(args) {
     const o = options(args), ctx = context(o);
     const name = snake(o._[0] || '').replace(/[^a-z0-9_]/g, '_');
-    if (!name) return console.error('  kreftjs make:migration create_posts_table');
+    if (!name) return console.error('  kreft make:migration create_posts_table');
     const dir = migrationsOf(o, ctx);
     write(path.join(dir, `${nextStamp(dir)}_${name}.js`), stubs.migration(name));
   },
   seeder(args) {
     const o = options(args), ctx = context(o);
     let { dirs, name } = nested(o._[0]);
-    if (!name) return console.error('  kreftjs make:seeder PostSeeder');
+    if (!name) return console.error('  kreft make:seeder PostSeeder');
     if (!/Seeder$/.test(name)) name += 'Seeder';
     const m = o.model ? nested(o.model) : null;
     const modelReq = m ? up(2 + dirs.length) + ['app', 'Models', ...m.dirs, m.name].join('/') : null;
@@ -1295,14 +1300,14 @@ const make = {
   middleware(args) {
     const o = options(args), ctx = context(o);
     const { dirs, name } = nested(o._[0]);
-    if (!name) return console.error('  kreftjs make:middleware EnsureIsAdmin');
+    if (!name) return console.error('  kreft make:middleware EnsureIsAdmin');
     write(path.join(ctx.base, 'app', 'Http', 'Middleware', ...dirs, name + '.js'), stubs.middleware(name));
     if (dirs.length) console.log(dim(`  In a folder, give it a name in app/Http/Kernel.js:  aliases: { '${snake(name).replace(/_/g, '-')}': 'Middleware/${[...dirs, name].join('/')}.js' }`));
   },
   request(args) {
     const o = options(args), ctx = context(o);
     let { dirs, name } = nested(o._[0]);
-    if (!name) return console.error('  kreftjs make:request StorePostRequest [--model Post]');
+    if (!name) return console.error('  kreft make:request StorePostRequest [--model Post]');
     if (!/Request$/.test(name)) name += 'Request';
     const reqDir = path.join(ctx.base, 'app', 'Http', 'Requests');
     if (!fs.existsSync(reqDir)) fs.mkdirSync(reqDir, { recursive: true });
@@ -1317,7 +1322,7 @@ const make = {
   resource(args) {
     const o = options(args), ctx = context(o);
     let { dirs, name } = nested(o._[0]);
-    if (!name) return console.error('  kreftjs make:resource PostResource');
+    if (!name) return console.error('  kreft make:resource PostResource');
     if (!/Resource$/.test(name)) name += 'Resource';
     const resDir = path.join(ctx.base, 'app', 'Http', 'Resources');
     if (!fs.existsSync(resDir)) fs.mkdirSync(resDir, { recursive: true });
@@ -1331,7 +1336,7 @@ const make = {
   rule(args) {
     const o = options(args), ctx = context(o);
     let { dirs, name } = nested(o._[0]);
-    if (!name) return console.error('  kreftjs make:rule Uppercase');
+    if (!name) return console.error('  kreft make:rule Uppercase');
     const ruleDir = path.join(ctx.base, 'app', 'Rules');
     if (!fs.existsSync(ruleDir)) fs.mkdirSync(ruleDir, { recursive: true });
     const isTs = isTsProject(path.join(ruleDir, ...dirs, name + '.js'));
@@ -1345,7 +1350,7 @@ const make = {
     const o = options(args), ctx = context(o);
     const locale = (o._[0] || '').toLowerCase().trim();
     if (!locale || /[\/\\]|\.\./.test(locale)) {
-      console.error('  kreftjs make:lang <locale>   (e.g. kreftjs make:lang ar)');
+      console.error('  kreft make:lang <locale>   (e.g. kreft make:lang ar)');
       return;
     }
     // Place in project root lang/ (matching standard Laravel 9/10/11) or backend/lang/ if already existing
@@ -1494,7 +1499,7 @@ const make = {
     console.log(dim(`  Use in frontend: { __('auth.failed') } or { t('Sign In') }`));
   },
 };
-// kreftjs make:errors — the error pages (errors/404.kreftjs, 403, 500…)
+// kreft make:errors — the error pages (errors/404.kreft, 403, 500…)
 make.errors = function (args) {
   const o = options(args), ctx = context(o);
   const from = path.join(__dirname, '..', 'templates', 'errors');
@@ -1504,19 +1509,19 @@ make.errors = function (args) {
   const index = path.join(o.dir ? path.resolve(o.dir) : ctx.frontend, 'index.html');
   if (fs.existsSync(index)) {
     const html = fs.readFileSync(index, 'utf8');
-    if (!/errors\s*:/.test(html) && /(?:Kreftjs|Kreft|Som)\.router\(\{/.test(html)) {
-      fs.writeFileSync(index, html.replace(/(?:Kreftjs|Kreft|Som)\.router\(\{/, (m) => `${m}\n      errors: '${path.relative(path.dirname(index), to).split(path.sep).join('/')}', // error pages: errors/404.kreftjs, abort(403) → errors/403.kreftjs`));
+    if (!/errors\s*:/.test(html) && /(?:Kreftjs|Kreft)\.router\(\{/.test(html)) {
+      fs.writeFileSync(index, html.replace(/(?:Kreftjs|Kreft)\.router\(\{/, (m) => `${m}\n      errors: '${path.relative(path.dirname(index), to).split(path.sep).join('/')}', // error pages: errors/404.kreft, abort(403) → errors/403.kreft`));
       console.log(`  ${green('UPDATED')}  ${path.relative(process.cwd(), index) || 'index.html'}  (errors: '${path.relative(path.dirname(index), to).split(path.sep).join('/')}' in Kreftjs.router)`);
     }
   }
 };
 
-// kreftjs make:routes admin        → frontend/routes/admin.kreftjs (pages), listed in Kreftjs.router({ routes: […] }) in index.html
-// kreftjs make:routes admin --api  → backend/routes/admin.js (API), loaded by routes/api.js
+// kreft make:routes admin        → frontend/routes/admin.kreft (pages), listed in Kreftjs.router({ routes: […] }) in index.html
+// kreft make:routes admin --api  → backend/routes/admin.js (API), loaded by routes/api.js
 make.routes = function (args) {
   const o = options(args), ctx = context(o);
-  const name = String(o._[0] || '').replace(/\.(kreftjs|kreft|som|js)$/, '').replace(/[^\w-]/g, '');
-  if (!name) return console.error('  kreftjs make:routes admin        (pages)\n  kreftjs make:routes admin --api  (API)');
+  const name = String(o._[0] || '').replace(/\.(kreftjs|kreft|js)$/, '').replace(/[^\w-]/g, '');
+  if (!name) return console.error('  kreft make:routes admin        (pages)\n  kreft make:routes admin --api  (API)');
   if (o.flags.has('api')) {
     const file = path.join(ctx.base, 'routes', name + '.js');
     if (!write(file, stubs.apiRoutes(name))) return;
@@ -1526,20 +1531,20 @@ make.routes = function (args) {
       const isTs = api.endsWith('.ts');
       if (!text.includes(`require('./${name}')`) && !text.includes(`import './${name}'`)) {
         const updated = isTs
-          ? text.replace(/(import \{[^}]*Route[^}]*\} from ['"](?:kreftjs|kreft|somjs|som)\/server['"][^\n]*\n)/, `$1\n// ${name} routes (routes/${name}.ts)\nimport './${name}'\n`)
-          : text.replace(/(const \{ Route \} = require\('(?:kreftjs|kreft|somjs|som)\/server'\)\n)/, `$1\n// ${name} routes (routes/${name}.js)\nrequire('./${name}')\n`);
+          ? text.replace(/(import \{[^}]*Route[^}]*\} from ['"](?:kreftjs|kreft)\/server['"][^\n]*\n)/, `$1\n// ${name} routes (routes/${name}.ts)\nimport './${name}'\n`)
+          : text.replace(/(const \{ Route \} = require\('(?:kreftjs|kreft)\/server'\)\n)/, `$1\n// ${name} routes (routes/${name}.js)\nrequire('./${name}')\n`);
         fs.writeFileSync(api, updated !== text ? updated : text + `\n${isTs ? `import './${name}'` : `require('./${name}')`}\n`);
         console.log(`  ${green('UPDATED')}  ${path.relative(process.cwd(), api)}  (${isTs ? `import './${name}'` : `require('./${name}')`})`);
       }
     }
     return;
   }
-  const file = path.join(ctx.frontend, 'routes', name + '.kreftjs');
+  const file = path.join(ctx.frontend, 'routes', name + '.kreft');
   if (!write(file, stubs.webRoutes(name))) return;
   const index = path.join(ctx.frontend, 'index.html');
   if (!fs.existsSync(index)) return;
   const html = fs.readFileSync(index, 'utf8');
-  const entry = `'routes/${name}.kreftjs'`;
+  const entry = `'routes/${name}.kreft'`;
   if (html.includes(entry)) return;
   let next = html;
   if (/routes:\s*\[\s*'routes\//.test(html)) next = html.replace(/(routes:\s*\[[^\]]*?)(\s*\])/, (_, list, end) => `${list.replace(/,\s*$/, '')}, ${entry}${end}`);
@@ -1549,12 +1554,12 @@ make.routes = function (args) {
   console.log(`  ${green('UPDATED')}  ${path.relative(process.cwd(), index)}  (${entry} in Kreftjs.router)`);
 };
 
-// kreftjs make:admin you@example.com      → that user may open the admin panel (/admin)
-// kreftjs make:admin you@example.com --remove
+// kreft make:admin you@example.com      → that user may open the admin panel (/admin)
+// kreft make:admin you@example.com --remove
 commands['make:admin'] = async function (args) {
   const o = options(args), ctx = context(o);
   const email = String(o._[0] || '').trim().toLowerCase(); // Register keeps emails in lowercase
-  if (!email) return console.error('  kreftjs make:admin you@example.com   (--remove takes the rights away)');
+  if (!email) return console.error('  kreft make:admin you@example.com   (--remove takes the rights away)');
   await withDb(o, ctx, async (db) => {
     const value = o.flags.has('remove') ? 0 : 1;
     const r = await db.run(`UPDATE ${db.q('users')} SET ${db.q('is_admin')} = ? WHERE LOWER(${db.q('email')}) = ?`, [db.kind === 'postgres' ? Boolean(value) : value, email]);
@@ -1615,8 +1620,8 @@ async function removeModel(args) {
   }
 
   if (!targetModelName) {
-    console.error('  Usage: kreftjs remove:model <Name> [--all] [--controller] [--request] [--route] [--migration] [--seeder] [--factory] [--page] [--folder=Folder]');
-    console.error('         kreftjs remove model <Name> [options]');
+    console.error('  Usage: kreft remove:model <Name> [--all] [--controller] [--request] [--route] [--migration] [--seeder] [--factory] [--page] [--folder=Folder]');
+    console.error('         kreft remove model <Name> [options]');
     console.error('         kreft:remove model <Name> [options]');
     return;
   }
@@ -1645,7 +1650,7 @@ async function removeModel(args) {
   // Collect candidate files to delete
   const filesToDelete = new Set();
   const checkFile = (p) => {
-    if (p && fs.existsSync(p)) filesToDelete.add(p);
+    for (const f of altExts(p || '')) if (f && fs.existsSync(f)) filesToDelete.add(f);
   };
 
   // 1. Model
@@ -1722,17 +1727,17 @@ async function removeModel(args) {
 
   // 6. Page
   if (wantsPage) {
-    checkFile(path.join(ctx.frontend, 'pages', ...otherDirs, `${name}.kreftjs`));
+    checkFile(path.join(ctx.frontend, 'pages', ...otherDirs, `${name}.kreft`));
     if (dirs.length && dirs.join('/') !== otherDirs.join('/')) {
-      checkFile(path.join(ctx.frontend, 'pages', ...dirs, `${name}.kreftjs`));
+      checkFile(path.join(ctx.frontend, 'pages', ...dirs, `${name}.kreft`));
     }
-    checkFile(path.join(ctx.frontend, 'pages', `${name}.kreftjs`));
-    checkFile(path.join(ctx.project, 'frontend', 'pages', ...otherDirs, `${name}.kreftjs`));
-    checkFile(path.join(ctx.project, 'frontend', 'pages', ...dirs, `${name}.kreftjs`));
-    checkFile(path.join(ctx.project, 'frontend', 'pages', `${name}.kreftjs`));
-    checkFile(path.join(ctx.project, 'pages', ...otherDirs, `${name}.kreftjs`));
-    checkFile(path.join(ctx.project, 'pages', ...dirs, `${name}.kreftjs`));
-    checkFile(path.join(ctx.project, 'pages', `${name}.kreftjs`));
+    checkFile(path.join(ctx.frontend, 'pages', `${name}.kreft`));
+    checkFile(path.join(ctx.project, 'frontend', 'pages', ...otherDirs, `${name}.kreft`));
+    checkFile(path.join(ctx.project, 'frontend', 'pages', ...dirs, `${name}.kreft`));
+    checkFile(path.join(ctx.project, 'frontend', 'pages', `${name}.kreft`));
+    checkFile(path.join(ctx.project, 'pages', ...otherDirs, `${name}.kreft`));
+    checkFile(path.join(ctx.project, 'pages', ...dirs, `${name}.kreft`));
+    checkFile(path.join(ctx.project, 'pages', `${name}.kreft`));
   }
 
   // 7. Migration
@@ -1868,9 +1873,6 @@ commands['remove'] = async function (args) {
   return await remove.model(args);
 };
 commands['kreft:remove'] = commands['remove'];
-// the Som.js names
-commands['som:remove:model'] = remove.model;
-commands['som:remove'] = commands['remove'];
 
 module.exports = { commands, stubs, make, remove, helpers: { options, context, withDb, write, nested, green, red, yellow, dim, migrationsOf, nextStamp, up, pascal, runSeed } };
 // the rest of the commands (queues, schedule, cache, tinker, make:job …) add themselves here

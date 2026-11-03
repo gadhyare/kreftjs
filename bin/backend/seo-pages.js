@@ -12,7 +12,7 @@
  *       if (!post) return null                       // answered as 404 (and noindex)
  *       return { title: post.title, description: post.excerpt, og: { image: post.image }, schema: { '@type': 'Article', headline: post.title } }
  *     },
- *     // the addresses of your data pages, for `kreftjs sitemap`: '/path' or { path, lastmod }
+ *     // the addresses of your data pages, for `kreft sitemap`: '/path' or { path, lastmod }
  *     urls: async () => (await Post.all()).map((p) => ({ path: '/posts/' + p.slug, lastmod: p.updated_at })),
  *   }
  *

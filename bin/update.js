@@ -1,18 +1,18 @@
 /*
- * kreftjs update [packages...]
+ * kreft update [packages...]
  *
  * Updates npm dependencies and/or Kreft runtime files in the current project:
  *
- *   kreftjs update                 Update all packages (npm update) and refresh kreftjs.js / kreftjs.d.ts
- *   kreftjs update <package...>    Update specific npm package(s)
- *   kreftjs update --latest        Upgrade dependencies to their latest versions
- *   kreftjs update --check         Check for outdated packages without installing (npm outdated)
- *   kreftjs update --core          Update only Kreft runtime files (kreftjs.js, kreftjs.d.ts, server.d.ts)
- *   kreftjs update --npm           Update only npm packages
+ *   kreft update                 Update all packages (npm update) and refresh kreftjs.js / kreftjs.d.ts
+ *   kreft update <package...>    Update specific npm package(s)
+ *   kreft update --latest        Upgrade dependencies to their latest versions
+ *   kreft update --check         Check for outdated packages without installing (npm outdated)
+ *   kreft update --core          Update only Kreft runtime files (kreftjs.js, kreftjs.d.ts, server.d.ts)
+ *   kreft update --npm           Update only npm packages
  */
 const fs = require('fs');
 const path = require('path');
-const { spawnSync } = require('child_process');
+const { runSync } = require('./win-spawn.js');
 const { layout } = require('./layout.js');
 const pkg = require('../package.json');
 
@@ -31,7 +31,7 @@ module.exports = function update(args = []) {
     const a = args[i];
     if (a === '--latest' || a === '-L') flags.add('latest');
     else if (a === '--check' || a === '--dry-run') flags.add('check');
-    else if (a === '--core' || a === '--kreft' || a === '--som') flags.add('core'); // --som: the Som.js name
+    else if (a === '--core' || a === '--kreft') flags.add('core');
     else if (a === '--npm') flags.add('npm');
     else if (a === '--help' || a === '-h') {
       printHelp();
@@ -74,16 +74,16 @@ function updateRuntimeFiles(lay, project) {
   const targets = [];
 
   // Check frontend / local kreftjs.js
-  // an older project has kreft.js / som.js (and the .d.ts): those files keep their names (index.html loads them) but get the new code
+  // an older project has kreft.js (and the .d.ts): those files keep their names (index.html loads them) but get the new code
   const named = (dir, name, ...legacy) => (!fs.existsSync(path.join(dir, name)) ? legacy.find((l) => fs.existsSync(path.join(dir, l))) || name : name);
-  const frontKreftJs = path.join(lay.frontend, named(lay.frontend, 'kreftjs.js', 'kreft.js', 'som.js'));
-  const rootKreftJs = path.join(project, named(project, 'kreftjs.js', 'kreft.js', 'som.js'));
+  const frontKreftJs = path.join(lay.frontend, named(lay.frontend, 'kreftjs.js', 'kreft.js'));
+  const rootKreftJs = path.join(project, named(project, 'kreftjs.js', 'kreft.js'));
   if (fs.existsSync(frontKreftJs) && frontKreftJs !== sourceKreftJs) targets.push({ src: sourceKreftJs, dest: frontKreftJs, label: 'frontend/' + path.basename(frontKreftJs) });
   else if (fs.existsSync(rootKreftJs) && rootKreftJs !== sourceKreftJs) targets.push({ src: sourceKreftJs, dest: rootKreftJs, label: path.basename(rootKreftJs) });
 
   // Check frontend / local kreftjs.d.ts
-  const frontKreftDts = path.join(lay.frontend, named(lay.frontend, 'kreftjs.d.ts', 'kreft.d.ts', 'som.d.ts'));
-  const rootKreftDts = path.join(project, named(project, 'kreftjs.d.ts', 'kreft.d.ts', 'som.d.ts'));
+  const frontKreftDts = path.join(lay.frontend, named(lay.frontend, 'kreftjs.d.ts', 'kreft.d.ts'));
+  const rootKreftDts = path.join(project, named(project, 'kreftjs.d.ts', 'kreft.d.ts'));
   if (fs.existsSync(frontKreftDts) && frontKreftDts !== sourceKreftDts) targets.push({ src: sourceKreftDts, dest: frontKreftDts, label: 'frontend/' + path.basename(frontKreftDts) });
   else if (fs.existsSync(rootKreftDts) && rootKreftDts !== sourceKreftDts) targets.push({ src: sourceKreftDts, dest: rootKreftDts, label: path.basename(rootKreftDts) });
 
@@ -134,8 +134,8 @@ function updateRuntimeFiles(lay, project) {
 }
 
 function upgradeAppLayout(lay) {
-  let layoutFile = path.join(lay.frontend, 'layouts', 'app.kreftjs');
-  if (!fs.existsSync(layoutFile)) layoutFile = ['app.kreft', 'app.som'].map((n) => path.join(lay.frontend, 'layouts', n)).find((p) => fs.existsSync(p)) || layoutFile; // older projects
+  let layoutFile = path.join(lay.frontend, 'layouts', 'app.kreft');
+  if (!fs.existsSync(layoutFile)) layoutFile = ['app.kreftjs'].map((n) => path.join(lay.frontend, 'layouts', n)).find((p) => fs.existsSync(p)) || layoutFile; // older projects
   if (!fs.existsSync(layoutFile)) return;
   let text = fs.readFileSync(layoutFile, 'utf8');
   let changed = false;
@@ -162,9 +162,9 @@ function upgradeAppLayout(lay) {
   if (changed) {
     try {
       fs.writeFileSync(layoutFile, text);
-      console.log(`    ${green('DONE')}  frontend/layouts/app.kreftjs ${dim('(upgraded sidebar navigation to route names)')}`);
+      console.log(`    ${green('DONE')}  frontend/layouts/app.kreft ${dim('(upgraded sidebar navigation to route names)')}`);
     } catch (err) {
-      console.error(`    ${red('FAIL')}  frontend/layouts/app.kreftjs: ${err.message}`);
+      console.error(`    ${red('FAIL')}  frontend/layouts/app.kreft: ${err.message}`);
     }
   }
 }
@@ -180,7 +180,7 @@ function updateNpmPackages(project, pkgs, flags) {
 
   if (flags.has('check')) {
     console.log(`  ${cyan('Checking for outdated packages (npm outdated):')}\n`);
-    const res = spawnSync(npmCmd, ['outdated'], { stdio: 'inherit', cwd: project });
+    const res = runSync(npmCmd, ['outdated'], { stdio: 'inherit', cwd: project });
     if (res.status === 0) {
       console.log(`  ${green('All packages are up to date.')}`);
     }
@@ -210,7 +210,7 @@ function updateNpmPackages(project, pkgs, flags) {
   }
 
   console.log(`  ${dim('$ ' + npmCmd + ' ' + cmdArgs.join(' '))}\n`);
-  const result = spawnSync(npmCmd, cmdArgs, { stdio: 'inherit', cwd: project });
+  const result = runSync(npmCmd, cmdArgs, { stdio: 'inherit', cwd: project });
 
   if (result.error) {
     console.error(`  ${red('Error running npm:')} ${result.error.message}`);
@@ -226,12 +226,12 @@ function updateNpmPackages(project, pkgs, flags) {
 function printHelp() {
   console.log(`
   Usage:
-    kreftjs update [package...]     Update project packages and Kreft runtime files
-    kreftjs update                  Update all packages in package.json and refresh kreftjs.js
-    kreftjs update <name>           Update a specific package (e.g. kreftjs update esbuild)
-    kreftjs update --latest         Upgrade packages to their latest versions
-    kreftjs update --check          Check for outdated packages (npm outdated)
-    kreftjs update --core           Update only Kreft runtime files (kreftjs.js, kreftjs.d.ts, server.d.ts)
-    kreftjs update --npm            Update only npm dependencies
+    kreft update [package...]     Update project packages and Kreft runtime files
+    kreft update                  Update all packages in package.json and refresh kreftjs.js
+    kreft update <name>           Update a specific package (e.g. kreft update esbuild)
+    kreft update --latest         Upgrade packages to their latest versions
+    kreft update --check          Check for outdated packages (npm outdated)
+    kreft update --core           Update only Kreft runtime files (kreftjs.js, kreftjs.d.ts, server.d.ts)
+    kreft update --npm            Update only npm dependencies
 `);
 }
