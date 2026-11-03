@@ -64,6 +64,7 @@ action copy() {
     <section class="hero-grid">
       <!-- Left Column: Copy, Headlines & CTA Badges -->
       <div class="hero-copy">
+        <p class="version-pill"><span class="version-dot" aria-hidden="true"></span>Kreft v{Kreftjs.version}</p>
         <h1 class="hero-headline">
           The Enterprise<br>
           JavaScript<br>
@@ -275,6 +276,21 @@ action copy() {
 .hero-copy {
   max-width: 540px;
 }
+.version-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0 0 20px;
+  padding: 5px 12px;
+  font-family: var(--font-mono, ui-monospace, monospace);
+  font-size: 12.5px;
+  font-weight: 500;
+  color: var(--foreground);
+  background: var(--accent);
+  border: 1px solid var(--border);
+  border-radius: 9999px;
+}
+.version-dot { width: 7px; height: 7px; border-radius: 50%; background: #10b981; }
 .hero-headline {
   font-size: clamp(38px, 5.2vw, 66px);
   line-height: 1.05;

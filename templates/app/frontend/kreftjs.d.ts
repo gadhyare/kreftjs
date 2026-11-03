@@ -1,4 +1,4 @@
-// Type definitions for Kreft 0.0.10-beta
+// Type definitions for Kreft 0.0.11-beta
 // Use from TypeScript or for editor hints in plain JavaScript (// @ts-check).
 
 export interface Signal<T> { value: T }

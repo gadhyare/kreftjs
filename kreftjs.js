@@ -1,5 +1,5 @@
 /*!
- * Kreft v0.0.10-beta — reactive by nature
+ * Kreft v0.0.11-beta — reactive by nature
  * The .kreft component language (state · derive · action · when · watch · on),
  * { } views with k-if / k-each / k-model, components, slots, router, stores,
  * share / receive, event bus and a template engine.
@@ -5036,7 +5036,7 @@
     stores, storeLog, busLog,
   };
 
-  const VERSION = '0.0.10-beta';
+  const VERSION = '0.0.11-beta';
   const Kreftjs = {
     version: VERSION,
     // PUBLIC_ values from .env (kreft dev and kreft build put them here); never secrets
