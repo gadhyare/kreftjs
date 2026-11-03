@@ -38,6 +38,9 @@ export declare class Request {
   html(key: string, options?: CleanHtmlOptions): SafeHtml
   isMethod(method: string): boolean
   expectsJson(): boolean
+  /** Request locale detected from query (?lang=), cookie, Accept-Language header, or default */
+  locale(): string
+  setLocale(locale: string): this
   /** Validation rules, plus unique:table,column[,ignoreId] and exists:table,column. Throws a 422 when they fail. */
   validate<T extends Record<string, any> = Record<string, any>>(rules: Rules, messages?: Record<string, string>, names?: Record<string, string>): Promise<T>
   validated(): Record<string, any>
@@ -432,8 +435,18 @@ export interface FactoryBuilder<M = any> {
   create(extra?: Record<string, any>): Promise<any>
   [state: string]: any
 }
+export interface FactoryDefinition<M = any> extends FactoryBuilder<M> {
+  (countOrAttrs?: number | Record<string, any>): FactoryBuilder<M>
+  new (countOrAttrs?: number | Record<string, any>): FactoryBuilder<M>
+  state(name: string, values: Record<string, any> | ((attrs: Record<string, any>, fake: FakeData) => Record<string, any>)): FactoryDefinition<M>
+  state(values: Record<string, any> | ((attrs: Record<string, any>, fake: FakeData) => Record<string, any>)): FactoryBuilder<M>
+  Model: M
+  default: FactoryDefinition<M>
+  [key: string]: any
+}
+
 export declare const Factory: {
-  define<M extends typeof Model>(model: M | any, definition: (fake: FakeData, i: number) => Record<string, any>): { state(name: string, values: Record<string, any>): any; Model: M }
+  define<M extends typeof Model>(model: M | any, definition: (fake: FakeData, i: number) => Record<string, any>): FactoryDefinition<M>
   for(model: any): FactoryBuilder
 }
 
@@ -484,10 +497,17 @@ export interface Column {
   constrained(table?: string, column?: string): this
   references(column: string): this
   on(table: string): this
+  inTable(table: string): this
   onDelete(action: string): this
   onUpdate(action: string): this
   cascadeOnDelete(): this
   nullOnDelete(): this
+  restrictOnDelete(): this
+  noActionOnDelete(): this
+  cascadeOnUpdate(): this
+  nullOnUpdate(): this
+  restrictOnUpdate(): this
+  noActionOnUpdate(): this
   change(): this
 }
 export interface Blueprint {
@@ -523,11 +543,19 @@ export interface Blueprint {
   rememberToken(): Column
   unique(columns: string | string[], name?: string): this
   index(columns: string | string[], name?: string): this
-  foreign(column: string): Column
+  createIndex(columns: string | string[], name?: string): this
+  addIndex(columns: string | string[], name?: string): this
+  createUnique(columns: string | string[], name?: string): this
+  addUnique(columns: string | string[], name?: string): this
+  fullText(columns: string | string[], name?: string): this
+  fulltext(columns: string | string[], name?: string): this
+  spatialIndex(columns: string | string[], name?: string): this
+  foreign(column: string | string[]): Column
   dropColumn(...names: string[]): this
   renameColumn(from: string, to: string): this
   dropIndex(name: string): this
   dropUnique(name: string): this
+  dropForeign(name: string | string[]): this
   dropTimestamps(): this
 }
 
@@ -597,9 +625,29 @@ export declare const Crypt: {
 type LogFn = (message: string, context?: Record<string, any>) => void
 /** Log.info('Order placed', { id }) → the terminal and backend/storage/logs/som.log */
 export declare const Log: { debug: LogFn; info: LogFn; notice: LogFn; warning: LogFn; error: LogFn; critical: LogFn; write(level: string, message: string, context?: any): void; clear(): boolean; path(): string; getDirectory(): string; setDirectory(dir: string): void }
-/** translations from backend/lang/<locale>.json: __('Welcome, :name', { name }) */
-export declare const Lang: { locale(): string; setLocale(locale: string): void; get(key: string, replace?: Record<string, any>, locale?: string): string; has(key: string, locale?: string): boolean }
-export declare function __(key: string, replace?: Record<string, any>): string
+/** translations from backend/lang/<locale>.json or in-memory dictionary: __('welcome', { name }) */
+export declare const Lang: {
+  setDirectory(dir: string): void
+  getDirectory(): string | null
+  locale(): string
+  setLocale(locale: string): void
+  fallbackLocale(): string
+  setFallbackLocale(locale: string): void
+  translations(localeOrDict: string | Record<string, any>, dict?: Record<string, any>): typeof Lang
+  all(locale?: string): Record<string, any>
+  dir(locale?: string): 'rtl' | 'ltr'
+  isRtl(locale?: string): boolean
+  get(key: string, replace?: Record<string, any>, locale?: string): string
+  choice(key: string, count: number, replace?: Record<string, any>, locale?: string): string
+  has(key: string, locale?: string): boolean
+  formatNumber(value: number, options?: Intl.NumberFormatOptions, locale?: string): string
+  formatCurrency(amount: number, currency?: string, locale?: string): string
+  formatDate(date: Date | string | number, options?: Intl.DateTimeFormatOptions, locale?: string): string
+}
+export declare function __(key: string, replace?: Record<string, any>, locale?: string): string
+export declare function trans(key: string, replace?: Record<string, any>, locale?: string): string
+export declare function transChoice(key: string, count: number, replace?: Record<string, any>, locale?: string): string
+export declare function trans_choice(key: string, count: number, replace?: Record<string, any>, locale?: string): string
 export interface ConfigFn {
   <T = any>(key?: string, defaultValue?: T): T
   get<T = any>(key: string, defaultValue?: T): T
@@ -690,11 +738,29 @@ export declare class Job {
   static tries: number
   static backoff: number | number[]
   static queue: string
+  static dispatch(...args: any[]): Promise<any> & {
+    delay(seconds: number): Promise<any> & { onQueue(name: string): Promise<any> }
+    onQueue(name: string): Promise<any> & { delay(seconds: number): Promise<any> }
+  }
+  static dispatchSync(...args: any[]): Promise<any>
   handle(): any
   failed?(error: Error): any
 }
 export declare function dispatch(job: Job, options?: { delay?: number; queue?: string }): Promise<any>
 export declare function dispatchSync(job: Job): Promise<any>
+
+/** Queue manager: pause, stop, resume, and restart queue workers */
+export declare const Queue: {
+  stop(queueName?: string): { stoppedAll: boolean; stoppedQueues: string[]; restartAt: number }
+  stopAll(): { stoppedAll: boolean; stoppedQueues: string[]; restartAt: number }
+  pause(queueName?: string): { stoppedAll: boolean; stoppedQueues: string[]; restartAt: number }
+  resume(queueName?: string): { stoppedAll: boolean; stoppedQueues: string[]; restartAt: number }
+  resumeAll(): { stoppedAll: boolean; stoppedQueues: string[]; restartAt: number }
+  restart(): { stoppedAll: boolean; stoppedQueues: string[]; restartAt: number }
+  status(): { stoppedAll: boolean; stoppedQueues: string[]; restartAt: number }
+  isStopped(queueName?: string): boolean
+  getStoppedQueues(): string[]
+}
 
 /** Notifications: await user.notify(new InvoicePaid(invoice)) — channels 'mail' and 'database' */
 export declare class Notification {
@@ -722,12 +788,19 @@ export declare const Cache: {
   increment(key: string, by?: number): Promise<number>
   decrement(key: string, by?: number): Promise<number>
   flush(): Promise<void>
-  lock(name: string, seconds?: number): Promise<{ release(): Promise<void> } | null>
+  lock<R = any>(name: string, seconds?: number, callback?: () => R | Promise<R>): Promise<{ owner: string; release(): Promise<void>; forceRelease(): Promise<boolean> } | null | R> & {
+    get<T = any>(fn?: () => T | Promise<T>): Promise<T | boolean | { owner: string; release(): Promise<void> } | null>
+    block<T = any>(waitSeconds?: number, fn?: () => T | Promise<T>): Promise<T | { owner: string; release(): Promise<void> }>
+    release(): Promise<void>
+    forceRelease(): Promise<boolean>
+  }
 }
 
 /** Redis client and connection manager: await Redis.get('key'); await Redis.set('key', 'val') */
 export interface RedisClient {
   call(cmd: string, ...args: any[]): Promise<any>
+  eval(script: string, numKeys?: number, ...args: any[]): Promise<any>
+  pipeline(fn?: (pipe: RedisClient) => any): Promise<any[]>
   get(key: string): Promise<string | null>
   set(key: string, value: any, ...args: any[]): Promise<any>
   setex(key: string, seconds: number, value: any): Promise<any>
@@ -937,6 +1010,19 @@ export declare const e: typeof escapeHtml
 export declare function unescapeHtml(str: any): string
 /** Tagged template literal for safely composing HTML */
 export declare function html(strings: TemplateStringsArray, ...values: any[]): SafeHtml
+/** Check if a URL uses a safe scheme (http, https, mailto, tel, or relative path) */
+export declare function isSafeUrl(url: string, allowedSchemes?: string[]): boolean
+
+/** Built-in Error Monitor & Diagnostics UI */
+export declare const ErrorMonitor: {
+  record(err: any, req?: any, context?: Record<string, any>): any
+  recent(limit?: number): any[]
+  clear(): void
+  renderDevErrorPage(entry: any): string
+  renderSafeErrorPage(status?: number, message?: string): string
+  handle(err: any, req?: any, res?: any): void
+}
+
 
 
 

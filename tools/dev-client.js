@@ -86,7 +86,18 @@
   }
   window.__somOpenDevtools = openDevtools; // pages can offer a button
   window.addEventListener('keydown', (e) => { if (e.altKey && e.shiftKey && (e.key === 'D' || e.key === 'd' || e.code === 'KeyD')) openDevtools(); });
+  function isElectron() {
+    if (typeof window === 'undefined') return false;
+    if (window.somDesktop && window.somDesktop.isElectron) return true;
+    if (window.__SOM_ELECTRON__) return true;
+    if (typeof navigator !== 'undefined' && /electron/i.test(navigator.userAgent)) return true;
+    if (typeof process !== 'undefined' && process.versions && process.versions.electron) return true;
+    return false;
+  }
+
   function addButton() {
+    // In Electron, totally hide the Som.js in-page DevTools button
+    if (isElectron()) return;
     let hidden = false;
     try { hidden = localStorage.getItem('som:devtools-button') === 'off'; } catch (_) { /* blocked */ }
     if (hidden) return;
@@ -98,7 +109,17 @@
     b.style.cssText = 'position:fixed;right:14px;bottom:14px;z-index:2147483645;width:34px;height:34px;border:0;' +
       'background:#18181b;color:#fafafa;font:700 16px/34px system-ui,sans-serif;cursor:pointer;border:1px solid #3f3f46;opacity:.9';
     b.onclick = openDevtools;
+    b.oncontextmenu = (e) => { e.preventDefault(); b.remove(); try { localStorage.setItem('som:devtools-button', 'off'); } catch (_) {} };
     document.body.appendChild(b);
   }
-  if (document.body) addButton(); else addEventListener('DOMContentLoaded', addButton);
+
+  if (isElectron()) {
+    // Ensure any devtools button is completely hidden in Electron
+    const s = document.createElement('style');
+    s.setAttribute('data-som-electron-style', '');
+    s.textContent = '[data-som-devtools-button] { display: none !important; }';
+    (document.head || document.documentElement).appendChild(s);
+  } else {
+    if (document.body) addButton(); else addEventListener('DOMContentLoaded', addButton);
+  }
 })();

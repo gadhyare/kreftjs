@@ -19,31 +19,39 @@
  */
 const support = require('./support.js');
 
+const cleanHeader = (s) => String(s ?? '').replace(/[\r\n\0]+/g, ' ').trim();
+const cleanDisplayName = (s) => cleanHeader(s).replace(/\\/g, '\\\\').replace(/"/g, '\\"');
+const cleanEmailAddr = (s) => cleanHeader(s).replace(/[<>"]/g, '');
+
 class Mailable {
   constructor() { Object.defineProperty(this, '__mail', { value: { attachments: [] }, writable: true, enumerable: false }); }
   _m() { if (!this.__mail) Object.defineProperty(this, '__mail', { value: { attachments: [] }, writable: true, enumerable: false }); return this.__mail; }
-  subject(s) { this._m().subject = s; return this; }
-  from(address, name) { this._m().from = name ? `"${name}" <${address}>` : address; return this; }
-  replyTo(address) { this._m().replyTo = address; return this; }
+  subject(s) { this._m().subject = cleanHeader(s); return this; }
+  from(address, name) { this._m().from = name ? `"${cleanDisplayName(name)}" <${cleanEmailAddr(address)}>` : cleanHeader(address); return this; }
+  replyTo(address) { this._m().replyTo = cleanHeader(address); return this; }
   text(t) { this._m().text = t; return this; }
   html(h) { this._m().html = h; return this; }
   // a simple, good-looking email from lines: greeting, lines, a button, a closing line
   markdown({ greeting, lines = [], action, outro = [], salutation } = {}) {
-    const esc = (s) => String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+    const esc = (s) => String(s ?? '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+    const safeUrl = (u) => {
+      const str = String(u ?? '').trim();
+      return /^(?:javascript|vbscript|data):/i.test(str.replace(/[\u0000-\u0020]+/g, '')) ? '#' : esc(str);
+    };
     const name = process.env.APP_NAME || 'App';
     const text = [greeting, '', ...lines, ...(action ? ['', `${action.text}: ${action.url}`] : []), ...(outro.length ? ['', ...outro] : []), '', salutation || `Regards,\n${name}`].filter((x) => x !== undefined).join('\n');
     const html = `<div style="font-family:system-ui,sans-serif;max-width:560px;margin:0 auto;padding:24px;color:#09090b">
 ${greeting ? `<h1 style="font-size:20px">${esc(greeting)}</h1>` : ''}${lines.map((l) => `<p style="line-height:1.6">${esc(l)}</p>`).join('')}
-${action ? `<p style="margin:24px 0"><a href="${esc(action.url)}" style="background:#18181b;color:#fafafa;padding:10px 18px;text-decoration:none;display:inline-block">${esc(action.text)}</a></p>` : ''}
+${action ? `<p style="margin:24px 0"><a href="${safeUrl(action.url)}" style="background:#18181b;color:#fafafa;padding:10px 18px;text-decoration:none;display:inline-block">${esc(action.text)}</a></p>` : ''}
 ${outro.map((l) => `<p style="line-height:1.6">${esc(l)}</p>`).join('')}<p style="color:#71717a">${esc(salutation || 'Regards,')}<br>${salutation ? '' : esc(name)}</p></div>`;
     return this.text(text).html(html);
   }
   attach(file, { as, mime } = {}) { this._m().attachments.push(typeof file === 'string' ? { path: file, filename: as, contentType: mime } : file); return this; }
   build() { return this; }
-  async render() { await this.build(); const m = this._m(); return { subject: m.subject || this.constructor.name.replace(/Mail$/, ''), text: m.text || '', html: m.html, from: m.from, replyTo: m.replyTo, attachments: m.attachments }; }
+  async render() { await this.build(); const m = this._m(); return { subject: cleanHeader(m.subject || this.constructor.name.replace(/Mail$/, '')), text: m.text || '', html: m.html, from: m.from, replyTo: m.replyTo, attachments: m.attachments }; }
 }
 
-const address = (to) => [].concat(to).filter(Boolean).map((x) => (typeof x === 'string' ? x : x.name ? `"${x.name}" <${x.email}>` : x.email)).join(', ');
+const address = (to) => [].concat(to).filter(Boolean).map((x) => (typeof x === 'string' ? cleanHeader(x) : x.name ? `"${cleanDisplayName(x.name)}" <${cleanEmailAddr(x.email)}>` : cleanEmailAddr(x.email))).join(', ');
 
 class PendingMail {
   constructor(to) { this._to = to; this._cc = []; this._bcc = []; }

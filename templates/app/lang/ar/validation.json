@@ -1,0 +1,22 @@
+{
+  "required": "حقل :attribute مطلوب.",
+  "email": "يجب أن يكون :attribute عنوان بريد إلكتروني صالح.",
+  "min": {
+    "string": "يجب أن يحتوي :attribute على :min أحرف على الأقل.",
+    "numeric": "يجب أن تكون قيمة :attribute على الأقل :min.",
+    "array": "يجب أن يحتوي :attribute على الأقل على :min عناصر."
+  },
+  "max": {
+    "string": "يجب ألا يتجاوز :attribute :max أحرف.",
+    "numeric": "يجب ألا تتجاوز قيمة :attribute :max.",
+    "array": "يجب ألا يحتوي :attribute على أكثر من :max عناصر."
+  },
+  "confirmed": "تأكيد :attribute غير متطابق.",
+  "attributes": {
+    "email": "البريد الإلكتروني",
+    "password": "كلمة المرور",
+    "name": "الاسم",
+    "title": "العنوان"
+  }
+}
+

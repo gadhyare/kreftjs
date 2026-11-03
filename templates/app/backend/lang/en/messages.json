@@ -1,0 +1,10 @@
+{
+  "welcome": "Welcome to Som.js",
+  "hello": "Hello, :name",
+  "items": "{0} No items|{1} One item|[2,*] :count items",
+  "pagination": {
+    "previous": "&laquo; Previous",
+    "next": "Next &raquo;"
+  }
+}
+

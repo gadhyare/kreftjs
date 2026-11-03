@@ -8,12 +8,14 @@ const ABILITIES = ['read', 'create', 'update', 'delete']
 class ApiTokenController {
   // GET /api/user/tokens
   async index(req) {
+    if (req.accessToken && req.accessToken.type !== 'session' && !req.accessToken.can('*')) abort(403, 'Only browser sessions may manage API tokens.')
     const rows = await PersonalAccessToken.where('user_id', req.user.id).where('type', 'api').orderByDesc('id').get()
     return { abilities: ABILITIES, tokens: rows.map((t) => ({ id: t.id, name: t.name, abilities: t.abilities || ['*'], last_used_at: t.last_used_at, created_at: t.created_at })) }
   }
 
   // POST /api/user/tokens  { name, abilities: ['read'] } → the token, shown this one time only
   async store(req) {
+    if (req.accessToken && req.accessToken.type !== 'session' && !req.accessToken.can('*')) abort(403, 'Only browser sessions may create API tokens.')
     const data = await req.validate({ name: 'required|string|max:100', abilities: 'sometimes|array' })
     const abilities = (data.abilities || ['read']).filter((a) => ABILITIES.includes(a))
     if (!abilities.length) abort(422, 'Choose at least one permission.')
@@ -23,6 +25,7 @@ class ApiTokenController {
 
   // PUT /api/user/tokens/{id}  { abilities }
   async update(req, id) {
+    if (req.accessToken && req.accessToken.type !== 'session' && !req.accessToken.can('*')) abort(403, 'Only browser sessions may update API tokens.')
     const token = await PersonalAccessToken.where('user_id', req.user.id).where('type', 'api').find(id)
     if (!token) abort(404, 'No such token.')
     const { abilities } = await req.validate({ abilities: 'required|array' })
@@ -33,6 +36,7 @@ class ApiTokenController {
 
   // DELETE /api/user/tokens/{id}
   async destroy(req, id) {
+    if (req.accessToken && req.accessToken.type !== 'session' && !req.accessToken.can('*')) abort(403, 'Only browser sessions may delete API tokens.')
     const token = await PersonalAccessToken.where('user_id', req.user.id).where('type', 'api').find(id)
     if (!token) abort(404, 'No such token.')
     await token.delete()

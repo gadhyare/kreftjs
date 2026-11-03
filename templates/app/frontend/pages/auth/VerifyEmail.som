@@ -12,7 +12,7 @@ on ready {
   if (!id || !hash) return
   try {
     const res = await api.post('/api/email/verify', { id, hash, expires: $route.query.expires, signature: $route.query.signature })
-    if ($store.auth.user && $store.auth.user.id === res.user.id) $store.auth.user = res.user
+    if ($store.auth.user && res.user && $store.auth.user.id === res.user.id) Object.assign($store.auth.user, res.user)
     $router.replace($store.auth.user ? '/dashboard?verified=1' : '/login?status=' + encodeURIComponent(res.message + ' Log in to go on.'))
   } catch (e) {
     problem = e.message

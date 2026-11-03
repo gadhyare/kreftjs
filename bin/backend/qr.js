@@ -148,13 +148,16 @@ function encode(text) {
   return mods;
 }
 
+const escAttr = (s) => String(s ?? '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#39;');
 const QR = {
   matrix: encode,
   svg(text, { size = 200, margin = 4, dark = '#09090b', light = '#ffffff' } = {}) {
-    const m = encode(text), n = m.length + margin * 2;
+    const safeSize = Math.max(1, parseInt(size, 10) || 200);
+    const safeMargin = Math.max(0, parseInt(margin, 10) >= 0 ? parseInt(margin, 10) : 4);
+    const m = encode(text), n = m.length + safeMargin * 2;
     let d = '';
-    m.forEach((row, y) => row.forEach((on, x) => { if (on) d += `M${x + margin} ${y + margin}h1v1h-1z`; }));
-    return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${n} ${n}" width="${size}" height="${size}" shape-rendering="crispEdges" role="img" aria-label="QR code"><rect width="${n}" height="${n}" fill="${light}"/><path d="${d}" fill="${dark}"/></svg>`;
+    m.forEach((row, y) => row.forEach((on, x) => { if (on) d += `M${x + safeMargin} ${y + safeMargin}h1v1h-1z`; }));
+    return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${n} ${n}" width="${safeSize}" height="${safeSize}" shape-rendering="crispEdges" role="img" aria-label="QR code"><rect width="${n}" height="${n}" fill="${escAttr(light)}"/><path d="${d}" fill="${escAttr(dark)}"/></svg>`;
   },
 };
 

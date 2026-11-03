@@ -15,21 +15,42 @@ const path = require('path');
 
 const PUBLIC = /^PUBLIC_/;
 const fromFile = new Set(); // keys this file set (so a changed file can update them)
+const isBadKey = (k) => k === '__proto__' || k === 'constructor' || k === 'prototype';
+
+function stripClosingQuote(body, q) {
+  const lastNl = body.lastIndexOf('\n');
+  const tail = body.slice(lastNl + 1);
+  for (let i = 0; i < tail.length; i++) {
+    if (tail[i] === '\\') { i++; continue; }
+    if (tail[i] === q) {
+      const rest = tail.slice(i + 1).trimStart();
+      if (rest === '' || rest.startsWith('#')) {
+        return body.slice(0, lastNl + 1 + i);
+      }
+    }
+  }
+  return null;
+}
 
 function parse(text) {
   const out = {};
-  const lines = text.replace(/\r\n?/g, '\n').split('\n');
+  const lines = String(text || '').replace(/\r\n?/g, '\n').split('\n');
   for (let i = 0; i < lines.length; i++) {
     const m = lines[i].match(/^\s*(?:export\s+)?([A-Za-z_][\w.-]*)\s*=\s*(.*)$/);
     if (!m) continue; // blank lines, # comments, anything else
     const key = m[1];
+    if (isBadKey(key)) continue;
     let value = m[2];
     const q = value[0];
     if (q === '"' || q === "'" || q === '`') {
       // quoted: may run over several lines; the quote must be closed
       let body = value.slice(1);
-      while (!new RegExp(`(^|[^\\\\])${q}\\s*(#.*)?$`).test(body) && i + 1 < lines.length) body += '\n' + lines[++i];
-      body = body.replace(new RegExp(`${q}\\s*(#.*)?$`), '');
+      let closed = stripClosingQuote(body, q);
+      while (closed === null && i + 1 < lines.length) {
+        body += '\n' + lines[++i];
+        closed = stripClosingQuote(body, q);
+      }
+      if (closed !== null) body = closed;
       if (q === '"') body = body.replace(/\\n/g, '\n').replace(/\\r/g, '\r').replace(/\\t/g, '\t').replace(/\\"/g, '"').replace(/\\\\/g, '\\');
       out[key] = { value: body, expand: q !== "'" }; // 'single quotes' are taken as they are
     } else {

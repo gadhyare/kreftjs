@@ -7,7 +7,8 @@
  *   posts.groupBy('user_id')             posts.keyBy('id')                    posts.sum('likes')
  *   collect([1, 2, 3]).chunk(2)          posts.first()  posts.isEmpty()       posts.unique('user_id')
  */
-const get = (item, key) => (typeof key === 'function' ? key(item) : key == null ? item : String(key).split('.').reduce((o, k) => (o == null ? undefined : o[k]), item));
+const isBadKey = (k) => k === '__proto__' || k === 'constructor' || k === 'prototype';
+const get = (item, key) => (typeof key === 'function' ? key(item) : key == null ? item : String(key).split('.').reduce((o, k) => (o == null || isBadKey(k) ? undefined : o[k]), item));
 const compare = (a, op, b) => {
   switch (op) {
     case '=': case '==': return a == b; // eslint-disable-line eqeqeq
@@ -35,7 +36,7 @@ class Collection extends Array {
   last(fn) { const list = fn ? this.filter(fn) : this; return list[list.length - 1] ?? null; }
   firstWhere(key, op, value) { return this.where(key, op, value).first(); }
   pluck(key, by) {
-    if (by) return Object.fromEntries(this.map((x) => [get(x, by), get(x, key)]));
+    if (by) return Object.fromEntries(this.map((x) => [get(x, by), get(x, key)]).filter(([k]) => !isBadKey(String(k))));
     return Collection.from(this, (x) => get(x, key));
   }
   where(key, op, value) {
@@ -67,17 +68,36 @@ class Collection extends Array {
   sortByDesc(key) { return this.sortBy(key, true); }
   groupBy(key) {
     const out = {};
-    this.forEach((x) => { const k = get(x, key); (out[k] = out[k] || new Collection()).push(x); });
+    this.forEach((x) => {
+      const k = String(get(x, key));
+      if (isBadKey(k)) return;
+      if (!Object.prototype.hasOwnProperty.call(out, k)) out[k] = new Collection();
+      out[k].push(x);
+    });
     return out;
   }
-  keyBy(key) { return Object.fromEntries(this.map((x) => [get(x, key), x])); }
-  countBy(key) { const out = {}; this.forEach((x) => { const k = get(x, key); out[k] = (out[k] || 0) + 1; }); return out; }
-  mapWithKeys(fn) { return Object.fromEntries(this.map((x, i) => Object.entries(fn(x, i))[0])); }
+  keyBy(key) { return Object.fromEntries(this.map((x) => [get(x, key), x]).filter(([k]) => !isBadKey(String(k)))); }
+  countBy(key) {
+    const out = {};
+    this.forEach((x) => {
+      const k = String(get(x, key));
+      if (isBadKey(k)) return;
+      out[k] = (Object.prototype.hasOwnProperty.call(out, k) ? out[k] : 0) + 1;
+    });
+    return out;
+  }
+  mapWithKeys(fn) { return Object.fromEntries(this.map((x, i) => Object.entries(fn(x, i))[0]).filter((e) => e && !isBadKey(String(e[0])))); }
   unique(key) {
     const seen = new Set();
     return this.filter((x) => { const k = key ? get(x, key) : x; if (seen.has(k)) return false; seen.add(k); return true; });
   }
-  chunk(size) { const out = new Collection(); for (let i = 0; i < this.length; i += size) out.push(Collection.from(this.slice(i, i + size))); return out; }
+  chunk(size) {
+    size = Math.floor(Number(size));
+    const out = new Collection();
+    if (!size || size < 1) return out;
+    for (let i = 0; i < this.length; i += size) out.push(Collection.from(this.slice(i, i + size)));
+    return out;
+  }
   take(n) { return Collection.from(n < 0 ? this.slice(n) : this.slice(0, n)); }
   skip(n) { return Collection.from(this.slice(n)); }
   partition(fn) { return Collection.of(this.filter(fn), this.filter((x, i) => !fn(x, i))); }

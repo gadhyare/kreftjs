@@ -6,6 +6,7 @@
  *   som build --out public     choose the output folder
  *   som build --base /         change <base href> in index.html
  *   som build --prerender      also save every page as ready HTML (needs: npm i -D jsdom)
+ *   som build --prerender --urls urls.js   ... and the addresses in that file (pages that come from your data)
  *   som build --include docs   also copy another folder into the output
  *
  * What it does:
@@ -23,20 +24,21 @@ const path = require('path');
 const Som = require('../som.js');
 
 const { expandBlocks, splitSom, splitInterp, exactBrace, stripBrace, interpToExpr, quoteBraceAttrs, expandSelfClosing,
-  scopeCss, hashString, propType, simplePathRE, fnExpRE, forAliasRE } = Som.__internal;
+  scopeCss, hashString, propType, simplePathRE, fnExpRE, forAliasRE, stripTypeScript } = Som.__internal;
 
 const deps = require('./deps.js');
 const SERVER_DIRS = new Set();
 const SKIP = new Set(['node_modules', '.git', '.vscode', '.idea', 'package.json', 'package-lock.json', '.DS_Store']);
 
 module.exports = function build(args) {
-  let folder = null, out = null, base = null, prerender = null;
+  let folder = null, out = null, base = null, prerender = null, urlsFile = null;
   const include = [];
   for (let i = 0; i < args.length; i++) {
     if (args[i] === '--out' || args[i] === '-o') out = args[++i];
     else if (args[i] === '--base') base = args[++i];
     else if (args[i] === '--include') include.push(args[++i]); // another folder to copy in, like the docs
     else if (args[i] === '--prerender') prerender = args[i + 1] && !args[i + 1].startsWith('-') && args[i + 1].includes('/') ? args[++i].split(',') : [];
+    else if (args[i] === '--urls') urlsFile = args[++i]; // a file with more addresses to prerender (pages from your data)
     else folder = args[i];
   }
   // a project with frontend/ and backend/: build frontend/ into dist/ at the top (backend/ is never built)
@@ -80,7 +82,7 @@ module.exports = function build(args) {
     templateBar.tick(rel);
     // routes/web.som and other route files: plain JavaScript with Route in scope, kept as a function
     if (/^routes\//.test(rel)) {
-      const src = fs.readFileSync(file, 'utf8');
+      const src = stripTypeScript(fs.readFileSync(file, 'utf8'));
       try { new Function('Route', src); } catch (e) { errors.push(`  ${rel}: ${e.message}`); continue; }
       components.push(`// ${rel}\nSom.__routes(${JSON.stringify(rel)}, function (Route) {\n${src}\n});`);
       continue;
@@ -103,12 +105,18 @@ module.exports = function build(args) {
   fs.rmSync(dist, { recursive: true, force: true });
   fs.mkdirSync(dist, { recursive: true });
 
+  const langHelper = require('./lang.js');
+  const langDirs = langHelper.findLangDirs(root);
+  const langData = langHelper.scanLangDir(langDirs);
+  const langInject = Object.keys(langData).length ? `Som.translations(${JSON.stringify(langData)});\n` : '';
+
   const precompiled = [...fns].map(([key, src]) => `F[${JSON.stringify(key)}] = ${src};`).join('\n');
   const appJs = `/* Built by som build — do not edit. Rebuild from your .som files instead. */
 ${env.envScript(env.publicEnv())}
 (function (Som) {
   if (!Som) throw new Error('Load som.js before app.js');
   var F = Som.__precompiled;
+${langInject ? indent(langInject) : ''}
 ${indent(precompiled)}
 
 ${indent(components.join('\n\n'))}
@@ -207,9 +215,11 @@ ${indent(components.join('\n\n'))}
       html = html.replace(own[0], () => `<script type="importmap">${JSON.stringify({ ...mine, imports: { ...map, ...(mine.imports || {}) } })}</script>`);
     } else html = html.replace(/<head[^>]*>/i, (m) => `${m}\n  <script type="importmap">${JSON.stringify({ imports: map })}</script>`);
   }
-  html = html.replace(/<\/head>/i, () => links.map((l) => `  <link rel="stylesheet" href="${l}">\n`).join('') + '  <link rel="stylesheet" href="app.css" data-som-presets>\n</head>');
+  const escAttr = (s) => String(s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+  html = html.replace(/<\/head>/i, () => links.map((l) => `  <link rel="stylesheet" href="${escAttr(l)}">\n`).join('') + '  <link rel="stylesheet" href="app.css" data-som-presets>\n</head>');
   if (base != null) {
-    const b = base.endsWith('/') ? base : base + '/';
+    const rawBase = base.endsWith('/') ? base : base + '/';
+    const b = String(rawBase).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
     html = /<base\b[^>]*>/i.test(html)
       ? html.replace(/<base\b[^>]*>/i, `<base href="${b}">`)
       : html.replace(/<head>/i, `<head>\n  <base href="${b}">`);
@@ -229,16 +239,19 @@ ${indent(components.join('\n\n'))}
     ];
     console.log('\n' + renderBox(lines, { width: 66, borderColor: green }) + '\n');
   };
-  if (prerender) return require('./prerender.js')(dist, root, prerender).then(report, (e) => fail('Could not prerender: ' + e.message));
+  if (prerender) {
+    return (urlsFile ? require('./urls-file.js')(urlsFile) : Promise.resolve([]))
+      .then((more) => require('./prerender.js')(dist, root, [...prerender, ...more.map((u) => (typeof u === 'string' ? u : u.path))]))
+      .then(report, (e) => fail('Could not prerender: ' + e.message));
+  }
   report();
 };
 
 // a frontend .ts file → the browser's JavaScript (types removed); its own './x.ts' imports become './x.js'
 function tsToJs(file, project) {
-  const es = require('./backend/typescript.js').loadEsbuild(project);
-  if (!es) fail(`${path.basename(file)} is TypeScript: install esbuild once in your project:  som add -D esbuild`);
-  const out = es.transformSync(fs.readFileSync(file, 'utf8'), { loader: 'ts', format: 'esm', target: 'es2020', sourcefile: file, minify: false });
-  return out.code.replace(/((?:from|import)\s*\(?\s*['"])(\.{1,2}\/[^'"]+?)\.ts(['"])/g, '$1$2.js$3');
+  const { transpileTs } = require('./backend/typescript.js');
+  const code = transpileTs(fs.readFileSync(file, 'utf8'), { filename: file, format: 'esm', projectDir: project });
+  return code.replace(/((?:from|import)\s*\(?\s*['"])(\.{1,2}\/[^'"]+?)\.ts(['"])/g, '$1$2.js$3');
 }
 
 /* ------------------------------------------------------------------ one .som file → JS */
@@ -340,8 +353,14 @@ const ASSIGN = (expr) => ['$s,$v', `with($s){${expr}=$v}`];
 function addFn(fns, [params, code]) {
   const key = params + '\u0000' + code;
   if (fns.has(key)) return;
-  const src = `function (${params.split(',').join(', ')}) { ${code} }`;
-  try { new Function('return ' + src); } catch (_) { return; } // invalid code: the runtime will report it as usual
+  let src = `function (${params.split(',').join(', ')}) { ${code} }`;
+  try {
+    new Function('return ' + src);
+  } catch (_) {
+    const stripped = stripTypeScript(code);
+    src = `function (${params.split(',').join(', ')}) { ${stripped} }`;
+    try { new Function('return ' + src); } catch (__) { return; } // invalid code: the runtime will report it as usual
+  }
   fns.set(key, src);
 }
 function addHandler(fns, expr) {
@@ -397,7 +416,10 @@ function collectExpressions(template, fns) {
 const ENTITIES = { amp: '&', lt: '<', gt: '>', quot: '"', apos: "'", nbsp: ' ', copy: '©', reg: '®', times: '×',
   middot: '·', hellip: '…', mdash: '—', ndash: '–', larr: '←', rarr: '→', uarr: '↑', darr: '↓', laquo: '«', raquo: '»', bull: '•' };
 const decode = (s) => s.replace(/&(#x[0-9a-f]+|#\d+|[a-z]+);/gi, (m, e) => {
-  if (e[0] === '#') return String.fromCodePoint(e[1] === 'x' || e[1] === 'X' ? parseInt(e.slice(2), 16) : parseInt(e.slice(1), 10));
+  if (e[0] === '#') {
+    const cp = e[1] === 'x' || e[1] === 'X' ? parseInt(e.slice(2), 16) : parseInt(e.slice(1), 10);
+    return Number.isNaN(cp) || cp < 0 || cp > 0x10ffff ? m : String.fromCodePoint(cp);
+  }
   return ENTITIES[e.toLowerCase()] ?? m;
 });
 function scanHtml(html, on) {

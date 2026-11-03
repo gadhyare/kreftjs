@@ -18,7 +18,7 @@ function readConfig(start) {
     for (const file of candidates) {
       if (fs.existsSync(file)) {
         // "${NAME}" in the file is replaced with that value from .env or the environment
-        try { return { ...JSON.parse(fs.readFileSync(file, 'utf8'), (k, v) => (typeof v === 'string' ? v.replace(/\$\{(\w+)\}/g, (_, n) => process.env[n] || '') : v)), dir, file }; }
+        try { return { ...JSON.parse(fs.readFileSync(file, 'utf8'), (k, v) => (k === '__proto__' || k === 'constructor' || k === 'prototype' ? undefined : typeof v === 'string' ? v.replace(/\$\{(\w+)\}/g, (_, n) => process.env[n] || '') : v)), dir, file }; }
         catch (e) { console.error(`  ${file} is not valid JSON: ${e.message}`); process.exit(1); }
       }
     }

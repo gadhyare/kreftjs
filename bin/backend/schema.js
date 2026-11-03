@@ -34,19 +34,72 @@ class Column {
   comment() { return this; }
   after() { return this; }
   change() { this.isChange = true; return this; }
-  // foreign keys: table.foreignId('user_id').constrained()  →  REFERENCES users(id)
+  // foreign keys: table.foreignId('user_id').constrained() or table.foreignId('user_id').references('id').inTable('users')
   constrained(table, column = 'id') {
-    this.foreign = { table: table || plural(this.name.replace(/_id$/, '')), column, onDelete: null, onUpdate: null };
+    this.foreign = {
+      table: table || (this.foreign && this.foreign.table) || plural(this.name.replace(/_id$/, '')),
+      column: column || (this.foreign && this.foreign.column) || 'id',
+      onDelete: (this.foreign && this.foreign.onDelete) || null,
+      onUpdate: (this.foreign && this.foreign.onUpdate) || null,
+    };
     return this;
   }
-  references(column) { this.foreign = { ...(this.foreign || {}), column }; return this; }
-  on(table) { this.foreign = { ...(this.foreign || { column: 'id' }), table }; return this; }
-  onDelete(action) { if (this.foreign) this.foreign.onDelete = action; return this; }
-  onUpdate(action) { if (this.foreign) this.foreign.onUpdate = action; return this; }
+  references(column) {
+    if (typeof column === 'string' && column.includes('.')) {
+      const parts = column.split('.');
+      this.foreign = { ...(this.foreign || {}), table: parts[0], column: parts[1] };
+    } else {
+      this.foreign = { ...(this.foreign || {}), column };
+    }
+    return this;
+  }
+  on(table) {
+    this.foreign = { ...(this.foreign || { column: 'id' }), table };
+    return this;
+  }
+  inTable(table) {
+    return this.on(table);
+  }
+  onDelete(action) {
+    this.foreign = { ...(this.foreign || { column: 'id' }), onDelete: action };
+    return this;
+  }
+  onUpdate(action) {
+    this.foreign = { ...(this.foreign || { column: 'id' }), onUpdate: action };
+    return this;
+  }
   cascadeOnDelete() { return this.onDelete('cascade'); }
   nullOnDelete() { return this.onDelete('set null'); }
+  restrictOnDelete() { return this.onDelete('restrict'); }
+  noActionOnDelete() { return this.onDelete('no action'); }
+  cascadeOnUpdate() { return this.onUpdate('cascade'); }
+  nullOnUpdate() { return this.onUpdate('set null'); }
+  restrictOnUpdate() { return this.onUpdate('restrict'); }
+  noActionOnUpdate() { return this.onUpdate('no action'); }
 }
 const CURRENT = { raw: 'CURRENT_TIMESTAMP' };
+
+function normalizeIndexArgs(a, b, knownColumns = []) {
+  if (b === undefined || b === null) {
+    return { columns: [].concat(a), name: null };
+  }
+  if (Array.isArray(b) && typeof a === 'string') {
+    return { columns: b, name: a };
+  }
+  if (Array.isArray(a) && typeof b === 'string') {
+    return { columns: a, name: b };
+  }
+  if (typeof a === 'string' && typeof b === 'string') {
+    const aKnown = knownColumns.some((c) => c.name === a);
+    const bKnown = knownColumns.some((c) => c.name === b);
+    if (bKnown && !aKnown) return { columns: [b], name: a };
+    if (aKnown && !bKnown) return { columns: [a], name: b };
+    const isLikelyIdx = (s) => /^(idx_|index_|uniq_|unique_)|(_idx|_index|_unique)$/i.test(s) || s.includes('_idx_');
+    if (isLikelyIdx(a) && !isLikelyIdx(b)) return { columns: [b], name: a };
+    if (isLikelyIdx(b) && !isLikelyIdx(a)) return { columns: [a], name: b };
+  }
+  return { columns: [].concat(a), name: b };
+}
 
 class Blueprint {
   constructor(table, kind, creating) {
@@ -89,10 +142,26 @@ class Blueprint {
   softDeletes(name = 'deleted_at') { return this.timestamp(name).nullable(); }
   rememberToken() { return this.string('remember_token', 100).nullable(); }
   // table parts
-  unique(columns, name) { this.commands.push({ type: 'index', unique: true, columns: [].concat(columns), name }); return this; }
-  index(columns, name) { this.commands.push({ type: 'index', unique: false, columns: [].concat(columns), name }); return this; }
+  unique(columns, name) {
+    const norm = normalizeIndexArgs(columns, name, this.columns);
+    this.commands.push({ type: 'index', unique: true, columns: norm.columns, name: norm.name });
+    return this;
+  }
+  index(columns, name) {
+    const norm = normalizeIndexArgs(columns, name, this.columns);
+    this.commands.push({ type: 'index', unique: false, columns: norm.columns, name: norm.name });
+    return this;
+  }
+  createIndex(columns, name) { return this.index(columns, name); }
+  addIndex(columns, name) { return this.index(columns, name); }
+  createUnique(columns, name) { return this.unique(columns, name); }
+  addUnique(columns, name) { return this.unique(columns, name); }
+  fullText(columns, name) { return this.index(columns, name); }
+  fulltext(columns, name) { return this.index(columns, name); }
+  spatialIndex(columns, name) { return this.index(columns, name); }
   foreign(column) {
-    const c = new Column(column, 'foreignKeyOnly');
+    const colName = Array.isArray(column) ? column[0] : column;
+    const c = new Column(colName, 'foreignKeyOnly');
     c.foreign = { column: 'id', table: null };
     this.commands.push({ type: 'foreign', column: c });
     return c;
@@ -102,10 +171,19 @@ class Blueprint {
   renameColumn(from, to) { this.commands.push({ type: 'renameColumn', from, to }); return this; }
   dropUnique(name) { this.commands.push({ type: 'dropIndex', name }); return this; }
   dropIndex(name) { this.commands.push({ type: 'dropIndex', name }); return this; }
+  dropForeign(name) {
+    const fkName = Array.isArray(name) ? `${this.table}_${name[0]}_foreign` : name;
+    this.commands.push({ type: 'dropForeign', name: fkName });
+    return this;
+  }
   dropTimestamps() { return this.dropColumn('created_at', 'updated_at'); }
 }
 
 // one column → its SQL for this database
+function safePosInt(v, def) {
+  const n = parseInt(v, 10);
+  return Number.isInteger(n) && n > 0 ? n : def;
+}
 function columnSql(c, kind, q) {
   const T = {
     sqlite: { bigIncrements: 'INTEGER', increments: 'INTEGER', foreignId: 'INTEGER', integer: 'INTEGER', tinyInteger: 'INTEGER', smallInteger: 'INTEGER', bigInteger: 'INTEGER', float: 'REAL', double: 'REAL', decimal: 'NUMERIC', boolean: 'BOOLEAN', date: 'DATE', time: 'TIME', dateTime: 'DATETIME', text: 'TEXT', mediumText: 'TEXT', longText: 'TEXT', json: 'TEXT', uuid: 'VARCHAR(36)' },
@@ -113,9 +191,13 @@ function columnSql(c, kind, q) {
     postgres: { bigIncrements: 'BIGSERIAL', increments: 'SERIAL', foreignId: 'BIGINT', integer: 'INTEGER', tinyInteger: 'SMALLINT', smallInteger: 'SMALLINT', bigInteger: 'BIGINT', float: 'REAL', double: 'DOUBLE PRECISION', decimal: 'DECIMAL', boolean: 'BOOLEAN', date: 'DATE', time: 'TIME', dateTime: 'TIMESTAMP', text: 'TEXT', mediumText: 'TEXT', longText: 'TEXT', json: 'JSONB', uuid: 'UUID' },
   }[kind];
   let type;
-  if (c.type === 'string' || c.type === 'enum') type = `VARCHAR(${c.opts.length || 255})`;
-  else if (c.type === 'char') type = `CHAR(${c.opts.length || 255})`;
-  else if (c.type === 'decimal') type = `${T.decimal}(${c.opts.precision}, ${c.opts.scale})`;
+  if (c.type === 'string' || c.type === 'enum') type = `VARCHAR(${safePosInt(c.opts.length, 255)})`;
+  else if (c.type === 'char') type = `CHAR(${safePosInt(c.opts.length, 255)})`;
+  else if (c.type === 'decimal') {
+    const prec = safePosInt(c.opts.precision, 8);
+    const scale = Math.max(0, parseInt(c.opts.scale, 10) || 0);
+    type = `${T.decimal}(${prec}, ${scale})`;
+  }
   else type = T[c.type];
   if (!type) throw new Error(`Unknown column type "${c.type}" for ${c.name}`);
   if (c.isUnsigned && kind === 'mysql' && !/UNSIGNED/.test(type) && /INT|DECIMAL|DOUBLE|FLOAT/.test(type)) type += ' UNSIGNED';
@@ -182,7 +264,17 @@ function compile(bp, db) {
         continue;
       }
       let sql = `ALTER TABLE ${q(bp.table)} ADD COLUMN ${columnSql(c, kind, q)}`;
-      if (c.foreign && c.foreign.table && kind === 'sqlite') sql += ` REFERENCES ${q(c.foreign.table)} (${q(c.foreign.column || 'id')})` + (c.foreign.onDelete ? ' ON DELETE ' + c.foreign.onDelete.toUpperCase() : '');
+      if (c.foreign && c.foreign.table && kind === 'sqlite') {
+        sql += ` REFERENCES ${q(c.foreign.table)} (${q(c.foreign.column || 'id')})`;
+        if (c.foreign.onDelete) {
+          const act = String(c.foreign.onDelete).toUpperCase().trim();
+          if (ALLOWED_FK_ACTIONS.has(act)) sql += ' ON DELETE ' + act;
+        }
+        if (c.foreign.onUpdate) {
+          const act = String(c.foreign.onUpdate).toUpperCase().trim();
+          if (ALLOWED_FK_ACTIONS.has(act)) sql += ' ON UPDATE ' + act;
+        }
+      }
       out.push(sql);
       if (c.foreign && c.foreign.table && kind !== 'sqlite') out.push(`ALTER TABLE ${q(bp.table)} ADD ${foreignSql(c, q)}`);
     }
@@ -190,6 +282,9 @@ function compile(bp, db) {
       if (cmd.type === 'dropColumn') cmd.names.forEach((n) => out.push(`ALTER TABLE ${q(bp.table)} DROP COLUMN ${q(n)}`));
       if (cmd.type === 'renameColumn') out.push(`ALTER TABLE ${q(bp.table)} RENAME COLUMN ${q(cmd.from)} TO ${q(cmd.to)}`);
       if (cmd.type === 'dropIndex') out.push(kind === 'mysql' ? `DROP INDEX ${q(cmd.name)} ON ${q(bp.table)}` : `DROP INDEX ${q(cmd.name)}`);
+      if (cmd.type === 'dropForeign' && kind !== 'sqlite') {
+        out.push(kind === 'mysql' ? `ALTER TABLE ${q(bp.table)} DROP FOREIGN KEY ${q(cmd.name)}` : `ALTER TABLE ${q(bp.table)} DROP CONSTRAINT ${q(cmd.name)}`);
+      }
       if (cmd.type === 'foreign' && kind !== 'sqlite') out.push(`ALTER TABLE ${q(bp.table)} ADD ${foreignSql(cmd.column, q)}`);
     }
   }
@@ -213,6 +308,8 @@ function createSchema(db, log = null) {
     drop: (table) => run([`DROP TABLE ${db.q(table)}`]),
     dropIfExists: (table) => run([`DROP TABLE IF EXISTS ${db.q(table)}`]),
     rename: (from, to) => run([`ALTER TABLE ${db.q(from)} RENAME TO ${db.q(to)}`]),
+    createIndex: (table, columns, name, unique = false) => run([`CREATE ${unique ? 'UNIQUE ' : ''}INDEX ${db.q(name || `${table}_${[].concat(columns).join('_')}_${unique ? 'unique' : 'index'}`)} ON ${db.q(table)} (${[].concat(columns).map(db.q).join(', ')})`]),
+    dropIndex: (table, name) => run([db.kind === 'mysql' ? `DROP INDEX ${db.q(name)} ON ${db.q(table)}` : `DROP INDEX ${db.q(name)}`]),
     hasTable: (table) => queue(async () => (await db.tables()).some((t) => t.name === table)),
     hasColumn: (table, column) => queue(async () => { const t = (await db.tables()).find((x) => x.name === table); return !!t && t.columns.some((c) => c.name === column); }),
     raw: (sql) => run([sql]),

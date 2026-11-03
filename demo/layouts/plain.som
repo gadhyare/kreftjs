@@ -13,9 +13,12 @@
 </view>
 
 <style scoped>
-main { max-width: 1180px; margin: 0 auto; padding: 0 32px 48px; }
-footer { display: flex; gap: 20px; max-width: 1180px; margin: 0 auto; padding: 24px 32px 40px; border-top: 1px solid var(--border); color: var(--muted); font-size: 13px; }
-footer a { color: var(--muted); text-decoration: none; }
+main { width: 100%; max-width: calc(var(--container) + var(--container-pad) * 2); margin: 0 auto; padding: 0 var(--container-pad) 48px; box-sizing: border-box; }
+footer { display: flex; align-items: center; gap: 20px; width: 100%; max-width: calc(var(--container) + var(--container-pad) * 2); margin: 0 auto; padding: 20px var(--container-pad) 36px; border-top: 1px solid var(--border); color: var(--muted); font-size: 13px; box-sizing: border-box; }
+footer a { color: var(--muted); text-decoration: none; font-weight: 500; }
 footer a:hover { color: var(--foreground); }
-@media (max-width: 760px) { main, footer { padding-left: 16px; padding-right: 16px; } }
+@media (max-width: 640px) {
+  main { padding: 0 16px 36px; }
+  footer { padding: 20px 16px 36px; flex-wrap: wrap; gap: 14px; }
+}
 </style>

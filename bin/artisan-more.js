@@ -162,6 +162,77 @@ commands['queue:clear'] = async function (args) {
   const o = options(args), ctx = context(o);
   await withDb(o, ctx, async (db) => { const n = (await db.run('DELETE FROM jobs')).changes; console.log(`  Deleted ${n} waiting job${n === 1 ? '' : 's'}.`); });
 };
+commands['queue:stop'] = async function (args) {
+  const o = options(args);
+  const q = require('./backend/queue.js');
+  const target = o.flags.has('all') ? 'all' : (o._[0] || 'all');
+  q.stop(target);
+  if (target === 'all' || target === '*') {
+    console.log(`  ${red('STOPPED')} All running queues have been stopped.`);
+    console.log(dim('  Resume anytime with: som queue:resume --all'));
+  } else {
+    console.log(`  ${yellow('STOPPED')} Queue "${target}" has been stopped.`);
+    console.log(dim(`  Resume with: som queue:resume ${target}`));
+  }
+};
+commands['queue:pause'] = commands['queue:stop'];
+
+commands['queue:resume'] = async function (args) {
+  const o = options(args);
+  const q = require('./backend/queue.js');
+  const target = o.flags.has('all') ? 'all' : (o._[0] || 'all');
+  q.resume(target);
+  if (target === 'all' || target === '*') {
+    console.log(`  ${green('RESUMED')} All queues are now active and running.`);
+  } else {
+    console.log(`  ${green('RESUMED')} Queue "${target}" is now active and running.`);
+  }
+};
+commands['queue:start'] = commands['queue:resume'];
+
+commands['queue:restart'] = async function () {
+  const q = require('./backend/queue.js');
+  q.restart();
+  console.log(`  ${green('SIGNALED')} Queue workers will gracefully finish active jobs and restart.`);
+};
+
+commands['queue:status'] = async function (args) {
+  const o = options(args), ctx = context(o);
+  const q = require('./backend/queue.js');
+  const ctrl = q.status();
+  console.log('\n  Queue System Status:\n');
+  if (ctrl.stoppedAll) {
+    console.log(`  Worker State:    ${red('STOPPED (ALL QUEUES)')}`);
+  } else if (ctrl.stoppedQueues.length > 0) {
+    console.log(`  Worker State:    ${yellow('PARTIALLY STOPPED')}`);
+    console.log(`  Stopped Queues:  ${yellow(ctrl.stoppedQueues.join(', '))}`);
+  } else {
+    console.log(`  Worker State:    ${green('RUNNING')}`);
+  }
+
+  const { readConfig } = require('./som-config.js');
+  const config = readConfig(ctx.base);
+  const url = o.db || process.env.DATABASE_URL || config.db;
+  if (url) {
+    await withDb(o, ctx, async (db) => {
+      if (await q.tablesReady()) {
+        const rows = await db.query('SELECT queue, count(*) as count FROM jobs GROUP BY queue');
+        console.log('\n  Pending Jobs:');
+        if (!rows.length) {
+          console.log('    No jobs waiting.');
+        } else {
+          for (const r of rows) {
+            const stoppedTag = q.isStopped(r.queue) ? ` ${red('[STOPPED]')}` : '';
+            console.log(`    - ${r.queue}: ${r.count} waiting${stoppedTag}`);
+          }
+        }
+        const failed = await db.query('SELECT count(*) as count FROM failed_jobs');
+        console.log(`\n  Failed Jobs:     ${failed[0] ? failed[0].count : 0}`);
+      }
+    }).catch(() => {});
+  }
+  console.log('');
+};
 
 /* ------------------------------------------------------------------ schedule */
 commands['schedule:list'] = async function (args) {
@@ -290,6 +361,8 @@ commands['sitemap'] = async function (args) {
   const baseUrl = o.url || process.env.APP_URL || 'http://localhost:8000';
 
   const routes = ['/'];
+  // a route with a :param or * is a family of pages, not one address: it cannot be listed as it is
+  const add = (p) => { if (p && p.startsWith('/') && !/[:*]/.test(p) && !routes.includes(p)) routes.push(p); };
   const webSom = [
     path.join(ctx.frontend, 'routes', 'web.som'),
     path.join(ctx.project, 'routes', 'web.som'),
@@ -297,19 +370,54 @@ commands['sitemap'] = async function (args) {
 
   if (webSom) {
     const src = fs.readFileSync(webSom, 'utf8');
-    const matches = src.matchAll(/Route\.(?:view|get)\(\s*['"]([^'"]+)['"]/g);
-    for (const m of matches) {
-      const p = m[1].replace(/:\w+/g, '1');
-      if (!routes.includes(p)) routes.push(p);
+    for (const m of src.matchAll(/Route\.(?:view|get)\(\s*['"]([^'"]+)['"]/g)) add(m[1]);
+  }
+
+  // routes written in Som.router({ routes: [{ path: '/about', component: ... }] }) in index.html
+  const indexHtml = [path.join(ctx.frontend, 'index.html'), path.join(ctx.project, 'index.html')].find((f) => fs.existsSync(f));
+  if (indexHtml) {
+    for (const line of fs.readFileSync(indexHtml, 'utf8').split('\n')) {
+      if (/redirect\s*:/.test(line) || !/component\s*:/.test(line)) continue; // redirects and guards are not pages
+      for (const m of line.matchAll(/path\s*:\s*['"]([^'"]+)['"]/g)) add(m[1]);
     }
+  }
+
+  // pages that come from your data: --urls urls.js, and `urls` in backend/routes/seo.js (it can use your models)
+  const extra = [];
+  try {
+    if (o.urls) extra.push(...await require('./urls-file.js')(o.urls));
+    if (fs.existsSync(path.join(ctx.base, 'routes')) && require('./backend/typescript.js').findFile(path.join(ctx.base, 'routes', 'seo'))) {
+      const { readConfig } = require('./som-config.js');
+      const dbUrl = o.db || process.env.DATABASE_URL || readConfig(ctx.base).db;
+      const seoPages = require('./backend/seo-pages.js');
+      const backend = require('./backend/index.js');
+      backend.installAlias();
+      let db = null;
+      if (dbUrl) {
+        db = await require('./db.js').connect(dbUrl, { root: readConfig(ctx.base).dir || ctx.project });
+        backend.setConnection(db);
+        require('./backend/model.js').setBaseDir(ctx.base);
+      }
+      try { extra.push(...await seoPages.urls(ctx.base)); } finally { if (db && typeof db.close === 'function') await db.close(); }
+    }
+  } catch (e) {
+    console.error('  ' + String(e.message || e).replace(/\n/g, '\n  '));
+    process.exitCode = 1;
+    return;
+  }
+  for (const u of extra) {
+    const p = typeof u === 'string' ? u : u.path;
+    if (!p || /[:*]/.test(p) || routes.some((r) => (typeof r === 'string' ? r : r.path) === p)) continue;
+    routes.push(u);
   }
 
   const bar = createProgressBar(routes.length, { label: 'Generating sitemap' });
   for (let i = 0; i < routes.length; i++) {
-    bar.update(i + 1, routes[i]);
+    bar.update(i + 1, typeof routes[i] === 'string' ? routes[i] : routes[i].path);
   }
   bar.complete(`${routes.length} URLs indexed`);
 
+  if (/^https?:\/\/(localhost|127\.0\.0\.1|\[::1\])(:|\/|$)/.test(baseUrl)) console.log(`  WARN  The sitemap uses ${baseUrl}. Search engines need your real address: som sitemap --url https://example.com (or set APP_URL)`);
   const { SEO } = require('./backend/support.js');
   const xml = SEO.sitemap(routes, { baseUrl });
   const robots = SEO.robots({ allow: '/', sitemapUrl: `${baseUrl.replace(/\/+$/, '')}/sitemap.xml` });
@@ -443,7 +551,7 @@ commands['key:generate'] = async function (args) {
   const updated = hasKey
     ? text.replace(/^APP_KEY=.*$/m, () => 'APP_KEY=' + key)
     : text + (text.endsWith('\n') || !text ? '' : '\n') + 'APP_KEY=' + key + '\n';
-  fs.writeFileSync(file, updated);
+  fs.writeFileSync(file, updated, { mode: 0o600 });
   process.env.APP_KEY = key;
 
   // Revoke all active sessions in the database so all users are forced to log in again
@@ -493,7 +601,7 @@ commands.down = function (args) {
   const secret = get('secret') || (o.flags.has('with-secret') ? crypto.randomBytes(12).toString('hex') : null);
   const data = { time: Math.floor(Date.now() / 1000), retry: Number(get('retry')) || null, message: get('message') || 'We are making the site better. Please come back soon.', secret };
   fs.mkdirSync(path.dirname(downFile(ctx)), { recursive: true });
-  fs.writeFileSync(downFile(ctx), JSON.stringify(data, null, 2));
+  fs.writeFileSync(downFile(ctx), JSON.stringify(data, null, 2), { mode: 0o600 });
   console.log(`  ${yellow('DOWN')}  The app is in maintenance mode: visitors see a 503 page.${secret ? `\n  You can still use it at: /${secret}  (once; a cookie remembers you)` : ''}\n  Back with: som up`);
 };
 commands.up = function (args) {
@@ -792,9 +900,9 @@ make.listener = makeIn('app/Listeners', '', (o, c, d, n, f) => write(f, stub.lis
 make.mail = makeIn('app/Mail', 'Mail', (o, c, d, n, f) => write(f, stub.mail(n)), 'som make:mail WelcomeMail');
 make.notification = makeIn('app/Notifications', '', (o, c, d, n, f) => write(f, stub.notification(n)), 'som make:notification InvoicePaid');
 make.policy = makeIn('app/Policies', 'Policy', (o, c, d, n, f) => write(f, stub.policy(n, o.model || n.replace(/Policy$/, ''))), 'som make:policy PostPolicy [--model Post]');
-make.request = makeIn('app/Http/Requests', 'Request', (o, c, d, n, f) => write(f, stub.request(n)), 'som make:request StorePostRequest');
-make.resource = makeIn('app/Http/Resources', 'Resource', (o, c, d, n, f) => write(f, stub.resource(n)), 'som make:resource PostResource');
-make.rule = makeIn('app/Rules', '', (o, c, d, n, f) => write(f, stub.rule(n)), 'som make:rule Uppercase');
+make.request = make.request || makeIn('app/Http/Requests', 'Request', (o, c, d, n, f) => write(f, stub.request(n)), 'som make:request StorePostRequest');
+make.resource = make.resource || makeIn('app/Http/Resources', 'Resource', (o, c, d, n, f) => write(f, stub.resource(n)), 'som make:resource PostResource');
+make.rule = make.rule || makeIn('app/Rules', '', (o, c, d, n, f) => write(f, stub.rule(n)), 'som make:rule Uppercase');
 make.observer = makeIn('app/Observers', 'Observer', (o, c, d, n, f) => write(f, stub.observer(n, o.model || n.replace(/Observer$/, ''))), 'som make:observer PostObserver [--model Post]');
 make.command = makeIn('app/Console/Commands', '', (o, c, d, n, f) => write(f, stub.command(n, o.command || n.replace(/Command$/, '').replace(/([a-z])([A-Z])/g, '$1-$2').toLowerCase().replace(/-/, ':'))), 'som make:command SendReport [--command report:send]');
 make.factory = function (args) {

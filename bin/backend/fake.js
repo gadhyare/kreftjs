@@ -53,7 +53,11 @@ const BRANDS = [
 ];
 const STATUSES = ['active', 'inactive', 'pending', 'draft', 'archived', 'published', 'completed'];
 
-const int = (min, max) => min + crypto.randomInt(max - min + 1);
+const int = (min, max) => {
+  const lo = Math.ceil(Math.min(Number(min) || 0, Number(max) || 0));
+  const hi = Math.floor(Math.max(Number(min) || 0, Number(max) || 0));
+  return lo >= hi ? lo : lo + crypto.randomInt(hi - lo + 1);
+};
 const pick = (list) => list[crypto.randomInt(list.length)];
 const cap = (s) => s[0].toUpperCase() + s.slice(1);
 const slugify = (s) => String(s).toLowerCase().normalize('NFKD').replace(/[\u0300-\u036f]/g, '').replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '');
@@ -137,7 +141,20 @@ function makeFake() {
     password: (n = 12) => crypto.randomBytes(n).toString('base64url').slice(0, n),
     // dates as 'YYYY-MM-DD HH:MM:SS' (how the database keeps them)
     date: (from = '-1 year', to = 'now') => {
-      const span = (s) => (s === 'now' ? Date.now() : Date.now() + Number(String(s).match(/-?\d+/)[0]) * ({ day: 864e5, week: 6048e5, month: 2592e6, year: 31536e6 }[String(s).match(/day|week|month|year/)[0]]));
+      const UNITS = { second: 1e3, minute: 6e4, hour: 36e5, day: 864e5, week: 6048e5, month: 2592e6, year: 31536e6 };
+      const span = (s) => {
+        if (s instanceof Date) return s.getTime();
+        if (typeof s === 'number' && Number.isFinite(s)) return s;
+        const str = String(s || 'now').trim();
+        if (str === 'now') return Date.now();
+        const numMatch = str.match(/-?\d+/);
+        const unitMatch = str.match(/second|minute|hour|day|week|month|year/i);
+        if (numMatch && unitMatch) {
+          return Date.now() + Number(numMatch[0]) * UNITS[unitMatch[0].toLowerCase()];
+        }
+        const parsed = Date.parse(str);
+        return Number.isNaN(parsed) ? Date.now() : parsed;
+      };
       const t = int(Math.min(span(from), span(to)), Math.max(span(from), span(to)));
       return new Date(t).toISOString().slice(0, 19).replace('T', ' ');
     },

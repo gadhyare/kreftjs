@@ -64,7 +64,7 @@ function sqlite(cfg, root) {
   const bind = (params = []) => params.map((v) => (typeof v === 'boolean' ? (v ? 1 : 0) : v === undefined ? null : v instanceof Date ? dateOut(v) : v));
   const db = {
     kind: 'sqlite', file,
-    q: (n) => '"' + String(n).replace(/"/g, '""') + '"',
+    q: (n) => '"' + String(n).replace(/\0/g, '').replace(/"/g, '""') + '"',
     async query(sql, params) { return conn.prepare(sql).all(...bind(params)); },
     async run(sql, params) {
       const r = conn.prepare(sql).run(...bind(params));
@@ -112,7 +112,7 @@ async function mysql(cfg, root) {
   const conv = (params = []) => params.map((v) => (v instanceof Date ? dateOut(v) : v !== null && typeof v === 'object' && !Buffer.isBuffer(v) ? JSON.stringify(v) : v === undefined ? null : v));
   const db = {
     kind: 'mysql',
-    q: (n) => '`' + String(n).replace(/`/g, '``') + '`',
+    q: (n) => '`' + String(n).replace(/\0/g, '').replace(/`/g, '``') + '`',
     async query(sql, params) { const [rows] = await pool.query(sql, conv(params)); return rows; },
     async run(sql, params) { const [r] = await pool.query(sql, conv(params)); return { changes: r.affectedRows, insertId: r.insertId || null }; },
     // a transaction keeps one connection from the pool until it ends
@@ -170,7 +170,7 @@ async function postgres(cfg, root) {
   const conv = (params = []) => params.map((v) => (v instanceof Date ? dateOut(v) : v !== null && typeof v === 'object' && !Buffer.isBuffer(v) ? JSON.stringify(v) : v === undefined ? null : v));
   const db = {
     kind: 'postgres',
-    q: (n) => '"' + String(n).replace(/"/g, '""') + '"',
+    q: (n) => '"' + String(n).replace(/\0/g, '').replace(/"/g, '""') + '"',
     async query(sql, params) { return (await pool.query(numbered(sql), conv(params))).rows; },
     async run(sql, params) { const r = await pool.query(numbered(sql), conv(params)); return { changes: r.rowCount, insertId: null, rows: r.rows }; },
     async exec(sql) { await pool.query(sql); },

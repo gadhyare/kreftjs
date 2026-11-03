@@ -114,7 +114,10 @@ const ENTITIES = {
   middot: '·', hellip: '…', mdash: '—', ndash: '–', larr: '←', rarr: '→', uarr: '↑', darr: '↓', laquo: '«', raquo: '»', bull: '•'
 };
 const decode = (s) => s.replace(/&(#x[0-9a-f]+|#\d+|[a-z]+);/gi, (m, e) => {
-  if (e[0] === '#') return String.fromCodePoint(e[1] === 'x' || e[1] === 'X' ? parseInt(e.slice(2), 16) : parseInt(e.slice(1), 10));
+  if (e[0] === '#') {
+    const cp = e[1] === 'x' || e[1] === 'X' ? parseInt(e.slice(2), 16) : parseInt(e.slice(1), 10);
+    return Number.isNaN(cp) || cp < 0 || cp > 0x10ffff ? m : String.fromCodePoint(cp);
+  }
   return ENTITIES[e.toLowerCase()] ?? m;
 });
 
@@ -242,6 +245,7 @@ function somPlugin(options = {}) {
     load(id) {
       if (id.includes('?som&type=style')) {
         const [filePath, query] = id.split('?');
+        if (!filePath.endsWith('.som') || !filter(filePath)) return null;
         const params = new URLSearchParams(query);
         const index = parseInt(params.get('index') || '0', 10);
         const isScoped = params.get('scoped') === 'true';
@@ -371,7 +375,9 @@ ${styleImports}
 var F = (typeof window !== 'undefined' && window.Som && window.Som.__precompiled) || {};
 ${precompiledSrc}
 
-var __run = new Function('$scope', '$h', ${JSON.stringify(runCode)});
+var __run = function ($scope, $h) {
+${runCode}
+};
 
 var __def = Som.__makeDef({
   name: ${JSON.stringify(sp.name)},

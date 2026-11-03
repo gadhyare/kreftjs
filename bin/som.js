@@ -722,6 +722,7 @@ async function devServer(args, { production = false } = {}) {
   };
   const isFile = (p) => { try { return fs.statSync(p).isFile(); } catch (_) { return false; } };
 
+  const prodHeaders = isProd ? { 'Referrer-Policy': 'same-origin', 'X-Frame-Options': 'SAMEORIGIN', 'Strict-Transport-Security': 'max-age=31536000; includeSubDomains; preload' } : {};
   function send(res, file, opts = {}) { // opts.seo: tags for <head> (pages from seo.js), opts.status: 404 for a page that does not exist
     // a TypeScript module for the browser: its JavaScript (som build writes it as .js)
     if (!production && /\.(m|c)?ts$/i.test(file) && !file.endsWith('.d.ts')) {
@@ -739,7 +740,7 @@ async function devServer(args, { production = false } = {}) {
       'Content-Type': type + (type.startsWith('text/') || type.endsWith('json') ? '; charset=utf-8' : ''),
       'Cache-Control': isProd ? 'no-cache' : 'no-store', // dev: always pick up your latest changes
       'X-Content-Type-Options': 'nosniff',
-      ...(isProd ? { 'Referrer-Policy': 'same-origin', 'X-Frame-Options': 'SAMEORIGIN', 'Strict-Transport-Security': 'max-age=31536000; includeSubDomains; preload' } : {}),
+      ...prodHeaders,
     });
     if (!production && type === 'text/html') {
       let html = fs.readFileSync(file, 'utf8');
@@ -890,20 +891,22 @@ async function devServer(args, { production = false } = {}) {
   setInterval(() => clients.forEach((c) => c.write(': ping\n\n')), 25000).unref();
   // a page of the app: index.html, with the SEO tags of backend/routes/seo.js for this address (and its status)
   async function sendPage(req, res, file, urlPath) {
+    const search = (() => { try { return new URL(req.url, 'http://x').search; } catch (_) { return ''; } })();
     let seo = null;
     if (req.method === 'GET' || req.method === 'HEAD') {
       try { seo = await require('./backend/seo-pages.js').resolve(backendDir, urlPath, req); } catch (e) { console.log('  routes/seo.js: ' + (e && e.message || e)); }
     }
     // a crawler or link preview gets the page already drawn (and a 404 when the app shows its 404 page)
     if (ssr.wants(req) && (!seo || seo.status === 200) && !fs.readFileSync(file, 'utf8').includes('data-som-ssg')) { // a page som build --prerender already drew is sent as it is
-      const page = await ssr.render(urlPath);
+      const page = await ssr.render(urlPath, search);
       if (page) {
-        res.writeHead(page.status, { 'Content-Type': 'text/html; charset=utf-8', 'Cache-Control': 'no-cache', 'Vary': 'User-Agent', 'X-Content-Type-Options': 'nosniff' });
-        return res.end(req.method === 'HEAD' ? undefined : page.html);
+        res.writeHead(page.status, { 'Content-Type': 'text/html; charset=utf-8', 'Cache-Control': isProd ? 'no-cache' : 'no-store', 'Vary': 'User-Agent', 'X-Content-Type-Options': 'nosniff', ...prodHeaders });
+        return res.end(page.html);
       }
     }
     return send(res, file, seo ? { seo: seo.tags, status: seo.status } : {});
   }
+  let warnedProxy = false;
   const ssr = require('./ssr.js').create({
     root,
     cached: production,
@@ -1021,7 +1024,17 @@ async function devServer(args, { production = false } = {}) {
         const isEncrypted = Boolean(req.socket && req.socket.encrypted);
         const forwardedProto = (req.headers['x-forwarded-proto'] || '').split(',')[0].trim().toLowerCase();
         const forceHttps = process.env.FORCE_HTTPS === 'true' || (process.env.APP_URL && process.env.APP_URL.startsWith('https://'));
-        const isPlainHttp = forwardedProto === 'http' || (!isEncrypted && forceHttps);
+        // A proxy that ends TLS says how the visitor came in (X-Forwarded-Proto). "http" is always believed (it only makes
+        // us stricter); "https" only from this machine or a proxy in TRUSTED_PROXIES, since anyone could write it. Without
+        // a believed header the server cannot tell, and FORCE_HTTPS / an https APP_URL decide.
+        // (Our own page-drawing browser asks over plain HTTP on this machine.)
+        const httpMod = require('./backend/http.js');
+        const believed = forwardedProto === 'http' || (forwardedProto === 'https' && httpMod.isTrustedProxy(req)) ? forwardedProto : '';
+        if (forwardedProto === 'https' && !believed && forceHttps && !warnedProxy) {
+          warnedProxy = true;
+          console.log(`  X-Forwarded-Proto: https came from ${(req.socket && req.socket.remoteAddress) || 'an unknown address'}, which is not a trusted proxy, so the request is treated as plain HTTP.\n  Behind a proxy that ends TLS, put its address in TRUSTED_PROXIES (.env), or * for any.`);
+        }
+        const isPlainHttp = !ssr.isInternal(req) && (believed ? believed === 'http' : (!isEncrypted && forceHttps));
         if (isPlainHttp) {
           const target = require('./backend/http.js').httpsRedirectTarget(req);
           if (!target) { res.writeHead(400, { 'Content-Type': 'text/plain; charset=utf-8' }); return res.end('Bad request'); }

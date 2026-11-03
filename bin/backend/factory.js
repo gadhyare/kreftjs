@@ -27,21 +27,124 @@ class Factory {
     if (Model && Model.default) Model = Model.default;
     const def = { Model, define, states: {} };
     definitions.set(Model, def);
-    const api = {
-      state(name, values) { def.states[name] = values; return api; },
-      Model,
+
+    function factoryFn(countOrAttrs) {
+      const inst = Factory.for(Model);
+      if (typeof countOrAttrs === 'number') {
+        return inst.count(countOrAttrs);
+      }
+      if (countOrAttrs && typeof countOrAttrs === 'object') {
+        return inst.state(countOrAttrs);
+      }
+      return inst;
+    }
+
+    Object.setPrototypeOf(factoryFn.prototype, Factory.prototype);
+
+    factoryFn.def = def;
+    factoryFn.Model = Model;
+    factoryFn.default = factoryFn;
+    if (Model && Model.name) {
+      factoryFn[Model.name + 'Factory'] = factoryFn;
+    }
+
+    factoryFn.state = function(nameOrValues, values) {
+      if (typeof nameOrValues === 'string' && values !== undefined) {
+        def.states[nameOrValues] = values;
+        return proxy;
+      }
+      const inst = Factory.for(Model);
+      if (typeof nameOrValues === 'string' && def.states[nameOrValues]) {
+        return inst.state(def.states[nameOrValues]);
+      }
+      return inst.state(nameOrValues);
     };
-    return api;
+
+    factoryFn.count = function(n) {
+      return Factory.for(Model).count(n);
+    };
+
+    factoryFn.create = function(extra) {
+      return Factory.for(Model).create(extra);
+    };
+
+    factoryFn.make = function(extra) {
+      return Factory.for(Model).make(extra);
+    };
+
+    factoryFn.raw = function(extra) {
+      return Factory.for(Model).raw(extra);
+    };
+
+    factoryFn.sequence = function(...vals) {
+      return Factory.for(Model).sequence(...vals);
+    };
+
+    factoryFn.for = function(parent, key) {
+      return Factory.for(Model).for(parent, key);
+    };
+
+    factoryFn.has = function(child, rel) {
+      return Factory.for(Model).has(child, rel);
+    };
+
+    factoryFn.clone = function() {
+      return Factory.for(Model).clone();
+    };
+
+    const proxy = new Proxy(factoryFn, {
+      get(target, prop, receiver) {
+        if (prop in target) return target[prop];
+        if (typeof prop === 'string') {
+          if (prop in def.states) {
+            return (...args) => Factory.for(Model)[prop](...args);
+          }
+          if (typeof Factory.prototype[prop] === 'function') {
+            return (...args) => Factory.for(Model)[prop](...args);
+          }
+        }
+        return target[prop];
+      },
+      apply(target, thisArg, argList) {
+        return target(...argList);
+      },
+      construct(target, argList, newTarget) {
+        return target(...argList);
+      }
+    });
+
+    return proxy;
   }
   static for(Model) {
     if (Model && Model.default) Model = Model.default;
     let def = definitions.get(Model);
-    if (!def) {
+    if (!def && Model && Model.name) {
+      for (const [m, d] of definitions.entries()) {
+        if (m.name === Model.name || (d.Model && d.Model.name === Model.name)) {
+          def = d;
+          definitions.set(Model, def);
+          break;
+        }
+      }
+    }
+    if (!def && Model && Model.name) {
       const { factoryFile } = require('./model.js');
       const file = factoryFile(Model.name);
-      if (file) { require(file); def = definitions.get(Model); }
+      if (file) {
+        require(file);
+        def = definitions.get(Model);
+        if (!def) {
+          for (const [m, d] of definitions.entries()) {
+            if (m.name === Model.name || (d.Model && d.Model.name === Model.name)) {
+              def = d;
+              definitions.set(Model, def);
+              break;
+            }
+          }
+        }
+      }
     }
-    if (!def) throw new Error(`No factory for ${Model.name}. Make one: som make:factory ${Model.name}Factory`);
+    if (!def) throw new Error(`No factory for ${Model && Model.name ? Model.name : 'Model'}. Make one: som make:factory ${(Model && Model.name) || 'Model'}Factory`);
     return new Factory(def);
   }
   constructor(def) {
@@ -56,7 +159,14 @@ class Factory {
   }
   clone() { const f = new Factory(this.def); Object.assign(f, { n: this.n, states: [...this.states], parents: [...this.parents], children: [...this.children], seq: this.seq }); return f; }
   count(n) { const f = this.clone(); f.n = n; return f; }
-  state(values) { const f = this.clone(); f.states.push(values); return f; }
+  state(values) {
+    const f = this.clone();
+    if (typeof values === 'string' && this.def && this.def.states && this.def.states[values]) {
+      values = this.def.states[values];
+    }
+    f.states.push(values);
+    return f;
+  }
   // sequence({ role: 'a' }, { role: 'b' }): row 1 gets the first, row 2 the second, then again
   sequence(...values) { const f = this.clone(); f.seq = values; return f; }
   // for(user) or for(user, 'author_id'): belongs to that model
@@ -86,20 +196,28 @@ class Factory {
   }
   // create(): saved (hooks run); fields that aren't fillable are still set
   async create(extra) {
-    const made = new Collection();
-    for (let i = 0; i < (this.n == null ? 1 : this.n); i++) {
-      const m = new this.def.Model().forceFill(this.attributes(i, extra));
-      await m.save();
-      for (const { child, relationName } of this.children) {
-        const name = relationName || require('./model.js').singular(child.def.Model.table) + 's';
-        const rel = m[name]();
-        const key = rel.__rel.foreignKey;
-        await child.state({ [key]: m[rel.__rel.localKey] }).create();
+    const run = async () => {
+      const made = new Collection();
+      for (let i = 0; i < (this.n == null ? 1 : this.n); i++) {
+        const m = new this.def.Model().forceFill(this.attributes(i, extra));
+        await m.save();
+        for (const { child, relationName } of this.children) {
+          const name = relationName || require('./model.js').singular(child.def.Model.table) + 's';
+          const rel = m[name]();
+          const key = rel.__rel.foreignKey;
+          await child.state({ [key]: m[rel.__rel.localKey] }).create();
+        }
+        made.push(m);
       }
-      made.push(m);
-    }
-    return this.n == null ? made[0] : made;
+      return this.n == null ? made[0] : made;
+    };
+    const p = run();
+    Factory.pendingCreations.add(p);
+    p.finally(() => Factory.pendingCreations.delete(p));
+    return p;
   }
 }
+
+Factory.pendingCreations = new Set();
 
 module.exports = { Factory };

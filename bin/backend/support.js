@@ -487,6 +487,8 @@ const SEO = {
     if (o.author) tags.push(`<meta name="author" content="${escAttr(o.author)}">`);
     if (o.robots) tags.push(`<meta name="robots" content="${escAttr(o.robots)}">`);
     if (o.canonical) tags.push(`<link rel="canonical" href="${escAttr(o.canonical)}">`);
+    const alts = Array.isArray(o.alternates) ? o.alternates : Object.entries(o.alternates || {}).map(([hreflang, href]) => ({ hreflang, href }));
+    for (const { hreflang, href } of alts) if (hreflang && href) tags.push(`<link rel="alternate" hreflang="${escAttr(hreflang)}" href="${escAttr(href)}">`);
 
     // OpenGraph
     const og = o.og || o.openGraph || {};
@@ -528,17 +530,30 @@ const SEO = {
 
     return tags.join('\n');
   },
+  // routes: '/path' or { path, lastmod, changefreq, priority }. A lastmod is only written when you give one:
+  // a date that is always "today" tells search engines nothing and teaches them to ignore it.
   sitemap(routes = [], { baseUrl = 'http://localhost' } = {}) {
     const cleanBase = baseUrl.replace(/\/+$/, '');
-    const date = new Date().toISOString().slice(0, 10);
-    const urls = routes.map((r) => {
+    const seen = new Set();
+    const urls = [];
+    for (const r of routes) {
       const path = typeof r === 'string' ? r : r.path || '/';
+      if (/[:*]/.test(path)) continue; // a pattern, not an address
       const loc = `${cleanBase}${path.startsWith('/') ? path : '/' + path}`;
-      const changefreq = (typeof r === 'object' && r.changefreq) || 'weekly';
-      const priority = (typeof r === 'object' && r.priority) || (path === '/' ? '1.0' : '0.8');
-      return `  <url>\n    <loc>${escAttr(loc)}</loc>\n    <lastmod>${date}</lastmod>\n    <changefreq>${escAttr(changefreq)}</changefreq>\n    <priority>${escAttr(priority)}</priority>\n  </url>`;
-    });
-    return `<?xml version="1.0" encoding="UTF-8"?>\n<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n${urls.join('\n')}\n</urlset>\n`;
+      if (seen.has(loc)) continue;
+      seen.add(loc);
+      const o = typeof r === 'object' ? r : {};
+      const alts = Array.isArray(o.alternates) ? o.alternates : Object.entries(o.alternates || {}).map(([hreflang, href]) => ({ hreflang, href }));
+      for (const a of alts) { if (a.href && !/^https?:\/\//.test(a.href)) a.href = cleanBase + (a.href.startsWith('/') ? a.href : '/' + a.href); }
+      const lastmod = o.lastmod instanceof Date ? o.lastmod.toISOString().slice(0, 10) : typeof o.lastmod === 'string' ? o.lastmod.replace(/^(\d{4}-\d{2}-\d{2})[ T].*$/, '$1') : o.lastmod; // a database date like 2026-01-02 10:00:00 becomes 2026-01-02
+      urls.push(`  <url>\n    <loc>${escAttr(loc)}</loc>` +
+        (lastmod ? `\n    <lastmod>${escAttr(lastmod)}</lastmod>` : '') +
+        (o.changefreq ? `\n    <changefreq>${escAttr(o.changefreq)}</changefreq>` : '') +
+        (o.priority != null ? `\n    <priority>${escAttr(o.priority)}</priority>` : '') +
+        alts.filter((a) => a.hreflang && a.href).map((a) => `\n    <xhtml:link rel="alternate" hreflang="${escAttr(a.hreflang)}" href="${escAttr(a.href)}"/>`).join('') +
+        '\n  </url>');
+    }
+    return `<?xml version="1.0" encoding="UTF-8"?>\n<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9" xmlns:xhtml="http://www.w3.org/1999/xhtml">\n${urls.join('\n')}\n</urlset>\n`;
   },
   robots({ allow = '/', disallow = [], sitemapUrl = null } = {}) {
     const lines = ['User-agent: *'];

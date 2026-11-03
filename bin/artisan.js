@@ -21,10 +21,11 @@ const fs = require('fs');
 const path = require('path');
 
 function options(args) {
+  const flatArgs = (Array.isArray(args) ? args.flat(Infinity) : []).map((x) => (typeof x === 'string' ? x : String(x ?? '')));
   const o = { _: [], flags: new Set() };
-  const valKeys = /^(db|backend|migrations|step|class|model|dir|event|route|routes|route-file|page|folder|subfolder|group|in|path)$/;
-  for (let i = 0; i < args.length; i++) {
-    const a = args[i];
+  const valKeys = /^(db|backend|migrations|step|class|model|dir|event|route|routes|route-file|page|folder|subfolder|group|in|path|file|url|urls)$/;
+  for (let i = 0; i < flatArgs.length; i++) {
+    const a = flatArgs[i];
     if (a.startsWith('--') && a.includes('=')) {
       const idx = a.indexOf('=');
       const k = a.slice(2, idx);
@@ -33,6 +34,7 @@ function options(args) {
       o[k] = v;
       if (k === 'route' || k === 'routes' || k === 'route-file') o.route = v;
       if (k === 'folder' || k === 'subfolder' || k === 'in' || k === 'group' || k === 'path') o.folder = v;
+      if (k === 'file' || k === 'path') o.file = v;
       o.flags.add(k);
     } else if (a.startsWith('--')) {
       const k = a.slice(2);
@@ -42,6 +44,7 @@ function options(args) {
         o[k] = v;
         if (k === 'route' || k === 'routes' || k === 'route-file') o.route = v;
         if (k === 'folder' || k === 'subfolder' || k === 'in' || k === 'group' || k === 'path') o.folder = v;
+        if (k === 'file' || k === 'path') o.file = v;
       }
       o.flags.add(k);
     } else if (/^-[a-z]+$/i.test(a)) {
@@ -82,22 +85,29 @@ async function withDb(o, ctx, fn) {
 }
 const migrationsOf = (o, ctx) => (o.migrations ? path.resolve(o.migrations) : path.join(ctx.base, 'database', 'migrations'));
 const green = (s) => (process.stdout.isTTY ? `\x1b[32m${s}\x1b[0m` : s);
+const red = (s) => (process.stdout.isTTY ? `\x1b[31m${s}\x1b[0m` : s);
+const yellow = (s) => (process.stdout.isTTY ? `\x1b[33m${s}\x1b[0m` : s);
 const dim = (s) => (process.stdout.isTTY ? `\x1b[2m${s}\x1b[0m` : s);
 
 /* ------------------------------------------------------------------ database commands */
 const commands = {
   async migrate(args) {
     const o = options(args), ctx = context(o);
+    const targetFile = o.file || (o._.length && !o._[0].startsWith('-') ? o._[0] : null);
     await withDb(o, ctx, async (db, b) => {
-      const ran = await b.migrator.migrate(db, migrationsOf(o, ctx), (f) => console.log(`  ${green('DONE')}  ${f}`));
+      const ran = await b.migrator.migrate(db, migrationsOf(o, ctx), (f) => console.log(`  ${green('DONE')}  ${f}`), { file: targetFile });
       console.log(ran.length ? `\n  ${ran.length} migration${ran.length === 1 ? '' : 's'} ran.` : '  Nothing to migrate.');
       if (o.flags.has('seed')) await runSeed(db, b, ctx, o.class);
     });
   },
   async 'migrate:rollback'(args) {
     const o = options(args), ctx = context(o);
+    const targetFile = o.file || (o._.length && !o._[0].startsWith('-') ? o._[0] : null);
     await withDb(o, ctx, async (db, b) => {
-      const undone = await b.migrator.rollback(db, migrationsOf(o, ctx), (f) => console.log(`  ${green('UNDONE')}  ${f}`), { steps: parseInt(o.step, 10) || 0 });
+      const undone = await b.migrator.rollback(db, migrationsOf(o, ctx), (f) => console.log(`  ${green('UNDONE')}  ${f}`), {
+        steps: parseInt(o.step, 10) || 0,
+        file: targetFile,
+      });
       if (!undone.length) console.log('  Nothing to roll back.');
     });
   },
@@ -122,11 +132,14 @@ const commands = {
     const o = options(args), ctx = context(o);
     await withDb(o, ctx, (db, b) => runSeed(db, b, ctx, o.class));
   },
+  'migrate:file': (args) => commands.migrate(args),
+  'migrate:undo': (args) => commands['migrate:rollback'](args),
   async 'route:list'(args) {
     const o = options(args), ctx = context(o);
     const b = require('./backend/index.js');
     const handler = b.createBackend(ctx.base, { log: console });
     if (!handler) return console.log('  No routes/api.js in ' + ctx.base);
+    if (typeof handler.ready === 'function') await handler.ready();
     const rows = handler.routes().map((r) => ({
       method: r.methods.filter((m) => m !== 'HEAD').join('|'),
       uri: ('api' + r.uri).replace(/\/$/, ''),
@@ -180,9 +193,12 @@ function nextStamp(dir) {
 }
 const stamp = (d = new Date()) => { const p = (n) => String(n).padStart(2, '0'); return `${d.getFullYear()}_${p(d.getMonth() + 1)}_${p(d.getDate())}_${p(d.getHours())}${p(d.getMinutes())}${p(d.getSeconds())}`; };
 
-// a project with a tsconfig.json gets TypeScript files from som make:* (import/export instead of require)
+// a project with a tsconfig.json (or --ts flag) gets TypeScript files from som make:* (import/export instead of require)
 function isTsProject(file) {
+  if (process.argv.includes('--ts') || process.argv.includes('--typescript')) return true;
+  if (process.argv.includes('--js') || process.argv.includes('--javascript')) return false;
   for (let dir = path.dirname(file); ; dir = path.dirname(dir)) {
+    if (fs.existsSync(path.join(dir, 'tsconfig.json'))) return true;
     if (fs.existsSync(path.join(dir, 'package.json'))) return fs.existsSync(path.join(dir, 'tsconfig.json'));
     if (dir === path.dirname(dir)) return false;
   }
@@ -318,7 +334,7 @@ ${model ? `const ${model} = require('${modelReq || '../../app/Models/' + model}'
 // som db:seed --class ${name}  (or this.call(${name}) from DatabaseSeeder)
 class ${name} extends Seeder {
   async run() {
-${model ? `    // await ${model}.create({ … })\n` : name === 'DatabaseSeeder' ? '    // await this.call([UserSeeder, PostSeeder])\n' : "    // await DB.table('posts').insert({ … })\n"}  }
+${model ? `    // await ${model}.factory().count(10).create()\n    // await ${model}.create({ … })\n` : name === 'DatabaseSeeder' ? '    // await this.call([UserSeeder, PostSeeder])\n' : "    // await DB.table('posts').insert({ … })\n"}  }
 }
 
 module.exports = ${name}
@@ -338,6 +354,132 @@ class ${name} {
 
 module.exports = ${name}
 `,
+  request: (name, rulesObj, isTs = false) => {
+    let rulesStr = '';
+    if (rulesObj && Object.keys(rulesObj).length) {
+      rulesStr = Object.entries(rulesObj)
+        .map(([k, v]) => `      ${k}: '${v}',`)
+        .join('\n');
+    } else {
+      rulesStr = `      // title: 'required|string|max:255',\n      // body: 'required|string',`;
+    }
+    if (isTs) {
+      return `import { FormRequest } from 'somjs/server'
+
+export default class ${name} extends FormRequest {
+  /**
+   * Determine if the user is authorized to make this request.
+   */
+  authorize(): boolean {
+    return true
+  }
+
+  /**
+   * Get the validation rules that apply to the request.
+   */
+  rules(): Record<string, string | string[]> {
+    return {
+${rulesStr}
+    }
+  }
+
+  /**
+   * Custom error messages.
+   */
+  messages(): Record<string, string> {
+    return {}
+  }
+}
+`;
+    }
+    return `const { FormRequest } = require('somjs/server')
+
+class ${name} extends FormRequest {
+  /**
+   * Determine if the user is authorized to make this request.
+   */
+  authorize() {
+    return true
+  }
+
+  /**
+   * Get the validation rules that apply to the request.
+   */
+  rules() {
+    return {
+${rulesStr}
+    }
+  }
+
+  /**
+   * Custom error messages.
+   */
+  messages() {
+    return {}
+  }
+}
+
+module.exports = ${name}
+`;
+  },
+  resource: (name, isTs = false) => {
+    if (isTs) {
+      return `import { JsonResource } from 'somjs/server'
+
+export default class ${name} extends JsonResource {
+  toArray(req: any) {
+    return {
+      id: this.id,
+      created_at: this.created_at,
+      updated_at: this.updated_at,
+    }
+  }
+}
+`;
+    }
+    return `const { JsonResource } = require('somjs/server')
+
+class ${name} extends JsonResource {
+  toArray(req) {
+    return {
+      id: this.id,
+      created_at: this.created_at,
+      updated_at: this.updated_at,
+    }
+  }
+}
+
+module.exports = ${name}
+`;
+  },
+  rule: (name, isTs = false) => {
+    if (isTs) {
+      return `// In rules: { code: ['required', new ${name}()] }
+export default class ${name} {
+  passes(attribute: string, value: any, data: any): boolean {
+    return true
+  }
+
+  message(): string {
+    return 'The :attribute is invalid.'
+  }
+}
+`;
+    }
+    return `// In rules: { code: ['required', new ${name}()] }
+class ${name} {
+  passes(attribute, value, data) {
+    return true
+  }
+
+  message() {
+    return 'The :attribute is invalid.'
+  }
+}
+
+module.exports = ${name}
+`;
+  },
   factory: (name, model, modelReq) => {
     const m = (model || '').toLowerCase();
     let fields = '';
@@ -384,22 +526,33 @@ ${fields}
 }))
 `;
   },
-  page: (name, endpoint, dirs = []) => `<!-- frontend/pages/${[...dirs, name].join('/')}.som -->
+  page: (name, endpoint, dirs = [], isTs = false) => `<!-- frontend/pages/${[...dirs, name].join('/')}.som -->
 layout 'layouts/app.som'
-
-state items = []
-state loading = true
-state error = ''
-state notice = ''
-state search = ''
-state sortBy = 'newest'
-state selected = null
-state showCreate = false
-state showEdit = false
+${isTs ? `
+interface ${name}Item {
+  id: number
+  title?: string
+  name?: string
+  body?: string
+  description?: string
+  created_at?: string
+  updated_at?: string
+  [key: string]: any
+}
+` : ''}
+state items${isTs ? `: ${name}Item[]` : ''} = []
+state loading${isTs ? ': boolean' : ''} = true
+state error${isTs ? ': string' : ''} = ''
+state notice${isTs ? ': string' : ''} = ''
+state search${isTs ? ': string' : ''} = ''
+state sortBy${isTs ? ': string' : ''} = 'newest'
+state selected${isTs ? `: ${name}Item | null` : ''} = null
+state showCreate${isTs ? ': boolean' : ''} = false
+state showEdit${isTs ? ': boolean' : ''} = false
 state form = { title: '', body: '' }
-state editForm = { id: null, title: '', body: '' }
+state editForm${isTs ? ': { id: number | null; title: string; body: string }' : ''} = { id: null, title: '', body: '' }
 
-derive filteredItems = items.filter(i => {
+derive filteredItems${isTs ? `: ${name}Item[]` : ''} = items.filter(i => {
   if (!search) return true
   const q = search.toLowerCase()
   return (i.title || i.name || '').toLowerCase().includes(q) || (i.body || i.description || '').toLowerCase().includes(q) || String(i.id).includes(q)
@@ -756,12 +909,278 @@ function addWebRoute(ctx, name, dirs, { route, auth }) {
   addSidebarLink(ctx, routeNameTag, plural(name));
 }
 
+function cleanUpEmptyDirs(filePath, stopDirs) {
+  let dir = path.dirname(filePath);
+  while (dir && dir !== '.' && dir !== '/' && dir !== path.dirname(dir)) {
+    const base = path.basename(dir);
+    if (stopDirs.has(base)) break;
+    try {
+      const items = fs.readdirSync(dir);
+      if (items.length === 0) {
+        fs.rmdirSync(dir);
+        dir = path.dirname(dir);
+      } else {
+        break;
+      }
+    } catch (_) {
+      break;
+    }
+  }
+}
+
+function removeApiRoute(ctx, name, dirs, { route, dryRun = false }) {
+  const routeName = route ? String(route).replace(/\.(js|ts)$/, '').replace(/^[\\/]+/, '') : 'api';
+  const routeBaseName = routeName.split(/[\\/]/).pop();
+  const routeFiles = [
+    path.join(ctx.base, 'routes', routeBaseName + '.js'),
+    path.join(ctx.base, 'routes', routeBaseName + '.ts'),
+    path.join(ctx.project, 'routes', routeBaseName + '.js'),
+    path.join(ctx.project, 'routes', routeBaseName + '.ts')
+  ];
+  if (routeBaseName !== 'api') {
+    routeFiles.push(
+      path.join(ctx.base, 'routes', 'api.js'),
+      path.join(ctx.base, 'routes', 'api.ts')
+    );
+  }
+  const seenFiles = new Set();
+  const removals = [];
+
+  const endpoints = new Set([
+    [...(dirs.length ? dirs.map((d) => snake(d).replace(/_/g, '-')) : []), plural(snake(name)).replace(/_/g, '-')].join('/'),
+    plural(snake(name)).replace(/_/g, '-')
+  ]);
+  const controllerName = `${name}Controller`;
+
+  for (const f of routeFiles) {
+    if (!f || seenFiles.has(f) || !fs.existsSync(f)) continue;
+    seenFiles.add(f);
+
+    const origText = fs.readFileSync(f, 'utf8');
+    const lines = origText.split('\n');
+
+    const filteredLines = lines.filter((line) => {
+      const trimmed = line.trim();
+      const isRoute = trimmed.startsWith('Route.') || trimmed.includes('Route.apiResource(');
+      if (isRoute) {
+        for (const ep of endpoints) {
+          if (line.includes(`'${ep}'`) || line.includes(`"${ep}"`)) {
+            return false;
+          }
+        }
+        if (line.includes(controllerName)) {
+          return false;
+        }
+      }
+      return true;
+    });
+
+    const controllerUsedElsewhere = new RegExp(`\\b${controllerName}\\b`).test(
+      filteredLines.filter((l) => !l.includes('require(') && !l.includes('import ')).join('\n')
+    );
+
+    let finalLines = filteredLines;
+    if (!controllerUsedElsewhere) {
+      finalLines = filteredLines.filter((line) => {
+        const trimmed = line.trim();
+        if ((trimmed.startsWith('const ') || trimmed.startsWith('let ') || trimmed.startsWith('var ') || trimmed.startsWith('import ')) &&
+            line.includes(controllerName)) {
+          return false;
+        }
+        return true;
+      });
+    }
+
+    const newText = finalLines.join('\n').replace(/\n{3,}/g, '\n\n');
+    if (newText !== origText) {
+      const epStr = Array.from(endpoints)[0];
+      const desc = `Route.apiResource('${epStr}', ${controllerName})`;
+      removals.push({
+        file: f,
+        desc,
+        apply: () => fs.writeFileSync(f, newText)
+      });
+    }
+  }
+
+  return removals;
+}
+
+function removeWebRoute(ctx, name, dirs, { route, dryRun = false }) {
+  const routeName = route ? String(route).replace(/\.(som|js)$/, '').replace(/^[\\/]+/, '') : 'web';
+  const routeBaseName = routeName.split(/[\\/]/).pop();
+  const fileTargetName = routeBaseName === 'api' ? 'web' : routeBaseName;
+  const routeFiles = [
+    path.join(ctx.frontend, 'routes', fileTargetName + '.som'),
+    path.join(ctx.project, 'frontend', 'routes', fileTargetName + '.som'),
+    path.join(ctx.frontend, 'routes', 'web.som'),
+    path.join(ctx.project, 'frontend', 'routes', 'web.som'),
+    path.join(ctx.project, 'routes', fileTargetName + '.som'),
+    path.join(ctx.project, 'routes', 'web.som')
+  ];
+
+  const seenFiles = new Set();
+  const removals = [];
+
+  const ep1 = '/' + [...(dirs.length ? dirs.map((d) => snake(d).replace(/_/g, '-')) : []), plural(snake(name)).replace(/_/g, '-')].join('/');
+  const ep2 = '/' + plural(snake(name)).replace(/_/g, '-');
+  const pageRel1 = `pages/${[...dirs, name].join('/')}.som`;
+  const pageRel2 = `pages/${name}.som`;
+  const routeNameTag1 = [...dirs.map(snake), plural(snake(name)).replace(/_/g, '-')].join('.');
+  const routeNameTag2 = plural(snake(name)).replace(/_/g, '-');
+
+  const matchTargets = [ep1, ep2, ep1.replace(/^\//, ''), ep2.replace(/^\//, ''), pageRel1, pageRel2, routeNameTag1, routeNameTag2];
+
+  for (const f of routeFiles) {
+    if (!f || seenFiles.has(f) || !fs.existsSync(f)) continue;
+    seenFiles.add(f);
+
+    const origText = fs.readFileSync(f, 'utf8');
+    const lines = origText.split('\n');
+
+    const filteredLines = lines.filter((line) => {
+      if (!line.includes('Route.view(')) return true;
+      for (const target of matchTargets) {
+        if (line.includes(`'${target}'`) || line.includes(`"${target}"`)) {
+          return false;
+        }
+      }
+      return true;
+    });
+
+    const newText = filteredLines.join('\n').replace(/\n{3,}/g, '\n\n');
+    if (newText !== origText) {
+      const desc = `Route.view('${ep1}', '${pageRel1}')`;
+      removals.push({
+        file: f,
+        desc,
+        apply: () => fs.writeFileSync(f, newText)
+      });
+    }
+  }
+
+  return removals;
+}
+
+function removeSidebarLink(ctx, name, dirs, { dryRun = false }) {
+  const layoutFiles = [
+    path.join(ctx.frontend, 'layouts', 'app.som'),
+    path.join(ctx.project, 'frontend', 'layouts', 'app.som'),
+    path.join(ctx.project, 'layouts', 'app.som')
+  ];
+
+  const seenFiles = new Set();
+  const removals = [];
+
+  const routeNameTag1 = [...dirs.map(snake), plural(snake(name)).replace(/_/g, '-')].join('.');
+  const routeNameTag2 = plural(snake(name)).replace(/_/g, '-');
+  const ep1 = '/' + [...(dirs.length ? dirs.map((d) => snake(d).replace(/_/g, '-')) : []), plural(snake(name)).replace(/_/g, '-')].join('/');
+  const ep2 = '/' + plural(snake(name)).replace(/_/g, '-');
+
+  const matchTags = [routeNameTag1, routeNameTag2, ep1, ep2];
+
+  for (const f of layoutFiles) {
+    if (!f || seenFiles.has(f) || !fs.existsSync(f)) continue;
+    seenFiles.add(f);
+
+    const origText = fs.readFileSync(f, 'utf8');
+    const lines = origText.split('\n');
+
+    const filteredLines = lines.filter((line) => {
+      if (!line.includes('to:')) return true;
+      for (const tag of matchTags) {
+        if (line.includes(`'${tag}'`) || line.includes(`"${tag}"`)) {
+          return false;
+        }
+      }
+      return true;
+    });
+
+    const newText = filteredLines.join('\n');
+    if (newText !== origText) {
+      removals.push({
+        file: f,
+        desc: `Sidebar: { to: '${routeNameTag1}' }`,
+        apply: () => fs.writeFileSync(f, newText)
+      });
+    }
+  }
+
+  return removals;
+}
+
 const pass = (o) => [
   ...(o.backend ? ['--backend', o.backend] : []),
   ...(o.dir ? ['--dir', o.dir] : []),
   ...(o.route ? ['--route', o.route] : []),
   ...(o.flags.has('auth') ? ['--auth'] : []),
 ];
+
+function introspectModelRules(ctx, modelName, requestName = '') {
+  if (!modelName) return null;
+  const { dirs, name } = nested(modelName);
+  const candidates = [
+    ctx && ctx.base ? path.join(ctx.base, 'app', 'Models', ...dirs, name + '.js') : null,
+    ctx && ctx.base ? path.join(ctx.base, 'app', 'Models', ...dirs, name + '.ts') : null,
+    ctx && ctx.base ? path.join(ctx.base, 'app', ...dirs, name + '.js') : null,
+    ctx && ctx.base ? path.join(ctx.base, 'app', ...dirs, name + '.ts') : null,
+    path.join(process.cwd(), 'app', 'Models', ...dirs, name + '.js'),
+    path.join(process.cwd(), 'app', 'Models', ...dirs, name + '.ts'),
+    path.join(process.cwd(), 'demo', 'app', 'Models', ...dirs, name + '.js'),
+  ].filter(Boolean);
+  let modelFile = candidates.find((f) => fs.existsSync(f));
+  if (!modelFile) return null;
+
+  try {
+    const text = fs.readFileSync(modelFile, 'utf8');
+    const fillableMatch = text.match(/fillable\s*=\s*\[([\s\S]*?)\]/);
+    if (!fillableMatch) return null;
+    const rawItems = fillableMatch[1].match(/['"`]([\w-]+)['"`]/g);
+    if (!rawItems || !rawItems.length) return null;
+    const fields = rawItems.map((s) => s.replace(/['"`]/g, ''));
+
+    const casts = {};
+    const castsMatch = text.match(/casts\s*=\s*\{([\s\S]*?)\}/);
+    if (castsMatch) {
+      const castPairs = castsMatch[1].matchAll(/['"`]?(\w+)['"`]?\s*:\s*['"`](\w+)['"`]/g);
+      for (const m of castPairs) casts[m[1]] = m[2].toLowerCase();
+    }
+
+    const isUpdate = /Update/i.test(requestName);
+    const prefix = isUpdate ? 'sometimes|' : 'required|';
+    const rules = {};
+
+    for (const field of fields) {
+      const cast = casts[field] || '';
+      if (cast === 'boolean' || cast === 'bool') {
+        rules[field] = `${prefix}boolean`;
+      } else if (cast === 'integer' || cast === 'int') {
+        rules[field] = `${prefix}integer`;
+      } else if (cast === 'float' || cast === 'decimal' || cast === 'real' || cast === 'double') {
+        rules[field] = `${prefix}numeric`;
+      } else if (cast === 'json' || cast === 'array') {
+        rules[field] = `${prefix}array`;
+      } else if (cast === 'date' || cast === 'datetime') {
+        rules[field] = `${prefix}date`;
+      } else if (/email/i.test(field)) {
+        rules[field] = `${prefix}string|email|max:255`;
+      } else if (/password/i.test(field)) {
+        rules[field] = `${prefix}string|min:8`;
+      } else if (/url/i.test(field)) {
+        rules[field] = `${prefix}url`;
+      } else if (/phone|mobile/i.test(field)) {
+        rules[field] = `${prefix}string|max:30`;
+      } else if (/body|description|content|notes|text/i.test(field)) {
+        rules[field] = `${prefix}string`;
+      } else {
+        rules[field] = `${prefix}string|max:255`;
+      }
+    }
+    return rules;
+  } catch (_) {
+    return null;
+  }
+}
 
 const make = {
   model(args) {
@@ -787,6 +1206,10 @@ const make = {
     if (all || o.flags.has('m') || o.flags.has('migration')) make.migration([`create_${plural(snake(name))}_table`, ...pass(o)]);
     if (all || o.flags.has('f') || o.flags.has('factory')) make.factory([`${name}Factory`, '--model', modelRel, ...pass(o)]);
     if (all || o.flags.has('s') || o.flags.has('seed') || o.flags.has('seeder')) make.seeder([`${name}Seeder`, '--model', modelRel, ...pass(o)]);
+    if (all || o.flags.has('req') || o.flags.has('request') || o.flags.has('requests')) {
+      make.request([[...otherDirs, `Store${name}Request`].join('/'), '--model', modelRel, ...pass(o)]);
+      make.request([[...otherDirs, `Update${name}Request`].join('/'), '--model', modelRel, ...pass(o)]);
+    }
     if (all || o.flags.has('c') || o.flags.has('controller') || o.flags.has('api')) {
       make.controller([[...otherDirs, `${name}Controller`].join('/'), '--model', modelRel, ...(hasRoute ? ['-r'] : []), ...pass(o)]);
     } else if (hasRoute) {
@@ -835,7 +1258,8 @@ const make = {
     const hasRoute = o.flags.has('r') || o.flags.has('route') || Boolean(o.route);
 
     const pageFile = path.join(ctx.frontend, 'pages', ...dirs, name + '.som');
-    if (write(pageFile, stubs.page(name, endpoint, dirs))) {
+    const isTs = isTsProject(pageFile);
+    if (write(pageFile, stubs.page(name, endpoint, dirs, isTs))) {
       if (hasRoute) {
         addWebRoute(ctx, name, dirs, { route: o.route, auth });
       } else {
@@ -875,6 +1299,200 @@ const make = {
     write(path.join(ctx.base, 'app', 'Http', 'Middleware', ...dirs, name + '.js'), stubs.middleware(name));
     if (dirs.length) console.log(dim(`  In a folder, give it a name in app/Http/Kernel.js:  aliases: { '${snake(name).replace(/_/g, '-')}': 'Middleware/${[...dirs, name].join('/')}.js' }`));
   },
+  request(args) {
+    const o = options(args), ctx = context(o);
+    let { dirs, name } = nested(o._[0]);
+    if (!name) return console.error('  som make:request StorePostRequest [--model Post]');
+    if (!/Request$/.test(name)) name += 'Request';
+    const reqDir = path.join(ctx.base, 'app', 'Http', 'Requests');
+    if (!fs.existsSync(reqDir)) fs.mkdirSync(reqDir, { recursive: true });
+    const isTs = isTsProject(path.join(reqDir, ...dirs, name + '.js'));
+    const ext = isTs ? '.ts' : '.js';
+    const filePath = path.join(reqDir, ...dirs, name + ext);
+    const rulesObj = introspectModelRules(ctx, o.model, name);
+    if (write(filePath, stubs.request(name, rulesObj, isTs))) {
+      console.log(dim(`  In controller:  const data = await ${name}.validate(req)`));
+    }
+  },
+  resource(args) {
+    const o = options(args), ctx = context(o);
+    let { dirs, name } = nested(o._[0]);
+    if (!name) return console.error('  som make:resource PostResource');
+    if (!/Resource$/.test(name)) name += 'Resource';
+    const resDir = path.join(ctx.base, 'app', 'Http', 'Resources');
+    if (!fs.existsSync(resDir)) fs.mkdirSync(resDir, { recursive: true });
+    const isTs = isTsProject(path.join(resDir, ...dirs, name + '.js'));
+    const ext = isTs ? '.ts' : '.js';
+    const filePath = path.join(resDir, ...dirs, name + ext);
+    if (write(filePath, stubs.resource(name, isTs))) {
+      console.log(dim(`  In controller:  return new ${name}(item)`));
+    }
+  },
+  rule(args) {
+    const o = options(args), ctx = context(o);
+    let { dirs, name } = nested(o._[0]);
+    if (!name) return console.error('  som make:rule Uppercase');
+    const ruleDir = path.join(ctx.base, 'app', 'Rules');
+    if (!fs.existsSync(ruleDir)) fs.mkdirSync(ruleDir, { recursive: true });
+    const isTs = isTsProject(path.join(ruleDir, ...dirs, name + '.js'));
+    const ext = isTs ? '.ts' : '.js';
+    const filePath = path.join(ruleDir, ...dirs, name + ext);
+    if (write(filePath, stubs.rule(name, isTs))) {
+      console.log(dim(`  In rules:  { field: ['required', new ${name}()] }`));
+    }
+  },
+  lang(args) {
+    const o = options(args), ctx = context(o);
+    const locale = (o._[0] || '').toLowerCase().trim();
+    if (!locale || /[\/\\]|\.\./.test(locale)) {
+      console.error('  som make:lang <locale>   (e.g. som make:lang ar)');
+      return;
+    }
+    // Place in project root lang/ (matching standard Laravel 9/10/11) or backend/lang/ if already existing
+    const rootLang = path.join(ctx.project || ctx.base, 'lang');
+    const backendLang = path.join(ctx.base, 'lang');
+    const targetBase = fs.existsSync(backendLang) && !fs.existsSync(rootLang) ? backendLang : rootLang;
+    const langDir = path.join(targetBase, locale);
+    if (!fs.existsSync(langDir)) fs.mkdirSync(langDir, { recursive: true });
+
+    const isAr = locale === 'ar';
+
+    // 1. auth.json
+    const authPath = path.join(langDir, 'auth.json');
+    if (!fs.existsSync(authPath)) {
+      const authData = isAr ? {
+        failed: 'بيانات الاعتماد هذه غير متطابقة مع سجلاتنا.',
+        password: 'كلمة المرور المدخلة غير صحيحة.',
+        throttle: 'محاولات تسجيل دخول كثيرة جداً. يرجى المحاولة بعد :seconds ثانية.'
+      } : {
+        failed: 'These credentials do not match our records.',
+        password: 'The provided password is incorrect.',
+        throttle: 'Too many login attempts. Please try again in :seconds seconds.'
+      };
+      write(authPath, JSON.stringify(authData, null, 2) + '\n');
+    }
+
+    // 2. pagination.json
+    const pagPath = path.join(langDir, 'pagination.json');
+    if (!fs.existsSync(pagPath)) {
+      const pagData = isAr ? {
+        previous: '&laquo; السابق',
+        next: 'التالي &raquo;'
+      } : {
+        previous: '&laquo; Previous',
+        next: 'Next &raquo;'
+      };
+      write(pagPath, JSON.stringify(pagData, null, 2) + '\n');
+    }
+
+    // 3. passwords.json
+    const passPath = path.join(langDir, 'passwords.json');
+    if (!fs.existsSync(passPath)) {
+      const passData = isAr ? {
+        reset: 'تمت إعادة تعيين كلمة المرور بنجاح.',
+        sent: 'تم إرسال رابط تعيين كلمة المرور إلى بريدك الإلكتروني.',
+        throttled: 'يرجى الانتظار قبل إعادة المحاولة.',
+        token: 'رمز إعادة تعيين كلمة المرور هذا غير صالح.',
+        user: 'لا يمكننا العثور على مستخدم بعنوان البريد الإلكتروني هذا.'
+      } : {
+        reset: 'Your password has been reset.',
+        sent: 'We have emailed your password reset link.',
+        throttled: 'Please wait before retrying.',
+        token: 'This password reset token is invalid.',
+        user: "We can't find a user with that email address."
+      };
+      write(passPath, JSON.stringify(passData, null, 2) + '\n');
+    }
+
+    // 4. messages.json
+    const msgPath = path.join(langDir, 'messages.json');
+    if (!fs.existsSync(msgPath)) {
+      const msgData = isAr ? {
+        welcome: 'أهلاً بك في Som.js',
+        hello: 'مرحباً، :name',
+        items: '{0} لا توجد عناصر|{1} عنصر واحد|{2} عنصران|[3,10] :count عناصر|[11,*] :count عنصراً'
+      } : {
+        welcome: 'Welcome to Som.js',
+        hello: 'Hello, :name',
+        items: '{0} No items|{1} One item|[2,*] :count items'
+      };
+      write(msgPath, JSON.stringify(msgData, null, 2) + '\n');
+    }
+
+    // 5. validation.json
+    const valPath = path.join(langDir, 'validation.json');
+    if (!fs.existsSync(valPath)) {
+      const valData = isAr ? {
+        required: 'حقل :attribute مطلوب.',
+        email: 'يجب أن يكون :attribute عنوان بريد إلكتروني صالح.',
+        min: {
+          string: 'يجب أن يحتوي :attribute على :min أحرف على الأقل.',
+          numeric: 'يجب أن تكون قيمة :attribute على الأقل :min.',
+          array: 'يجب أن يحتوي :attribute على الأقل على :min عناصر.'
+        },
+        max: {
+          string: 'يجب ألا يتجاوز :attribute :max أحرف.',
+          numeric: 'يجب ألا تتجاوز قيمة :attribute :max.',
+          array: 'يجب ألا يحتوي :attribute على أكثر من :max عناصر.'
+        },
+        confirmed: 'تأكيد :attribute غير متطابق.',
+        attributes: {
+          email: 'البريد الإلكتروني',
+          password: 'كلمة المرور',
+          name: 'الاسم',
+          title: 'العنوان'
+        }
+      } : {
+        required: 'The :attribute field is required.',
+        email: 'The :attribute field must be a valid email address.',
+        min: {
+          string: 'The :attribute field must be at least :min characters.',
+          numeric: 'The :attribute field must be at least :min.',
+          array: 'The :attribute field must have at least :min items.'
+        },
+        max: {
+          string: 'The :attribute field must not be greater than :max characters.',
+          numeric: 'The :attribute field must not be greater than :max.',
+          array: 'The :attribute field must not have more than :max items.'
+        },
+        confirmed: 'The :attribute confirmation does not match.',
+        attributes: {
+          email: 'email address',
+          password: 'password',
+          name: 'name',
+          title: 'title'
+        }
+      };
+      write(valPath, JSON.stringify(valData, null, 2) + '\n');
+    }
+
+    // 6. Root string translation: lang/<locale>.json
+    const rootJsonPath = path.join(targetBase, `${locale}.json`);
+    if (!fs.existsSync(rootJsonPath)) {
+      const rootStrings = isAr ? {
+        'Sign In': 'تسجيل الدخول',
+        'Sign Up': 'إنشاء حساب جديد',
+        'Dashboard': 'لوحة التحكم',
+        'Profile': 'الملف الشخصي',
+        'Logout': 'تسجيل الخروج',
+        'Save': 'حفظ',
+        'Cancel': 'إلغاء'
+      } : {
+        'Sign In': 'Sign In',
+        'Sign Up': 'Sign Up',
+        'Dashboard': 'Dashboard',
+        'Profile': 'Profile',
+        'Logout': 'Logout',
+        'Save': 'Save',
+        'Cancel': 'Cancel'
+      };
+      write(rootJsonPath, JSON.stringify(rootStrings, null, 2) + '\n');
+    }
+
+    console.log(dim(`  Laravel-compatible translations created in ${path.relative(process.cwd(), targetBase)}/${locale}/ & ${locale}.json`));
+    console.log(dim(`  Use in backend:  __('auth.failed') or __('Sign In')`));
+    console.log(dim(`  Use in frontend: { __('auth.failed') } or { t('Sign In') }`));
+  },
 };
 // som make:errors — the error pages (errors/404.som, 403, 500…)
 make.errors = function (args) {
@@ -905,9 +1523,13 @@ make.routes = function (args) {
     const api = require('./backend/typescript.js').findFile(path.join(ctx.base, 'routes', 'api')) || path.join(ctx.base, 'routes', 'api.js');
     if (fs.existsSync(api) && name !== 'api') {
       const text = fs.readFileSync(api, 'utf8');
-      if (!text.includes(`require('./${name}')`)) {
-        fs.writeFileSync(api, text.replace(/(const \{ Route \} = require\('somjs\/server'\)\n)/, `$1\n// ${name} routes (routes/${name}.js)\nrequire('./${name}')\n`));
-        console.log(`  ${green('UPDATED')}  ${path.relative(process.cwd(), api)}  (require('./${name}'))`);
+      const isTs = api.endsWith('.ts');
+      if (!text.includes(`require('./${name}')`) && !text.includes(`import './${name}'`)) {
+        const updated = isTs
+          ? text.replace(/(import \{[^}]*Route[^}]*\} from ['"]somjs\/server['"][^\n]*\n)/, `$1\n// ${name} routes (routes/${name}.ts)\nimport './${name}'\n`)
+          : text.replace(/(const \{ Route \} = require\('somjs\/server'\)\n)/, `$1\n// ${name} routes (routes/${name}.js)\nrequire('./${name}')\n`);
+        fs.writeFileSync(api, updated !== text ? updated : text + `\n${isTs ? `import './${name}'` : `require('./${name}')`}\n`);
+        console.log(`  ${green('UPDATED')}  ${path.relative(process.cwd(), api)}  (${isTs ? `import './${name}'` : `require('./${name}')`})`);
       }
     }
     return;
@@ -956,6 +1578,297 @@ make.vite = function (args) {
 
 Object.entries(make).forEach(([k, fn]) => { commands['make:' + k] = fn; });
 
-module.exports = { commands, stubs, make, helpers: { options, context, withDb, write, nested, green, dim, migrationsOf, nextStamp, up, pascal, runSeed } };
+async function removeModel(args) {
+  const o = options(args);
+  const ctx = context(o);
+
+  let rawPositional = [...o._];
+  if (rawPositional[0] && rawPositional[0].toLowerCase() === 'model') {
+    rawPositional.shift();
+  }
+
+  const ARTIFACT_KEYWORDS = new Set([
+    'all',
+    'controller', 'controllers', 'c',
+    'request', 'requests', 'req',
+    'route', 'routes', 'r',
+    'migration', 'migrations', 'm',
+    'seeder', 'seeders', 'seed', 's',
+    'factory', 'factories', 'f',
+    'page', 'pages', 'p',
+    'model', 'models'
+  ]);
+
+  const positionalTokens = new Set();
+  let targetModelName = o.model || null;
+  let positionalFolder = null;
+
+  for (const token of rawPositional) {
+    const lower = token.toLowerCase();
+    if (ARTIFACT_KEYWORDS.has(lower)) {
+      positionalTokens.add(lower);
+    } else if (!targetModelName) {
+      targetModelName = token;
+    } else if (!positionalFolder && !o.folder) {
+      positionalFolder = token;
+    }
+  }
+
+  if (!targetModelName) {
+    console.error('  Usage: som remove:model <Name> [--all] [--controller] [--request] [--route] [--migration] [--seeder] [--factory] [--page] [--folder=Folder]');
+    console.error('         som remove model <Name> [options]');
+    console.error('         som:remove model <Name> [options]');
+    return;
+  }
+
+  const { dirs, name } = nested(targetModelName);
+  const targetFolder = o.folder || o.subfolder || o['in'] || o.group || o.path || positionalFolder;
+  const otherDirs = targetFolder ? targetFolder.split(/[\\/]/).filter(Boolean) : dirs;
+  const flatModel = o.flags.has('flat-model') || o.flags.has('except-model') || o.flags.has('no-model-dir') || Boolean(targetFolder);
+  const modelDirs = flatModel ? [] : dirs;
+
+  const wantsAll = o.flags.has('a') || o.flags.has('all') || positionalTokens.has('all');
+  const wantsController = wantsAll || o.flags.has('c') || o.flags.has('controller') || o.flags.has('controllers') || positionalTokens.has('controller') || positionalTokens.has('controllers') || positionalTokens.has('c');
+  const wantsRequest = wantsAll || o.flags.has('req') || o.flags.has('request') || o.flags.has('requests') || positionalTokens.has('request') || positionalTokens.has('requests') || positionalTokens.has('req');
+  const wantsRoute = wantsAll || o.flags.has('r') || o.flags.has('route') || o.flags.has('routes') || positionalTokens.has('route') || positionalTokens.has('routes') || positionalTokens.has('r');
+  const wantsMigration = wantsAll || o.flags.has('m') || o.flags.has('migration') || o.flags.has('migrations') || positionalTokens.has('migration') || positionalTokens.has('migrations') || positionalTokens.has('m');
+  const wantsSeeder = wantsAll || o.flags.has('s') || o.flags.has('seed') || o.flags.has('seeder') || o.flags.has('seeders') || positionalTokens.has('seeder') || positionalTokens.has('seeders') || positionalTokens.has('seed') || positionalTokens.has('s');
+  const wantsFactory = wantsAll || o.flags.has('f') || o.flags.has('factory') || o.flags.has('factories') || positionalTokens.has('factory') || positionalTokens.has('factories') || positionalTokens.has('f');
+  const wantsPage = wantsAll || o.flags.has('p') || o.flags.has('page') || o.flags.has('pages') || positionalTokens.has('page') || positionalTokens.has('pages') || positionalTokens.has('p');
+
+  const anySpecific = wantsController || wantsRequest || wantsRoute || wantsMigration || wantsSeeder || wantsFactory || wantsPage;
+  const wantsModel = wantsAll || o.flags.has('model') || positionalTokens.has('model') || positionalTokens.has('models') || !anySpecific;
+
+  const dryRun = o.flags.has('dry-run') || o.flags.has('d');
+  const force = o.flags.has('force') || o.flags.has('f') || o.flags.has('yes') || o.flags.has('y');
+
+  // Collect candidate files to delete
+  const filesToDelete = new Set();
+  const checkFile = (p) => {
+    if (p && fs.existsSync(p)) filesToDelete.add(p);
+  };
+
+  // 1. Model
+  if (wantsModel) {
+    checkFile(path.join(ctx.base, 'app', 'Models', ...modelDirs, `${name}.js`));
+    checkFile(path.join(ctx.base, 'app', 'Models', ...modelDirs, `${name}.ts`));
+    if (dirs.length) {
+      checkFile(path.join(ctx.base, 'app', 'Models', ...dirs, `${name}.js`));
+      checkFile(path.join(ctx.base, 'app', 'Models', ...dirs, `${name}.ts`));
+      checkFile(path.join(ctx.project, 'app', 'Models', ...dirs, `${name}.js`));
+      checkFile(path.join(ctx.project, 'app', 'Models', ...dirs, `${name}.ts`));
+    }
+    checkFile(path.join(ctx.base, 'app', 'Models', `${name}.js`));
+    checkFile(path.join(ctx.base, 'app', 'Models', `${name}.ts`));
+    checkFile(path.join(ctx.project, 'app', 'Models', `${name}.js`));
+    checkFile(path.join(ctx.project, 'app', 'Models', `${name}.ts`));
+  }
+
+  // 2. Controller
+  if (wantsController) {
+    checkFile(path.join(ctx.base, 'app', 'Http', 'Controllers', ...otherDirs, `${name}Controller.js`));
+    checkFile(path.join(ctx.base, 'app', 'Http', 'Controllers', ...otherDirs, `${name}Controller.ts`));
+    if (dirs.length && dirs.join('/') !== otherDirs.join('/')) {
+      checkFile(path.join(ctx.base, 'app', 'Http', 'Controllers', ...dirs, `${name}Controller.js`));
+      checkFile(path.join(ctx.base, 'app', 'Http', 'Controllers', ...dirs, `${name}Controller.ts`));
+    }
+    checkFile(path.join(ctx.base, 'app', 'Http', 'Controllers', `${name}Controller.js`));
+    checkFile(path.join(ctx.base, 'app', 'Http', 'Controllers', `${name}Controller.ts`));
+    checkFile(path.join(ctx.project, 'app', 'Http', 'Controllers', ...otherDirs, `${name}Controller.js`));
+    checkFile(path.join(ctx.project, 'app', 'Http', 'Controllers', ...dirs, `${name}Controller.js`));
+    checkFile(path.join(ctx.project, 'app', 'Http', 'Controllers', `${name}Controller.js`));
+  }
+
+  // 3. Requests
+  if (wantsRequest) {
+    for (const prefix of ['Store', 'Update']) {
+      checkFile(path.join(ctx.base, 'app', 'Http', 'Requests', ...otherDirs, `${prefix}${name}Request.js`));
+      checkFile(path.join(ctx.base, 'app', 'Http', 'Requests', ...otherDirs, `${prefix}${name}Request.ts`));
+      if (dirs.length && dirs.join('/') !== otherDirs.join('/')) {
+        checkFile(path.join(ctx.base, 'app', 'Http', 'Requests', ...dirs, `${prefix}${name}Request.js`));
+        checkFile(path.join(ctx.base, 'app', 'Http', 'Requests', ...dirs, `${prefix}${name}Request.ts`));
+      }
+      checkFile(path.join(ctx.base, 'app', 'Http', 'Requests', `${prefix}${name}Request.js`));
+      checkFile(path.join(ctx.base, 'app', 'Http', 'Requests', `${prefix}${name}Request.ts`));
+      checkFile(path.join(ctx.project, 'app', 'Http', 'Requests', ...otherDirs, `${prefix}${name}Request.js`));
+      checkFile(path.join(ctx.project, 'app', 'Http', 'Requests', ...dirs, `${prefix}${name}Request.js`));
+      checkFile(path.join(ctx.project, 'app', 'Http', 'Requests', `${prefix}${name}Request.js`));
+    }
+  }
+
+  // 4. Factory
+  if (wantsFactory) {
+    checkFile(path.join(ctx.base, 'database', 'factories', `${name}Factory.js`));
+    checkFile(path.join(ctx.base, 'database', 'factories', `${name}Factory.ts`));
+    if (dirs.length) {
+      checkFile(path.join(ctx.base, 'database', 'factories', ...dirs, `${name}Factory.js`));
+      checkFile(path.join(ctx.base, 'database', 'factories', ...dirs, `${name}Factory.ts`));
+    }
+    checkFile(path.join(ctx.project, 'database', 'factories', `${name}Factory.js`));
+    checkFile(path.join(ctx.project, 'database', 'factories', `${name}Factory.ts`));
+  }
+
+  // 5. Seeder
+  if (wantsSeeder) {
+    checkFile(path.join(ctx.base, 'database', 'seeders', `${name}Seeder.js`));
+    checkFile(path.join(ctx.base, 'database', 'seeders', `${name}Seeder.ts`));
+    if (dirs.length) {
+      checkFile(path.join(ctx.base, 'database', 'seeders', ...dirs, `${name}Seeder.js`));
+      checkFile(path.join(ctx.base, 'database', 'seeders', ...dirs, `${name}Seeder.ts`));
+    }
+    checkFile(path.join(ctx.project, 'database', 'seeders', `${name}Seeder.js`));
+    checkFile(path.join(ctx.project, 'database', 'seeders', `${name}Seeder.ts`));
+  }
+
+  // 6. Page
+  if (wantsPage) {
+    checkFile(path.join(ctx.frontend, 'pages', ...otherDirs, `${name}.som`));
+    if (dirs.length && dirs.join('/') !== otherDirs.join('/')) {
+      checkFile(path.join(ctx.frontend, 'pages', ...dirs, `${name}.som`));
+    }
+    checkFile(path.join(ctx.frontend, 'pages', `${name}.som`));
+    checkFile(path.join(ctx.project, 'frontend', 'pages', ...otherDirs, `${name}.som`));
+    checkFile(path.join(ctx.project, 'frontend', 'pages', ...dirs, `${name}.som`));
+    checkFile(path.join(ctx.project, 'frontend', 'pages', `${name}.som`));
+    checkFile(path.join(ctx.project, 'pages', ...otherDirs, `${name}.som`));
+    checkFile(path.join(ctx.project, 'pages', ...dirs, `${name}.som`));
+    checkFile(path.join(ctx.project, 'pages', `${name}.som`));
+  }
+
+  // 7. Migration
+  if (wantsMigration) {
+    const migrationDirs = new Set([
+      migrationsOf(o, ctx),
+      path.join(ctx.base, 'database', 'migrations'),
+      path.join(ctx.project, 'database', 'migrations')
+    ]);
+    const pluralSnake = plural(snake(name));
+    const singularSnake = snake(name);
+    const migPattern = new RegExp(`^\\d{4}_\\d{2}_\\d{2}_\\d{6}_create_(${pluralSnake}|${singularSnake})_table\\.(js|ts|sql)$`);
+    const fallbackPattern = new RegExp(`_create_(${pluralSnake}|${singularSnake})_table\\.(js|ts|sql)$`);
+
+    for (const mDir of migrationDirs) {
+      if (!fs.existsSync(mDir)) continue;
+      try {
+        const files = fs.readdirSync(mDir);
+        for (const file of files) {
+          if (migPattern.test(file) || fallbackPattern.test(file)) {
+            checkFile(path.join(mDir, file));
+          }
+        }
+      } catch (_) {}
+    }
+  }
+
+  // 8. Routes
+  let routeRemovals = [];
+  if (wantsRoute || wantsController) {
+    // a deleted controller must not stay required by routes/api.js (that would break every /api route, login too)
+    routeRemovals.push(...removeApiRoute(ctx, name, otherDirs, { route: o.route, dryRun }));
+    if (dirs.length && dirs.join('/') !== otherDirs.join('/')) {
+      routeRemovals.push(...removeApiRoute(ctx, name, dirs, { route: o.route, dryRun }));
+    }
+  }
+  if (wantsRoute) {
+    routeRemovals.push(...removeWebRoute(ctx, name, otherDirs, { route: o.route, dryRun }));
+    if (dirs.length && dirs.join('/') !== otherDirs.join('/')) {
+      routeRemovals.push(...removeWebRoute(ctx, name, dirs, { route: o.route, dryRun }));
+    }
+    routeRemovals.push(...removeSidebarLink(ctx, name, otherDirs, { dryRun }));
+    if (dirs.length && dirs.join('/') !== otherDirs.join('/')) {
+      routeRemovals.push(...removeSidebarLink(ctx, name, dirs, { dryRun }));
+    }
+  }
+
+  const seenRouteFileDescs = new Set();
+  routeRemovals = routeRemovals.filter((r) => {
+    const key = `${r.file}::${r.desc}`;
+    if (seenRouteFileDescs.has(key)) return false;
+    seenRouteFileDescs.add(key);
+    return true;
+  });
+
+  const totalItems = filesToDelete.size + routeRemovals.length;
+  if (totalItems === 0) {
+    console.log(`  No matching files or routes found for ${name}.`);
+    return;
+  }
+
+  if (dryRun) {
+    for (const f of filesToDelete) {
+      console.log(`  ${yellow('WOULD DELETE')}  ${path.relative(process.cwd(), f)}`);
+    }
+    for (const r of routeRemovals) {
+      console.log(`  ${yellow('WOULD REMOVE')}  ${path.relative(process.cwd(), r.file)}  (${r.desc})`);
+    }
+    console.log(`\n  ${totalItems} item${totalItems === 1 ? '' : 's'} would be removed (dry-run).`);
+    return;
+  }
+
+  if (!force && process.stdin.isTTY && process.stdout.isTTY) {
+    const readline = require('readline');
+    const rl = readline.createInterface({ input: process.stdin, output: process.stdout });
+    const answer = await new Promise((resolve) => {
+      console.log(`\n  Remove ${totalItems} item${totalItems === 1 ? '' : 's'} for ${name}:`);
+      for (const f of filesToDelete) console.log(`    - ${path.relative(process.cwd(), f)}`);
+      for (const r of routeRemovals) console.log(`    - ${path.relative(process.cwd(), r.file)} (${r.desc})`);
+      rl.question('\n  Are you sure? [y/N]: ', (ans) => {
+        rl.close();
+        resolve(String(ans || '').trim().toLowerCase());
+      });
+    });
+    if (answer !== 'y' && answer !== 'yes') {
+      console.log('  Removal cancelled.');
+      return;
+    }
+  }
+
+  const stopDirs = new Set(['app', 'backend', 'frontend', 'database', 'Models', 'Controllers', 'Requests', 'factories', 'seeders', 'migrations', 'pages', 'routes', 'views', '.']);
+
+  let count = 0;
+  for (const f of filesToDelete) {
+    try {
+      fs.unlinkSync(f);
+      cleanUpEmptyDirs(f, stopDirs);
+      console.log(`  ${red('DELETED')}  ${path.relative(process.cwd(), f)}`);
+      count++;
+    } catch (e) {
+      console.error(`  Failed to delete ${path.relative(process.cwd(), f)}: ${e.message}`);
+    }
+  }
+
+  for (const r of routeRemovals) {
+    try {
+      r.apply();
+      console.log(`  ${red('REMOVED')}  ${path.relative(process.cwd(), r.file)}  (${r.desc})`);
+      count++;
+    } catch (e) {
+      console.error(`  Failed to update ${path.relative(process.cwd(), r.file)}: ${e.message}`);
+    }
+  }
+
+  console.log(`\n  ${count} item${count === 1 ? '' : 's'} removed.`);
+}
+
+const remove = {
+  model: removeModel
+};
+
+commands['remove:model'] = remove.model;
+commands['som:remove:model'] = remove.model;
+commands['remove'] = async function (args) {
+  const o = options(args);
+  const first = (o._[0] || '').toLowerCase();
+  if (first === 'model') {
+    return await remove.model(args);
+  }
+  if (first && typeof remove[first] === 'function') {
+    return await remove[first](args);
+  }
+  return await remove.model(args);
+};
+commands['som:remove'] = commands['remove'];
+
+module.exports = { commands, stubs, make, remove, helpers: { options, context, withDb, write, nested, green, red, yellow, dim, migrationsOf, nextStamp, up, pascal, runSeed } };
 // the rest of the commands (queues, schedule, cache, tinker, make:job …) add themselves here
 require('./artisan-more.js');

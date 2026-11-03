@@ -6,6 +6,9 @@
 saved collapsed = false
 state open = false
 state userMenuOpen = false
+state sessionWarning = false
+state remainingMinutes = 5
+state inactivityTimer = null
 
 // SVG vector icon paths (24x24)
 state icons = {
@@ -29,6 +32,7 @@ state navGroups = [
   ] },
   { label: 'Platform', links: [
     { to: 'welcome', label: 'Showcase', icon: 'showcase' },
+    { to: 'error-monitor', label: 'Error Monitor', icon: 'panel' },
     { to: 'docs', label: 'Documentation', icon: 'docs' },
     { to: 'tests.index', label: 'Test Suite', icon: 'tests' },
   ] },
@@ -68,8 +72,37 @@ action onKeydown(e) {
   }
 }
 
-on ready { window.addEventListener('keydown', onKeydown) }
-on destroy { window.removeEventListener('keydown', onKeydown) }
+on ready {
+  window.addEventListener('keydown', onKeydown)
+  const timeoutMin = Number(env.PUBLIC_SESSION_TIMEOUT) || 30
+  const warnMin = Number(env.PUBLIC_SESSION_WARNING) || 5
+  if (Som.useInactivityTimer && timeoutMin > 0) {
+    inactivityTimer = Som.useInactivityTimer({
+      timeoutMinutes: timeoutMin,
+      warningMinutes: warnMin,
+      onWarning(mins) {
+        remainingMinutes = mins
+        sessionWarning = true
+      },
+      onReset() {
+        sessionWarning = false
+      },
+      async onTimeout() {
+        sessionWarning = false
+        await logout()
+      },
+    })
+  }
+}
+on destroy {
+  window.removeEventListener('keydown', onKeydown)
+  if (inactivityTimer && inactivityTimer.stop) inactivityTimer.stop()
+}
+
+action extendSession() {
+  sessionWarning = false
+  if (inactivityTimer && inactivityTimer.reset) inactivityTimer.reset()
+}
 
 <view>
   <div class={'dash-shell' + (collapsed ? ' collapsed' : '') + (open ? ' open' : '')}>
@@ -178,6 +211,11 @@ on destroy { window.removeEventListener('keydown', onKeydown) }
         </button>
       </header>
 
+      <div s-if="sessionWarning" class="session-warning-banner" role="alert">
+        <span>Your session will expire in {remainingMinutes} min due to inactivity.</span>
+        <button class="btn sm" @click={extendSession}>Stay Signed In</button>
+      </div>
+
       <main class="dash-content-area">
         <slot></slot>
       </main>
@@ -209,7 +247,7 @@ on destroy { window.removeEventListener('keydown', onKeydown) }
   display: flex;
   flex-direction: column;
   background: var(--card);
-  border-right: 1px solid var(--border);
+  border-inline-end: 1px solid var(--border);
   overflow: hidden;
   z-index: 40;
 }
@@ -278,10 +316,10 @@ on destroy { window.removeEventListener('keydown', onKeydown) }
   padding: 4px 8px;
   font-size: 11px;
   font-family: var(--mono);
-  font-weight: 700;
+  font-weight: 800;
   text-transform: uppercase;
   letter-spacing: 0.06em;
-  color: var(--muted);
+  color: var(--foreground);
 }
 
 .nav-list {
@@ -296,25 +334,27 @@ on destroy { window.removeEventListener('keydown', onKeydown) }
   display: flex;
   align-items: center;
   gap: 10px;
-  height: 34px;
+  height: 36px;
   padding: 0 10px;
   color: var(--foreground);
   text-decoration: none;
-  font-size: 13px;
-  font-weight: 500;
-  transition: all .15s ease;
+  font-family: var(--font);
+  font-size: 13.5px;
+  font-weight: 600;
+  transition: all .12s ease;
   border: 1px solid transparent;
 }
 
 .nav-item:hover {
   background: var(--accent);
-  border-color: var(--border);
+  border-color: var(--foreground);
 }
 
 .nav-item.active-link {
-  background: var(--accent);
-  border-color: var(--foreground);
-  font-weight: 600;
+  background: var(--primary);
+  color: var(--primary-foreground);
+  border-color: var(--primary);
+  font-weight: 700;
 }
 
 .nav-icon {
@@ -575,8 +615,8 @@ on destroy { window.removeEventListener('keydown', onKeydown) }
 }
 
 .dash-content-area {
-  padding: 28px 32px 64px;
-  max-width: 1140px;
+  padding: 28px var(--container-pad, 28px) 64px;
+  max-width: calc(var(--container, 1240px) + var(--container-pad, 28px) * 2);
   width: 100%;
   background: var(--background);
   color: var(--foreground);
@@ -598,6 +638,19 @@ on destroy { window.removeEventListener('keydown', onKeydown) }
   display: none;
 }
 
+.session-warning-banner {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 10px 24px;
+  background: var(--card);
+  border-bottom: 1px solid var(--destructive);
+  color: var(--destructive);
+  font-size: 13px;
+  font-weight: 500;
+}
+
 /* Responsive Phone Drawer */
 @media (max-width: 768px) {
   .dash-shell,
@@ -607,13 +660,17 @@ on destroy { window.removeEventListener('keydown', onKeydown) }
 
   .dash-sidebar {
     position: fixed;
-    left: 0;
+    inset-inline-start: 0;
     top: 0;
     bottom: 0;
     width: 260px;
     height: 100%;
     transform: translateX(-100%);
     transition: transform .2s ease;
+  }
+
+  [dir="rtl"] .dash-sidebar {
+    transform: translateX(100%);
   }
 
   .open .dash-sidebar {

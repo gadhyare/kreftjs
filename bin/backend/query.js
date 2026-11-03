@@ -47,10 +47,11 @@ class Builder {
   q(name) {
     if (name instanceof Raw) return name.sql;
     if (name === '*') return '*';
-    const s = String(name);
-    if (/[\0\r\n]/.test(s)) throw new Error('Invalid control characters in SQL identifier');
-    const as = s.match(/^(.+?)\s+as\s+(\w+)$/i); // 'users.name as author'
+    const s = String(name).trim();
+    if (/[\0\r\n;'"`\\]/.test(s)) throw new Error('Invalid characters in SQL identifier');
+    const as = s.match(/^([a-zA-Z0-9_.*]+)\s+as\s+([a-zA-Z0-9_]+)$/i); // 'users.name as author'
     if (as) return `${this.q(as[1])} AS ${this.db.q(as[2])}`;
+    if (!/^[a-zA-Z0-9_]+(\.[a-zA-Z0-9_*]+)*$/.test(s)) throw new Error(`Invalid SQL identifier "${s}"`);
     return s.split('.').map((p) => (p === '*' ? p : this.db.q(p))).join('.');
   }
   clone() {
@@ -234,7 +235,7 @@ class Builder {
   async pluck(column, key) {
     const col = String(column).split('.').pop(), k = key && String(key).split('.').pop();
     const rows = await this.clone().select(...[column, key].filter(Boolean)).get();
-    return key ? Object.fromEntries(rows.map((r) => [r[k], r[col]])) : Collection.from(rows.map((r) => r[col]));
+    return key ? Object.fromEntries(rows.map((r) => [r[k], r[col]]).filter(([kn]) => !/^(?:__proto__|constructor|prototype)$/.test(String(kn)))) : Collection.from(rows.map((r) => r[col]));
   }
   async exists() { return !!(await this.clone().reorder().limit(1).first()); }
   async doesntExist() { return !(await this.exists()); }
@@ -271,6 +272,7 @@ class Builder {
   }
   // chunk(100, async (rows) => { … }) — big tables a piece at a time; return false to stop
   async chunk(size, fn) {
+    size = Math.max(1, parseInt(size, 10) || 100);
     let page = 1;
     for (;;) {
       const rows = await this.clone().forPage(page, size).get();
@@ -285,10 +287,35 @@ class Builder {
   // ---- writing
   async insert(values) {
     const rows = [].concat(values);
+    if (!rows.length) return null;
+    const db = this.db;
+    const firstKeys = Object.keys(rows[0] || {});
+    const canBatch = rows.length > 1
+      && firstKeys.length > 0
+      && rows.every((r) => {
+        const k = Object.keys(r || {});
+        return k.length === firstKeys.length && k.every((col, i) => col === firstKeys[i]);
+      });
+
+    if (canBatch) {
+      const colsSql = firstKeys.map((k) => this.q(k)).join(', ');
+      const rowPlaceholder = `(${firstKeys.map(() => '?').join(', ')})`;
+      const chunkSize = Math.max(1, Math.floor(900 / firstKeys.length));
+      let lastId = null;
+      for (let i = 0; i < rows.length; i += chunkSize) {
+        const slice = rows.slice(i, i + chunkSize);
+        const placeholders = slice.map(() => rowPlaceholder).join(', ');
+        const sql = `INSERT INTO ${this.q(this._table)} (${colsSql}) VALUES ${placeholders}${db.kind === 'postgres' ? ' RETURNING *' : ''}`;
+        const params = slice.flatMap((row) => firstKeys.map((k) => row[k]));
+        const r = await db.run(sql, params);
+        lastId = r.insertId != null ? r.insertId : r.rows && r.rows.length ? r.rows[r.rows.length - 1].id ?? null : lastId;
+      }
+      return lastId;
+    }
+
     let lastId = null;
     for (const row of rows) {
       const keys = Object.keys(row || {});
-      const db = this.db;
       let sql;
       if (!keys.length) {
         sql = db.kind === 'mysql'

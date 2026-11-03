@@ -21,8 +21,10 @@ function getProjectRoot(start = process.cwd()) {
 }
 
 function resolveViteBinary(root) {
+  const jsCli = path.join(root, 'node_modules', 'vite', 'bin', 'vite.js');
+  if (fs.existsSync(jsCli)) return { cmd: process.execPath, prefixArgs: [jsCli], shell: false };
   const local = path.join(root, 'node_modules', '.bin', process.platform === 'win32' ? 'vite.cmd' : 'vite');
-  if (fs.existsSync(local)) return local;
+  if (fs.existsSync(local)) return { cmd: local, prefixArgs: [], shell: false };
   return null;
 }
 
@@ -158,20 +160,15 @@ function dev(args = []) {
   }
 
   const runVite = () => {
-    let cmd, cmdArgs;
-    if (hasLocalVite) {
-      cmd = viteBin;
-      cmdArgs = args.filter((a) => !['--db', '--api', '--delay', '--migrations', '--backend', '--server', '--seed'].includes(a));
-    } else {
-      cmd = 'npx';
-      cmdArgs = ['vite', ...args.filter((a) => !['--db', '--api', '--delay', '--migrations', '--backend', '--server', '--seed'].includes(a))];
-    }
+    const cleanArgs = args.filter((a) => !['--db', '--api', '--delay', '--migrations', '--backend', '--server', '--seed'].includes(a) && !/[;&|`$<>]/.test(String(a)));
+    const cmd = hasLocalVite ? viteBin.cmd : 'npx';
+    const cmdArgs = hasLocalVite ? [...viteBin.prefixArgs, ...cleanArgs] : ['vite', ...cleanArgs];
 
     const viteProc = spawn(cmd, cmdArgs, {
       cwd: root,
       stdio: 'inherit',
       env: process.env,
-      shell: process.platform === 'win32',
+      shell: hasLocalVite ? viteBin.shell : process.platform === 'win32',
     });
     children.push(viteProc);
 
@@ -192,15 +189,16 @@ function dev(args = []) {
 function build(args = []) {
   const root = getProjectRoot();
   const viteBin = resolveViteBinary(root);
-  const cmd = viteBin || 'npx';
-  const cmdArgs = viteBin ? ['build', ...args] : ['vite', 'build', ...args];
+  const cleanArgs = args.filter((a) => !/[;&|`$<>]/.test(String(a)));
+  const cmd = viteBin ? viteBin.cmd : 'npx';
+  const cmdArgs = viteBin ? [...viteBin.prefixArgs, 'build', ...cleanArgs] : ['vite', 'build', ...cleanArgs];
 
   console.log('  Building Som.js frontend with Vite & Rollup…\n');
   const proc = spawn(cmd, cmdArgs, {
     cwd: root,
     stdio: 'inherit',
     env: { ...process.env, NODE_ENV: 'production' },
-    shell: process.platform === 'win32',
+    shell: viteBin ? viteBin.shell : process.platform === 'win32',
   });
 
   proc.on('exit', (code) => {
@@ -211,14 +209,15 @@ function build(args = []) {
 function preview(args = []) {
   const root = getProjectRoot();
   const viteBin = resolveViteBinary(root);
-  const cmd = viteBin || 'npx';
-  const cmdArgs = viteBin ? ['preview', ...args] : ['vite', 'preview', ...args];
+  const cleanArgs = args.filter((a) => !/[;&|`$<>]/.test(String(a)));
+  const cmd = viteBin ? viteBin.cmd : 'npx';
+  const cmdArgs = viteBin ? [...viteBin.prefixArgs, 'preview', ...cleanArgs] : ['vite', 'preview', ...cleanArgs];
 
   const proc = spawn(cmd, cmdArgs, {
     cwd: root,
     stdio: 'inherit',
     env: process.env,
-    shell: process.platform === 'win32',
+    shell: viteBin ? viteBin.shell : process.platform === 'win32',
   });
 
   proc.on('exit', (code) => {

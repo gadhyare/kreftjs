@@ -98,7 +98,7 @@ action remove(user) {
                 </span>
               </td>
               <td>
-                <select value={u.role} @change="setRole(u, $event.target.value)" aria-label={'Role of ' + u.name} class="role-select">
+                <select value={u.role} @change="setRole(u, $event.target.value)" aria-label={'Role of ' + u.name} class="role-select" disabled={!$store.auth.user || !$store.auth.user.is_admin}>
                   <option value="user">User</option>
                   <option value="editor">Editor</option>
                 </select>
@@ -109,10 +109,10 @@ action remove(user) {
                 </span>
               </td>
               <td class="actions-col">
-                <button class="btn ghost sm" @click="toggleAdmin(u)">
+                <button class="btn ghost sm" @click="toggleAdmin(u)" disabled={!$store.auth.user || !$store.auth.user.is_admin}>
                   {u.is_admin ? 'Revoke Admin' : 'Make Admin'}
                 </button>
-                <button class="btn danger sm" @click="remove(u)" disabled={$store.auth.user && u.id === $store.auth.user.id}>
+                <button class="btn danger sm" @click="remove(u)" disabled={!$store.auth.user || !$store.auth.user.is_admin || u.id === $store.auth.user.id}>
                   Delete
                 </button>
               </td>
@@ -200,7 +200,7 @@ action remove(user) {
 }
 
 .actions-col {
-  text-align: right;
+  text-align: end;
   white-space: nowrap;
 }
 

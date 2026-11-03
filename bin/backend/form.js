@@ -20,17 +20,45 @@
 const { HttpError } = require('./http.js');
 
 class FormRequest {
+  constructor(req = null) {
+    this.req = req;
+    this._validated = null;
+  }
+  user() {
+    return this.req ? this.req.user : null;
+  }
+  validated(key = null, fallback = null) {
+    const data = this._validated || (this.req && this.req.validated) || {};
+    if (key == null) return data;
+    return Object.prototype.hasOwnProperty.call(data, key) ? data[key] : fallback;
+  }
   authorize() { return true; }
   rules() { return {}; }
   messages() { return {}; }
   attributes() { return {}; }
   prepareForValidation(data) { return data; }
   static async validate(req) {
-    const f = new this();
+    const f = new this(req);
     if (!(await f.authorize(req))) throw new HttpError(403, 'This action is unauthorized.');
-    const prepared = await f.prepareForValidation({ ...(req.body && typeof req.body === 'object' ? req.body : {}) });
-    if (prepared && typeof prepared === 'object') req.body = prepared;
-    return req.validate(await f.rules(req), f.messages(), f.attributes());
+    const prepared = await f.prepareForValidation({ ...(req && req.body && typeof req.body === 'object' ? req.body : {}) });
+    if (prepared && typeof prepared === 'object' && req) req.body = prepared;
+    const validated = await req.validate(await f.rules(req), f.messages(), f.attributes());
+    f._validated = validated;
+    if (req) {
+      req.validated = validated;
+      req._validated = validated;
+      req.formRequest = f;
+    }
+    return validated;
+  }
+  static handle(req, res, next) {
+    return Promise.resolve()
+      .then(() => this.validate(req))
+      .then(() => { if (typeof next === 'function') next(); })
+      .catch((err) => {
+        if (typeof next === 'function') next(err);
+        else throw err;
+      });
   }
 }
 

@@ -8,7 +8,7 @@
   <title>Som.js Demo</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600;700&family=Geist+Mono:wght@400;500&display=swap">
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Geist:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600;700&family=Geist+Mono:wght@400;500;600;700&display=swap">
   <!-- the look: quiet, like shadcn/ui, with square corners and no shadows -->
   <link rel="stylesheet" href="ui.css">
   <style>
@@ -90,6 +90,8 @@
           { path: 'look', component: 'pages/settings/Look.som', meta: { title: 'Look · Som.js' } },
         ] },
         // Tools
+        { path: '/security', component: 'pages/Security.som', meta: { title: 'HTML Security · Som.js' } },
+        { path: '/error-monitor', component: 'pages/ErrorMonitor.som', meta: { title: 'Error Monitor · Som.js' } },
         { path: '/render', component: 'pages/Render.som', meta: { title: 'Template engine · Som.js' } },
         { path: '/tools', component: 'pages/Tools.som', meta: { title: 'Dev tools · Som.js' } },
       ],

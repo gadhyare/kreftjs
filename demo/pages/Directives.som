@@ -1,8 +1,9 @@
-<!-- s-if / s-elif / s-else · s-show · :class / :style · s-ref · a custom directive · som-portal -->
+<!-- s-if / s-elif / s-else · s-show · s-html · :class / :style · s-ref · a custom directive · som-portal -->
 state level = 60
 state visible = true
 state open = false
 state box = null
+state richHtml = '<b>Safe bold</b>, <i>italic</i>, and <img src=x onerror=alert(1)> (onerror stripped!)'
 
 action focusBox() { box.focus() }
 
@@ -22,9 +23,13 @@ action focusBox() { box.focus() }
   </section>
 
   <section class="card">
-    <h2><code>s-show</code></h2>
+    <h2><code>s-show</code> and <code>s-html</code> (Auto-Sanitized)</h2>
     <label class="check"><input type="checkbox" s-model="visible"> Show the box</label>
     <p s-show="visible" class="box">s-show hides me with CSS; s-if would remove me.</p>
+
+    <p class="muted"><code>s-html</code> renders rich HTML through <code>Som.cleanHtml()</code> so scripts and event handlers are stripped automatically (<som-link to="/security">open full XSS playground</som-link>):</p>
+    <input s-model="richHtml" aria-label="Rich HTML">
+    <div class="box" s-html="richHtml"></div>
   </section>
 
   <section class="card">

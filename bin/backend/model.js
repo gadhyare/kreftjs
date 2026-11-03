@@ -37,6 +37,13 @@ const snake = (s) => s.replace(/([a-z0-9])([A-Z])/g, '$1_$2').toLowerCase();
 const studly = (s) => String(s).replace(/(^|[_-])(\w)/g, (_, __, c) => c.toUpperCase());
 const singular = (s) => s.replace(/ies$/, 'y').replace(/(ss|sh|ch|x|z)es$/, '$1').replace(/s$/, '');
 const now = () => new Date().toISOString().slice(0, 19).replace('T', ' ');
+let _migrator = null;
+function isSeedingActive() {
+  if (!_migrator) {
+    try { _migrator = require('./migrator.js'); } catch (_) {}
+  }
+  return Boolean(_migrator && _migrator.Seeder && _migrator.Seeder.isSeeding);
+}
 const cls = (M) => {
   if (typeof M === 'string') {
     const app = require('./app.js');
@@ -203,7 +210,9 @@ class ModelBuilder extends Builder {
     if (b._columns.length === 1 && b._columns[0] === '*') b._columns = [`${this._model.table}.*`];
     for (const { name, constrain } of this._withCounts) {
       // 'comments as approved_count' names the column itself
-      const [, rel, alias] = name.match(/^(\w+)(?:\s+as\s+(\w+))?$/i) || [null, name];
+      const m = String(name).trim().match(/^(\w+)(?:\s+as\s+(\w+))?$/i);
+      if (!m) throw new Error(`Invalid relation name "${name}" in withCount()`);
+      const [, rel, alias] = m;
       const { sql, params } = relatedSubquery(this._model, rel, constrain);
       b._columns.push(new Raw(`(${sql}) AS ${this.db.q(alias || snake(rel) + '_count')}`, params));
     }
@@ -320,6 +329,12 @@ class Model {
     await m.save();
     return m;
   }
+  static async forceCreate(attributes = {}) {
+    const m = new this();
+    m.forceFill(attributes);
+    await m.save();
+    return m;
+  }
   static async createMany(list = []) { const out = new Collection(); for (const a of list) out.push(await this.create(a)); return out; }
   static async firstOrNew(match, extra = {}) { return (await this.where(match).first()) || new this({ ...match, ...extra }); }
   static async firstOrCreate(match, extra = {}) {
@@ -348,7 +363,12 @@ class Model {
     const cols = await columnsOf(this.table);
     const pivot = {};
     for (const [k, v] of Object.entries(row)) {
-      if (k.startsWith('pivot_')) { pivot[k.slice(6)] = v; continue; }
+      if (BAD_KEYS.has(k)) continue;
+      if (k.startsWith('pivot_')) {
+        const pk = k.slice(6);
+        if (!BAD_KEYS.has(pk)) pivot[pk] = v;
+        continue;
+      }
       if (k === '__som_parent') continue;
       m[k] = castOut(this, k, v, cols);
     }
@@ -373,6 +393,25 @@ class Model {
   // fill({ … }): only fillable keys; setXAttribute(value) mutators run here
   fill(attributes = {}) {
     const C = this.constructor;
+    const isSeeding = isSeedingActive();
+    if (isSeeding || C.strictFillable || Model.strictFillable) {
+      if (C.fillable) {
+        for (const k of Object.keys(attributes)) {
+          if (BAD_KEYS.has(k)) continue;
+          if (!C.fillable.includes(k)) {
+            throw new Error(`[MassAssignmentException] Field "${k}" is not fillable on model [${C.name || C.table}]. Add "${k}" to static fillable = [${C.fillable.map((x) => "'" + x + "'").join(', ')}] or use forceFill() / forceCreate().`);
+          }
+        }
+      }
+      if ((C.guarded || []).length) {
+        for (const k of Object.keys(attributes)) {
+          if (BAD_KEYS.has(k)) continue;
+          if (C.guarded.includes('*') || C.guarded.includes(k)) {
+            throw new Error(`[MassAssignmentException] Field "${k}" is guarded on model [${C.name || C.table}]. Remove it from static guarded or use forceFill() / forceCreate().`);
+          }
+        }
+      }
+    }
     for (const [k, v] of Object.entries(attributes)) {
       if (BAD_KEYS.has(k)) continue;
       const allowed = C.fillable ? C.fillable.includes(k) : !(C.guarded || []).includes(k) && !(C.guarded || []).includes('*');
@@ -382,11 +421,13 @@ class Model {
   }
   forceFill(attributes = {}) { for (const [k, v] of Object.entries(attributes)) if (!BAD_KEYS.has(k)) this.setAttribute(k, v); return this; }
   setAttribute(key, value) {
+    if (BAD_KEYS.has(key)) return this;
     const mutator = this[`set${studly(key)}Attribute`];
     this[key] = typeof mutator === 'function' ? mutator.call(this, value) : value;
     return this;
   }
   getAttribute(key) {
+    if (BAD_KEYS.has(key)) return undefined;
     const accessor = this[`get${studly(key)}Attribute`];
     return typeof accessor === 'function' ? accessor.call(this) : this[key];
   }
@@ -724,7 +765,8 @@ function toIso(v) {
   const d = new Date(`${m[1]}T${m[2]}${m[3] || 'Z'}`);
   return Number.isNaN(d.getTime()) ? v : d.toISOString();
 }
-const safeJson = (s) => { try { return JSON.parse(s); } catch (_) { return s; } };
+const { parseJson } = require('../safe-json.js');
+const safeJson = (s) => { try { return parseJson(s); } catch (_) { return s; } };
 
 // where a factory file is: database/factories/UserFactory.js (or .ts)
 function factoryFile(name) {

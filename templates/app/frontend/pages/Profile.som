@@ -100,5 +100,5 @@ action remove() {
 form { max-width: 420px; margin-top: 16px; }
 .row { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
 .ok { color: var(--success); font-size: 13px; }
-.danger-zone { border-color: #fecaca; }
+.danger-zone { border-color: var(--destructive); }
 </style>

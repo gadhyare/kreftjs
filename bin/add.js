@@ -602,10 +602,21 @@ function fetchRegistryMeta(pkgName) {
         }
 
         let body = '';
-        res.on('data', (c) => (body += c));
+        let bytes = 0;
+        const MAX_REGISTRY_BYTES = 10 * 1024 * 1024;
+        res.on('data', (c) => {
+          bytes += c.length;
+          if (bytes > MAX_REGISTRY_BYTES) {
+            req.destroy();
+            resolve({ error: 'NPM registry response exceeded size limit' });
+            return;
+          }
+          body += c;
+        });
         res.on('end', () => {
+          if (bytes > MAX_REGISTRY_BYTES) return;
           try {
-            const data = JSON.parse(body);
+            const data = JSON.parse(body, (k, v) => (k === '__proto__' || k === 'constructor' || k === 'prototype' ? undefined : v));
             const latestTag = data['dist-tags'] && data['dist-tags'].latest;
             const latestPkg = (latestTag && data.versions && data.versions[latestTag]) || {};
 
@@ -680,10 +691,21 @@ function fetchWeeklyDownloads(pkgName) {
       (res) => {
         if (res.statusCode !== 200) return resolve(null);
         let body = '';
-        res.on('data', (c) => (body += c));
+        let bytes = 0;
+        const MAX_DOWNLOADS_BYTES = 1024 * 1024;
+        res.on('data', (c) => {
+          bytes += c.length;
+          if (bytes > MAX_DOWNLOADS_BYTES) {
+            req.destroy();
+            resolve(null);
+            return;
+          }
+          body += c;
+        });
         res.on('end', () => {
+          if (bytes > MAX_DOWNLOADS_BYTES) return;
           try {
-            const data = JSON.parse(body);
+            const data = JSON.parse(body, (k, v) => (k === '__proto__' || k === 'constructor' || k === 'prototype' ? undefined : v));
             resolve(typeof data.downloads === 'number' ? data.downloads : null);
           } catch (_) {
             resolve(null);
@@ -704,9 +726,11 @@ function fetchWeeklyDownloads(pkgName) {
 
 function getInstalledPackageJson(projectDir, pkgName) {
   try {
-    const parts = pkgName.split('/');
-    const pkgPath = path.join(projectDir, 'node_modules', ...parts, 'package.json');
-    if (fs.existsSync(pkgPath)) {
+    const nmRoot = path.resolve(projectDir, 'node_modules');
+    const parts = String(pkgName || '').split('/');
+    if (parts.some((p) => !p || p === '.' || p === '..')) return null;
+    const pkgPath = path.resolve(nmRoot, ...parts, 'package.json');
+    if (pkgPath.startsWith(nmRoot + path.sep) && fs.existsSync(pkgPath)) {
       return JSON.parse(fs.readFileSync(pkgPath, 'utf8'));
     }
   } catch (_) {}

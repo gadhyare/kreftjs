@@ -1,7 +1,7 @@
 /*
  * Developer Error Details & Interactive Error Monitoring Page for Som.js
- * Renders an interactive, modern debug dashboard in development with code context,
- * stack trace frames, intelligent solution suggestions, request inspection, and environment telemetry.
+ * Renders Som.js's own high-precision geometric UI (matching ui.css tokens, dark/light mode,
+ * 1px borders, monochrome active states, and dark terminal code preview).
  */
 const fs = require('fs');
 const path = require('path');
@@ -68,10 +68,9 @@ function levenshtein(a, b) {
 
 function generateSmartSolution(err, topFrame) {
   const msg = String(err && err.message || err || '');
-  const name = String(err && err.name || '');
 
   // 1. Method typo on models or objects
-  const methodMatch = msg.match(/is not a function|Call to undefined method ([^\s(]+)::([^\s(]+)/i) || msg.match(/([a-zA-Z0-9_$]+)\.([a-zA-Z0-9_$]+) is not a function/);
+  const methodMatch = msg.match(/([a-zA-Z0-9_$]+)\.([a-zA-Z0-9_$]+) is not a function/i) || msg.match(/Call to undefined method ([^\s(:]+)(?:::|\.)([^\s(]+)/i);
   if (methodMatch) {
     const caller = methodMatch[1];
     const fnName = methodMatch[2] || caller;
@@ -79,8 +78,8 @@ function generateSmartSolution(err, topFrame) {
     const close = commonMethods.find(m => Math.abs(m.length - fnName.length) <= 2 && (fnName.includes(m) || m.includes(fnName) || levenshtein(m, fnName) <= 2));
     if (close) {
       return {
-        title: 'Bad Method Call',
-        message: `Did you mean <code>${escapeHtml(caller ? caller + '::' + close + '()' : '.' + close + '()')}</code> ?`
+        title: 'Unknown Model Method',
+        message: `Did you mean <code>${escapeHtml(caller ? caller + '.' + close + '()' : '.' + close + '()')}</code>?`
       };
     }
   }
@@ -90,8 +89,8 @@ function generateSmartSolution(err, topFrame) {
   if (undefMatch) {
     const prop = undefMatch[2];
     return {
-      title: 'Null Reference Protection',
-      message: `The target object is <code>${undefMatch[1]}</code> when accessing <code>.${escapeHtml(prop)}</code>. Consider using optional chaining <code>?.${escapeHtml(prop)}</code> or verifying the object exists.`
+      title: 'Null Reference Guard',
+      message: `The target object is <code>${undefMatch[1]}</code> when reading <code>.${escapeHtml(prop)}</code>. Use optional chaining <code>?.${escapeHtml(prop)}</code> or verify the record exists.`
     };
   }
 
@@ -101,29 +100,29 @@ function generateSmartSolution(err, topFrame) {
     const varName = refMatch[1];
     return {
       title: 'Undefined Identifier',
-      message: `Variable <code>${escapeHtml(varName)}</code> is referenced but not declared. Check your imports, function parameters, or declare it.`
+      message: `Identifier <code>${escapeHtml(varName)}</code> is referenced but not declared. Check your imports or action arguments.`
     };
   }
 
   // 4. Missing Database Table
   if (msg.includes('no such table') || msg.includes('does not exist')) {
     return {
-      title: 'Missing Database Table',
-      message: `A queried database table was not found. Run <code>som db migrate</code> to execute pending migrations.`
+      title: 'Pending Database Migration',
+      message: `The queried table does not exist yet. Run <code>som db:migrate</code> to apply pending migrations.`
     };
   }
 
   // 5. Default contextual suggestion
   if (topFrame && topFrame.file) {
     return {
-      title: 'Exception Recommendation',
-      message: `Review line <strong>${topFrame.line}</strong> in <code>${escapeHtml(path.basename(topFrame.file))}</code> to verify input values and method invocations.`
+      title: 'Diagnostic Hint',
+      message: `Inspect line <strong>${topFrame.line}</strong> in <code>${escapeHtml(path.basename(topFrame.file))}</code> and verify input values.`
     };
   }
 
   return {
-    title: 'Debugging Tip',
-    message: 'Inspect the stack trace frames below to isolate where the exception was triggered.'
+    title: 'Diagnostic Hint',
+    message: 'Select any stack frame below to inspect the source lines around the exception.'
   };
 }
 
@@ -136,13 +135,31 @@ function escapeHtml(str) {
     .replace(/'/g, '&#39;');
 }
 
+const SENSITIVE_KEY_RE = /(password|passwd|secret|token|api_key|apikey|private_key|recovery_code|authorization|cookie|set-cookie|xsrf|csrf|challenge|credit_card|cvv)/i;
+
+function redactSensitive(obj, depth = 0) {
+  if (depth > 6 || obj === null || obj === undefined) return obj;
+  if (Array.isArray(obj)) return obj.map((item) => redactSensitive(item, depth + 1));
+  if (typeof obj !== 'object') return obj;
+  const out = {};
+  for (const [k, v] of Object.entries(obj)) {
+    if (SENSITIVE_KEY_RE.test(k)) {
+      out[k] = '******** [REDACTED]';
+    } else if (v && typeof v === 'object') {
+      out[k] = redactSensitive(v, depth + 1);
+    } else {
+      out[k] = v;
+    }
+  }
+  return out;
+}
+
 function renderErrorPage(err, req = null, { status = 500 } = {}) {
   const errName = err && err.name ? err.name : 'Error';
   const errMessage = err && err.message ? err.message : String(err);
   const stack = err && err.stack ? err.stack : '';
   const frames = parseStack(stack);
 
-  // Attach pre-parsed snippets for all frames
   for (const f of frames) {
     if (f.file && f.line) {
       f.snippet = getCodeSnippet(f.file, f.line);
@@ -153,19 +170,21 @@ function renderErrorPage(err, req = null, { status = 500 } = {}) {
   const initialSnippet = topAppFrame && topAppFrame.snippet ? topAppFrame.snippet : null;
   const smartSolution = generateSmartSolution(err, topAppFrame);
 
-  const method = req ? (req.method || 'GET').toUpperCase() : '';
-  const url = req ? (req.url || '/') : '';
-  const headers = req ? (req.headers || {}) : {};
-  const query = req && req.query ? req.query : {};
-  const body = req && req.body ? req.body : {};
-  const params = req && req.params ? req.params : {};
+  const method = req ? (req.method || 'GET').toUpperCase() : 'GET';
+  const url = req ? (req.url || '/') : '/';
+  const headers = redactSensitive(req ? (req.headers || {}) : {});
+  const query = redactSensitive(req && req.query ? req.query : {});
+  const body = redactSensitive(req && req.body ? req.body : {});
+  const params = redactSensitive(req && req.params ? req.params : {});
   const ip = req && typeof req.ip === 'function' ? req.ip() : (req && req.ip) || '127.0.0.1';
 
   const memory = Math.round(process.memoryUsage().heapUsed / 1024 / 1024) + ' MB';
   const nodeVersion = process.version;
   const somVersion = require('../../package.json').version;
+  const internalCount = frames.filter((f) => !f.isApp).length;
 
-  const framesJson = JSON.stringify(frames.map((f, i) => ({
+  const safeJson = (val) => JSON.stringify(val).replace(/</g, '\\u003c').replace(/[\u2028\u2029]/g, (c) => '\\u' + c.charCodeAt(0).toString(16));
+  const framesJson = safeJson(frames.map((f, i) => ({
     id: i,
     fn: f.fn || '<anonymous>',
     file: f.file || f.raw || '',
@@ -180,506 +199,511 @@ function renderErrorPage(err, req = null, { status = 500 } = {}) {
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>${escapeHtml(errName)}: ${escapeHtml(errMessage)}</title>
+  <title>${escapeHtml(errName)} — Som.js Diagnostic</title>
   <style>
+    :root {
+      color-scheme: light dark;
+      --background: #ffffff;
+      --foreground: #09090b;
+      --card: #ffffff;
+      --border: #e4e4e7;
+      --accent: #f4f4f5;
+      --primary: #09090b;
+      --primary-foreground: #fafafa;
+      --muted: #71717a;
+      --destructive: #dc2626;
+      --success: #10b981;
+      --success-bg: #ecfdf5;
+      --terminal-bg: #09090b;
+      --terminal-fg: #f4f4f5;
+      --grid-line: rgba(0, 0, 0, 0.04);
+      --font: 'Geist', ui-sans-serif, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      --mono: 'Geist Mono', ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+    }
+    @media (prefers-color-scheme: dark) {
+      :root {
+        --background: #09090b;
+        --foreground: #f4f4f5;
+        --card: #111115;
+        --border: #27272a;
+        --accent: #18181b;
+        --primary: #f4f4f5;
+        --primary-foreground: #09090b;
+        --muted: #a1a1aa;
+        --destructive: #ef4444;
+        --success: #10b981;
+        --success-bg: #064e3b;
+        --terminal-bg: #050507;
+        --terminal-fg: #f4f4f5;
+        --grid-line: rgba(255, 255, 255, 0.04);
+      }
+    }
     *, *::before, *::after {
       box-sizing: border-box;
-      border-radius: 0 !important;
-      box-shadow: none !important;
-    }
-    :root {
-      --bg: #ffffff;
-      --surface: #f8fafc;
-      --border: #e2e8f0;
-      --text: #0f172a;
-      --text-muted: #64748b;
-      --accent-red: #ef4444;
-      --accent-red-subtle: #fee2e2;
-      --solution-bg: #a7f3d0;
-      --solution-border: #6ee7b7;
-      --solution-text: #064e3b;
-      --font-mono: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
-      --font-sans: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+      border-radius: 0;
+      box-shadow: none;
     }
     body {
       margin: 0;
-      padding: 0;
-      background: var(--bg);
-      color: var(--text);
-      font-family: var(--font-sans);
+      font-family: var(--font);
       font-size: 14px;
-      line-height: 1.5;
+      line-height: 1.6;
+      background-color: var(--background);
+      background-image:
+        linear-gradient(to right, var(--grid-line) 1px, transparent 1px),
+        linear-gradient(to bottom, var(--grid-line) 1px, transparent 1px);
+      background-size: 32px 32px;
+      color: var(--foreground);
       -webkit-font-smoothing: antialiased;
     }
-    /* Top Bar */
-    .nav-bar {
+    .shell {
+      max-width: 1120px;
+      margin: 0 auto;
+      padding: 32px 24px 64px;
+      display: grid;
+      gap: 16px;
+    }
+    .card {
+      background: var(--card);
+      border: 1px solid var(--border);
+      padding: 24px;
+    }
+    .head-card {
+      border-inline-start: 3px solid var(--destructive);
+    }
+    .top-bar {
       display: flex;
       justify-content: space-between;
       align-items: center;
-      background: #ffffff;
-      border-bottom: 2px solid var(--accent-red);
-      padding: 0 24px;
-      height: 50px;
-    }
-    .tabs-group {
-      display: flex;
-      height: 100%;
-      gap: 4px;
-    }
-    .tab-item {
-      background: none;
-      border: none;
-      color: var(--text-muted);
-      font-weight: 700;
-      font-size: 13px;
-      letter-spacing: 0.05em;
-      padding: 0 16px;
-      cursor: pointer;
-      display: flex;
-      align-items: center;
-      gap: 6px;
-      position: relative;
-    }
-    .tab-item:hover {
-      color: var(--text);
-    }
-    .tab-item.active {
-      color: var(--accent-red);
-      border-bottom: 2px solid var(--accent-red);
-    }
-    .nav-actions {
-      display: flex;
-      align-items: center;
       gap: 12px;
+      flex-wrap: wrap;
+      margin-bottom: 14px;
     }
-    .btn-nav {
-      background: none;
-      border: none;
-      color: var(--text-muted);
-      font-weight: 700;
-      font-size: 12px;
-      cursor: pointer;
-      text-decoration: none;
-    }
-    .btn-copy-main {
-      background: #0f172a;
-      color: #ffffff;
-      border: none;
-      padding: 6px 14px;
-      font-size: 12px;
-      font-weight: 700;
-      cursor: pointer;
-    }
-    .status-badge {
-      background: var(--accent-red);
-      color: #ffffff;
-      font-weight: 800;
-      font-size: 12px;
-      padding: 4px 8px;
-      font-family: var(--font-mono);
-    }
-    /* Hero Section */
-    .hero-container {
-      background: #ffffff;
-      border-bottom: 1px solid var(--border);
-      padding: 24px;
-      display: grid;
-      grid-template-columns: 1fr 380px;
-      gap: 24px;
-      align-items: start;
-    }
-    .hero-badges {
+    .badges, .actions {
       display: flex;
       gap: 8px;
       align-items: center;
-      margin-bottom: 10px;
+      flex-wrap: wrap;
     }
-    .badge-error-type {
-      background: var(--accent-red-subtle);
-      color: #991b1b;
-      font-family: var(--font-mono);
-      font-weight: 700;
+    .badge {
+      display: inline-flex;
+      align-items: center;
+      height: 24px;
+      padding: 0 10px;
+      font-family: var(--mono);
+      font-size: 11px;
+      font-weight: 600;
+      text-transform: uppercase;
+      border: 1px solid var(--border);
+      background: var(--background);
+      color: var(--foreground);
+    }
+    .badge.danger {
+      background: var(--destructive);
+      border-color: var(--destructive);
+      color: #ffffff;
+    }
+    .badge.solid {
+      background: var(--primary);
+      border-color: var(--primary);
+      color: var(--primary-foreground);
+    }
+    .badge.success {
+      background: var(--success-bg);
+      border-color: var(--success);
+      color: var(--success);
+    }
+    .btn {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      height: 30px;
+      padding: 0 12px;
+      font-family: var(--font);
       font-size: 12px;
-      padding: 3px 8px;
+      font-weight: 600;
+      color: var(--foreground);
+      background: var(--background);
+      border: 1px solid var(--border);
+      cursor: pointer;
+      text-decoration: none;
     }
-    .badge-runtime {
-      color: var(--text-muted);
-      font-size: 12px;
-      font-family: var(--font-mono);
+    .btn:hover {
+      background: var(--accent);
+      border-color: var(--foreground);
     }
-    .hero-headline {
-      font-size: 22px;
-      font-weight: 800;
-      color: var(--text);
-      margin: 0;
-      line-height: 1.3;
+    .btn.primary {
+      background: var(--primary);
+      border-color: var(--primary);
+      color: var(--primary-foreground);
+    }
+    .err-msg {
+      font-family: var(--mono);
+      font-size: 20px;
+      line-height: 1.35;
+      margin: 0 0 8px;
       word-break: break-word;
     }
-    .solution-box {
-      background: var(--solution-bg);
-      border: 1px solid var(--solution-border);
-      color: var(--solution-text);
-      padding: 16px 20px;
-      position: relative;
-    }
-    .solution-box-title {
-      font-weight: 800;
+    .err-loc {
+      margin: 0;
       font-size: 13px;
+      color: var(--muted);
+    }
+    code {
+      font-family: var(--mono);
+      font-size: 0.88em;
+      background: var(--accent);
+      border: 1px solid var(--border);
+      padding: 2px 6px;
+    }
+    .hint-box {
+      border: 1px solid var(--border);
+      background: var(--accent);
+      padding: 14px 16px;
+      margin-top: 16px;
+    }
+    .hint-head {
+      display: flex;
+      align-items: center;
+      gap: 10px;
       margin-bottom: 6px;
+      font-size: 13px;
+    }
+    .hint-body {
+      margin: 0;
+      font-size: 13px;
+      font-family: var(--mono);
+    }
+    .tabs {
+      display: flex;
+      border-bottom: 1px solid var(--border);
+      gap: 4px;
+    }
+    .tab-btn {
+      border: 0;
+      border-bottom: 2px solid transparent;
+      background: none;
+      color: var(--muted);
+      height: 36px;
+      padding: 0 14px;
+      font-family: var(--font);
+      font-size: 13px;
+      font-weight: 600;
+      cursor: pointer;
+    }
+    .tab-btn:hover {
+      color: var(--foreground);
+      background: var(--accent);
+    }
+    .tab-btn.active {
+      color: var(--foreground);
+      border-bottom-color: var(--foreground);
+    }
+    .workbench {
+      display: grid;
+      grid-template-columns: 320px minmax(0, 1fr);
+      border: 1px solid var(--border);
+      background: var(--card);
+    }
+    .frame-pane {
+      border-inline-end: 1px solid var(--border);
+      display: flex;
+      flex-direction: column;
+    }
+    .pane-bar {
       display: flex;
       justify-content: space-between;
       align-items: center;
-    }
-    .solution-box-close {
-      cursor: pointer;
-      font-size: 14px;
-      font-weight: 700;
-      color: var(--solution-text);
-    }
-    .solution-box-body {
-      font-size: 13px;
-      line-height: 1.5;
-    }
-    .solution-box-body code {
-      background: rgba(0,0,0,0.06);
-      padding: 1px 4px;
-      font-family: var(--font-mono);
-      font-weight: 700;
-    }
-    /* Split Stack Layout */
-    .split-stack {
-      display: grid;
-      grid-template-columns: 340px 1fr;
-      height: calc(100vh - 165px);
-      overflow: hidden;
-    }
-    .sidebar-frames {
-      background: #ffffff;
-      border-right: 1px solid var(--border);
-      overflow-y: auto;
-    }
-    .frames-header {
-      padding: 10px 16px;
+      padding: 8px 14px;
       border-bottom: 1px solid var(--border);
-      background: var(--surface);
+      background: var(--accent);
+      font-size: 12px;
+      font-weight: 600;
+      color: var(--muted);
+      min-height: 40px;
     }
-    .btn-vendor-toggle {
-      background: #ffffff;
-      border: 1px solid #cbd5e1;
-      padding: 5px 10px;
-      font-size: 11px;
-      font-weight: 700;
-      color: var(--text-muted);
-      cursor: pointer;
-      width: 100%;
+    .frame-list {
+      display: flex;
+      flex-direction: column;
+      max-height: 460px;
+      overflow-y: auto;
     }
     .frame-row {
-      padding: 12px 16px;
-      border-bottom: 1px solid #f1f5f9;
+      padding: 10px 14px;
+      border-bottom: 1px solid var(--border);
+      border-inline-start: 3px solid transparent;
       cursor: pointer;
-      transition: background 0.15s;
     }
     .frame-row:hover {
-      background: var(--surface);
+      background: var(--accent);
     }
     .frame-row.active {
-      background: var(--accent-red) !important;
-      color: #ffffff;
-    }
-    .frame-row.active .frame-loc,
-    .frame-row.active .frame-name {
-      color: #ffffff !important;
-    }
-    .frame-loc {
-      font-family: var(--font-mono);
-      font-size: 11px;
-      color: var(--text-muted);
-      margin-bottom: 2px;
-      word-break: break-all;
-    }
-    .frame-name {
-      font-weight: 700;
-      font-size: 13px;
-      color: #1e293b;
+      background: var(--accent);
+      border-inline-start-color: var(--foreground);
     }
     .frame-row.vendor {
-      opacity: 0.55;
+      opacity: 0.6;
     }
-    /* Right Code Inspector */
-    .editor-pane {
-      background: #ffffff;
-      overflow-y: auto;
-    }
-    .editor-toolbar {
-      background: var(--surface);
-      border-bottom: 1px solid var(--border);
-      padding: 10px 20px;
+    .frame-top {
       display: flex;
       justify-content: space-between;
-      font-family: var(--font-mono);
+      align-items: center;
+      gap: 8px;
+      margin-bottom: 3px;
+    }
+    .frame-name {
+      font-family: var(--mono);
       font-size: 12px;
-      color: var(--text-muted);
+      font-weight: 600;
+      color: var(--foreground);
     }
-    .editor-file-title {
-      font-weight: 700;
-      color: #334155;
+    .frame-tag {
+      font-family: var(--mono);
+      font-size: 10px;
+      text-transform: uppercase;
+      padding: 1px 5px;
+      border: 1px solid var(--border);
+      color: var(--muted);
     }
-    .editor-lines {
-      padding: 16px 0;
-      font-family: var(--font-mono);
+    .frame-loc {
+      font-family: var(--mono);
+      font-size: 11px;
+      color: var(--muted);
+      word-break: break-all;
+    }
+    .source-pane {
+      display: flex;
+      flex-direction: column;
+      min-width: 0;
+    }
+    .terminal-code {
+      background: var(--terminal-bg);
+      color: var(--terminal-fg);
+      padding: 14px 0;
+      font-family: var(--mono);
       font-size: 13px;
       line-height: 1.7;
+      overflow-x: auto;
+      flex: 1;
     }
     .code-row {
       display: flex;
-      padding: 1px 20px;
+      padding: 1px 16px;
+      border-inline-start: 3px solid transparent;
     }
     .code-row.target {
-      background: var(--accent-red-subtle);
-      border-left: 4px solid var(--accent-red);
-      color: #991b1b;
+      background: rgba(239, 68, 68, 0.18);
+      border-inline-start-color: var(--destructive);
+      color: #ffffff;
       font-weight: 600;
     }
     .line-no {
-      width: 48px;
-      text-align: right;
-      padding-right: 18px;
-      color: #94a3b8;
+      width: 44px;
+      text-align: end;
+      padding-inline-end: 16px;
+      color: #71717a;
       user-select: none;
       flex-shrink: 0;
     }
     .code-row.target .line-no {
-      color: var(--accent-red);
-      font-weight: 800;
+      color: var(--destructive);
+      font-weight: 700;
     }
     .line-text {
-      white-space: pre-wrap;
-      word-break: break-all;
+      white-space: pre;
     }
-    /* Tab Contents: Context & Share */
     .tab-view {
       display: none;
-      padding: 32px 24px;
-      max-width: 1100px;
-      margin: 0 auto;
     }
     .tab-view.active {
       display: block;
     }
     .cards-grid {
       display: grid;
-      grid-template-columns: 1fr 1fr;
-      gap: 24px;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 16px;
     }
-    .card-box {
-      background: #ffffff;
-      border: 1px solid var(--border);
-      padding: 20px;
-    }
-    .card-box h3 {
-      margin: 0 0 16px;
-      font-size: 14px;
-      font-weight: 800;
-      text-transform: uppercase;
-      letter-spacing: 0.05em;
-    }
-    .data-table {
+    table {
       width: 100%;
       border-collapse: collapse;
-      font-size: 12px;
-    }
-    .data-table th, .data-table td {
+      font-size: 13px;
       border: 1px solid var(--border);
-      padding: 8px 12px;
-      text-align: left;
     }
-    .data-table th {
-      background: var(--surface);
-      color: var(--text-muted);
-      width: 180px;
-      font-family: var(--font-mono);
+    th, td {
+      text-align: start;
+      padding: 10px 14px;
+      border-bottom: 1px solid var(--border);
     }
-    .json-code {
-      background: #0f172a;
-      color: #f8fafc;
+    th {
+      width: 160px;
+      font-family: var(--mono);
+      font-size: 11px;
+      text-transform: uppercase;
+      color: var(--muted);
+      background: var(--accent);
+    }
+    pre.json-code {
+      font-family: var(--mono);
+      background: var(--terminal-bg);
+      color: var(--terminal-fg);
+      border: 1px solid var(--border);
       padding: 16px;
-      font-family: var(--font-mono);
       font-size: 12px;
       overflow-x: auto;
+      margin: 0;
     }
-    @media (max-width: 900px) {
-      .hero-container { grid-template-columns: 1fr; }
-      .split-stack { grid-template-columns: 1fr; height: auto; }
-      .cards-grid { grid-template-columns: 1fr; }
+    @media (max-width: 820px) {
+      .workbench, .cards-grid { grid-template-columns: minmax(0, 1fr); }
+      .frame-pane { border-inline-end: 0; border-bottom: 1px solid var(--border); }
     }
   </style>
 </head>
 <body>
-  <!-- Top Bar -->
-  <header class="nav-bar">
-    <div class="tabs-group">
-      <button class="tab-item active" onclick="switchTab('tab-stack', this)">
-        <span>☰</span> STACK
-      </button>
-      <button class="tab-item" onclick="switchTab('tab-context', this)">
-        <span>⚏</span> CONTEXT
-      </button>
-      <button class="tab-item" onclick="switchTab('tab-share', this)">
-        <span>↗</span> SHARE
-      </button>
+  <div class="shell">
+    <section class="card head-card">
+      <div class="top-bar">
+        <div class="badges">
+          <span class="badge danger">HTTP ${escapeHtml(status)}</span>
+          <span class="badge solid">${escapeHtml(errName)}</span>
+          <span class="badge">Som.js v${escapeHtml(somVersion)}</span>
+          <span class="badge">Node ${escapeHtml(nodeVersion)}</span>
+        </div>
+        <div class="actions">
+          <button class="btn" id="copy-report-btn" onclick="copyDiagnosticReport()">Copy Report</button>
+          <a href="/docs" class="btn">Docs</a>
+        </div>
+      </div>
+
+      <h1 class="err-msg">${escapeHtml(errMessage)}</h1>
+      ${topAppFrame ? `<p class="err-loc">in <code>${escapeHtml(topAppFrame.file)}:${escapeHtml(topAppFrame.line)}</code> · ${escapeHtml(topAppFrame.fn || '<anonymous>')}</p>` : ''}
+
+      ${smartSolution ? `
+      <div class="hint-box">
+        <div class="hint-head">
+          <span class="badge success">Fix Suggestion</span>
+          <strong>${escapeHtml(smartSolution.title)}</strong>
+        </div>
+        <p class="hint-body">${smartSolution.message}</p>
+      </div>` : ''}
+    </section>
+
+    <div class="tabs" role="tablist">
+      <button class="tab-btn active" onclick="switchTab('tab-stack', this)">Stack Trace (${frames.length})</button>
+      <button class="tab-btn" onclick="switchTab('tab-context', this)">Request &amp; Runtime</button>
+      <button class="tab-btn" onclick="switchTab('tab-share', this)">Markdown Report</button>
     </div>
 
-    <div class="nav-actions">
-      <a href="/docs" target="_blank" class="btn-nav">📖 DOCS</a>
-      <button class="btn-copy-main" onclick="copyDiagnosticReport()">COPY REPORT</button>
-      <span class="status-badge">${escapeHtml(status)}</span>
-    </div>
-  </header>
+    <section id="tab-stack" class="workbench tab-view active" style="display: grid;">
+      <aside class="frame-pane">
+        <div class="pane-bar">
+          <span>Frames</span>
+          ${internalCount > 0 ? `<button class="btn" id="vendor-toggle-btn" style="height:24px;padding:0 8px;font-size:11px;" onclick="toggleVendorFrames()">Show internal (${internalCount})</button>` : ''}
+        </div>
+        <div class="frame-list" id="frames-container">
+          ${frames.map((f, i) => `
+          <div class="frame-row${f === topAppFrame ? ' active' : ''}${f.isApp ? ' app' : ' vendor'}"
+               data-frame-index="${i}"
+               onclick="selectFrame(${i})"
+               style="${!f.isApp ? 'display: none;' : ''}">
+            <div class="frame-top">
+              <span class="frame-name">${escapeHtml(f.fn || '<anonymous>')}</span>
+              <span class="frame-tag">${f.isApp ? 'app' : 'core'}</span>
+            </div>
+            <div class="frame-loc">${escapeHtml(f.file || f.raw || '')}:${escapeHtml(f.line || 1)}</div>
+          </div>`).join('')}
+        </div>
+      </aside>
 
-  <!-- Error Hero Section -->
-  <section class="hero-container">
-    <div>
-      <div class="hero-badges">
-        <span class="badge-error-type">${escapeHtml(errName)}</span>
-        <span class="badge-runtime">Node.js ${escapeHtml(nodeVersion)}</span>
-        <span class="badge-runtime">Som.js v${escapeHtml(somVersion)}</span>
+      <main class="source-pane">
+        <div class="pane-bar">
+          <code id="editor-file-label">${escapeHtml(topAppFrame ? topAppFrame.file + ':' + topAppFrame.line : 'source.js')}</code>
+          <span id="editor-lines-label">${initialSnippet ? 'Lines ' + initialSnippet.start + '–' + initialSnippet.end : ''}</span>
+        </div>
+        <div class="terminal-code" id="editor-code-container">
+          ${initialSnippet ? initialSnippet.lines.map(l => `
+          <div class="code-row${l.isTarget ? ' target' : ''}">
+            <span class="line-no">${l.num}</span>
+            <span class="line-text">${escapeHtml(l.code)}</span>
+          </div>`).join('') : '<p style="padding: 16px; color: #a1a1aa;">No source snippet available for this frame.</p>'}
+        </div>
+      </main>
+    </section>
+
+    <section id="tab-context" class="tab-view">
+      <div class="cards-grid">
+        <div class="card">
+          <h3 style="margin-top:0;">HTTP Request</h3>
+          <table>
+            <tr><th>Method</th><td><code>${escapeHtml(method)}</code></td></tr>
+            <tr><th>URL</th><td><code>${escapeHtml(url)}</code></td></tr>
+            <tr><th>Client IP</th><td><code>${escapeHtml(ip)}</code></td></tr>
+          </table>
+          ${Object.keys(params).length ? `
+          <h4 style="margin: 16px 0 8px;">Route Parameters</h4>
+          <table>
+            ${Object.entries(params).map(([k, v]) => `<tr><th>${escapeHtml(k)}</th><td>${escapeHtml(typeof v === 'object' ? JSON.stringify(v) : v)}</td></tr>`).join('')}
+          </table>` : ''}
+          ${Object.keys(query).length ? `
+          <h4 style="margin: 16px 0 8px;">Query Parameters</h4>
+          <table>
+            ${Object.entries(query).map(([k, v]) => `<tr><th>${escapeHtml(k)}</th><td>${escapeHtml(typeof v === 'object' ? JSON.stringify(v) : v)}</td></tr>`).join('')}
+          </table>` : ''}
+          ${body && Object.keys(body).length ? `
+          <h4 style="margin: 16px 0 8px;">Request Body</h4>
+          <pre class="json-code">${escapeHtml(JSON.stringify(body, null, 2))}</pre>` : ''}
+        </div>
+
+        <div class="card">
+          <h3 style="margin-top:0;">Som.js Runtime &amp; Headers</h3>
+          <table style="margin-bottom: 16px;">
+            <tr><th>Som.js</th><td><code>v${escapeHtml(somVersion)}</code></td></tr>
+            <tr><th>Node.js</th><td><code>${escapeHtml(nodeVersion)}</code></td></tr>
+            <tr><th>Heap Memory</th><td><code>${escapeHtml(memory)}</code></td></tr>
+            <tr><th>Platform</th><td><code>${escapeHtml(process.platform)} (${escapeHtml(process.arch)})</code></td></tr>
+          </table>
+          <h4 style="margin: 16px 0 8px;">Headers</h4>
+          <table>
+            ${Object.entries(headers).map(([k, v]) => `<tr><th>${escapeHtml(k)}</th><td>${escapeHtml(Array.isArray(v) ? v.join(', ') : v)}</td></tr>`).join('')}
+          </table>
+        </div>
       </div>
-      <h1 class="hero-headline">${escapeHtml(errMessage)}</h1>
-    </div>
+    </section>
 
-    ${smartSolution ? `
-    <div class="solution-box" id="solution-banner">
-      <div class="solution-box-title">
-        <span>💡 ${escapeHtml(smartSolution.title)}</span>
-        <span class="solution-box-close" onclick="document.getElementById('solution-banner').style.display='none'">✕</span>
-      </div>
-      <div class="solution-box-body">${smartSolution.message}</div>
-    </div>` : ''}
-  </section>
-
-  <!-- Tab 1: Split Stack View -->
-  <section id="tab-stack" class="split-stack tab-view active" style="padding: 0; max-width: none;">
-    <!-- Left Column: Frames List -->
-    <aside class="sidebar-frames">
-      <div class="frames-header">
-        <button class="btn-vendor-toggle" id="vendor-toggle-btn" onclick="toggleVendorFrames()">
-          Expand vendor frames (${frames.filter(f => !f.isApp).length})
-        </button>
-      </div>
-
-      <div id="frames-container">
-        ${frames.map((f, i) => `
-        <div class="frame-row${f === topAppFrame ? ' active' : ''}${f.isApp ? ' app' : ' vendor'}"
-             data-frame-index="${i}"
-             onclick="selectFrame(${i})"
-             style="${!f.isApp ? 'display: none;' : ''}">
-          <div class="frame-loc">${escapeHtml(f.file || f.raw || '')}:${escapeHtml(f.line || 1)}</div>
-          <div class="frame-name">${escapeHtml(f.fn || '<anonymous>')}</div>
-        </div>`).join('')}
-      </div>
-    </aside>
-
-    <!-- Right Column: Code Editor -->
-    <main class="editor-pane">
-      <div class="editor-toolbar">
-        <span class="editor-file-title" id="editor-file-label">
-          ${escapeHtml(topAppFrame ? topAppFrame.file + ':' + topAppFrame.line : 'Source Code')}
-        </span>
-        <span id="editor-lines-label">
-          ${initialSnippet ? 'Lines ' + initialSnippet.start + ' - ' + initialSnippet.end : ''}
-        </span>
-      </div>
-
-      <div class="editor-lines" id="editor-code-container">
-        ${initialSnippet ? initialSnippet.lines.map(l => `
-        <div class="code-row${l.isTarget ? ' target' : ''}">
-          <span class="line-no">${l.num}</span>
-          <span class="line-text">${escapeHtml(l.code)}</span>
-        </div>`).join('') : '<p style="padding: 24px; color: var(--text-muted);">No source snippet available for this frame.</p>'}
-      </div>
-    </main>
-  </section>
-
-  <!-- Tab 2: Context View -->
-  <section id="tab-context" class="tab-view">
-    <div class="cards-grid">
-      <div class="card-box">
-        <h3>HTTP Request</h3>
-        <table class="data-table">
-          <tr><th>Method</th><td><strong style="color: var(--accent-red);">${escapeHtml(method || 'GET')}</strong></td></tr>
-          <tr><th>URL</th><td>${escapeHtml(url || '/')}</td></tr>
-          <tr><th>Client IP</th><td>${escapeHtml(ip)}</td></tr>
-        </table>
-
-        ${Object.keys(params).length ? `
-        <h4 style="margin: 16px 0 8px; font-size: 12px; text-transform: uppercase;">Route Parameters</h4>
-        <table class="data-table">
-          ${Object.entries(params).map(([k, v]) => `<tr><th>${escapeHtml(k)}</th><td>${escapeHtml(typeof v === 'object' ? JSON.stringify(v) : v)}</td></tr>`).join('')}
-        </table>` : ''}
-
-        ${Object.keys(query).length ? `
-        <h4 style="margin: 16px 0 8px; font-size: 12px; text-transform: uppercase;">Query Parameters</h4>
-        <table class="data-table">
-          ${Object.entries(query).map(([k, v]) => `<tr><th>${escapeHtml(k)}</th><td>${escapeHtml(typeof v === 'object' ? JSON.stringify(v) : v)}</td></tr>`).join('')}
-        </table>` : ''}
-
-        ${body && Object.keys(body).length ? `
-        <h4 style="margin: 16px 0 8px; font-size: 12px; text-transform: uppercase;">Request Body</h4>
-        <pre class="json-code">${escapeHtml(JSON.stringify(body, null, 2))}</pre>` : ''}
-      </div>
-
-      <div class="card-box">
-        <h3>Headers & Environment</h3>
-        <table class="data-table" style="margin-bottom: 20px;">
-          <tr><th>Node.js Version</th><td>${escapeHtml(nodeVersion)}</td></tr>
-          <tr><th>Som.js Version</th><td>${escapeHtml(somVersion)}</td></tr>
-          <tr><th>Heap Memory</th><td>${escapeHtml(memory)}</td></tr>
-          <tr><th>Host Environment</th><td>${escapeHtml(process.platform)} (${escapeHtml(process.arch)})</td></tr>
-        </table>
-
-        <h4 style="margin: 16px 0 8px; font-size: 12px; text-transform: uppercase;">HTTP Headers</h4>
-        <table class="data-table">
-          ${Object.entries(headers).map(([k, v]) => `<tr><th>${escapeHtml(k)}</th><td>${escapeHtml(Array.isArray(v) ? v.join(', ') : v)}</td></tr>`).join('')}
-        </table>
-      </div>
-    </div>
-  </section>
-
-  <!-- Tab 3: Share View -->
-  <section id="tab-share" class="tab-view">
-    <div class="card-box">
-      <h3>Export Diagnostic Report</h3>
-      <p style="color: var(--text-muted); margin-bottom: 16px;">
-        Generate an error report formatted for GitHub Issues, bug trackers, or sharing with teammates:
-      </p>
-      <pre class="json-code" id="markdown-preview-block">### Som.js Exception Report
-**${escapeHtml(errName)}**: ${escapeHtml(errMessage)}
-**Top Frame**: ${escapeHtml(topAppFrame ? topAppFrame.file + ':' + topAppFrame.line : 'unknown')}
+    <section id="tab-share" class="tab-view">
+      <div class="card">
+        <div class="top-bar">
+          <h3 style="margin:0;">Diagnostic Markdown Report</h3>
+          <div class="actions">
+            <button class="btn primary" onclick="copyDiagnosticReport()">Copy Markdown</button>
+            <button class="btn" onclick="copyJsonReport()">Copy JSON</button>
+          </div>
+        </div>
+        <pre class="json-code" id="markdown-preview-block"># Som.js Diagnostic Report
+- **Exception:** \`${escapeHtml(errName)}\` (HTTP ${escapeHtml(status)})
+- **Message:** ${escapeHtml(errMessage)}
+- **Location:** \`${escapeHtml(topAppFrame ? topAppFrame.file + ':' + topAppFrame.line : 'unknown')}\`
 
 \`\`\`text
 ${escapeHtml(stack)}
 \`\`\`</pre>
-      <div style="margin-top: 16px; display: flex; gap: 12px;">
-        <button class="btn-copy-main" onclick="copyDiagnosticReport()">Copy Markdown Report</button>
-        <button class="btn-vendor-toggle" style="width: auto;" onclick="copyJsonReport()">Copy JSON</button>
       </div>
-    </div>
-  </section>
+    </section>
+  </div>
 
   <script>
     const allFrames = ${framesJson};
     let vendorExpanded = false;
 
     function switchTab(tabId, btn) {
-      document.querySelectorAll('.tab-item').forEach(b => b.classList.remove('active'));
+      document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
       document.querySelectorAll('.tab-view').forEach(v => {
         v.classList.remove('active');
-        if (v.id === 'tab-stack') v.style.display = 'none';
+        v.style.display = 'none';
       });
       btn.classList.add('active');
       const target = document.getElementById(tabId);
       target.classList.add('active');
-      if (tabId === 'tab-stack') target.style.display = 'grid';
+      target.style.display = tabId === 'tab-stack' ? 'grid' : 'block';
     }
 
     function toggleVendorFrames() {
@@ -687,7 +711,8 @@ ${escapeHtml(stack)}
       document.querySelectorAll('.frame-row.vendor').forEach(el => {
         el.style.display = vendorExpanded ? 'block' : 'none';
       });
-      document.getElementById('vendor-toggle-btn').textContent = vendorExpanded ? 'Collapse vendor frames ↑' : 'Expand vendor frames ↓';
+      const btn = document.getElementById('vendor-toggle-btn');
+      if (btn) btn.textContent = (vendorExpanded ? 'Hide internal' : 'Show internal') + ' (${internalCount})';
     }
 
     function selectFrame(index) {
@@ -702,7 +727,7 @@ ${escapeHtml(stack)}
       const container = document.getElementById('editor-code-container');
 
       if (f.snippet && f.snippet.lines) {
-        document.getElementById('editor-lines-label').textContent = 'Lines ' + f.snippet.start + ' - ' + f.snippet.end;
+        document.getElementById('editor-lines-label').textContent = 'Lines ' + f.snippet.start + '–' + f.snippet.end;
         container.innerHTML = f.snippet.lines.map(l => {
           return '<div class="code-row' + (l.isTarget ? ' target' : '') + '">' +
                  '<span class="line-no">' + l.num + '</span>' +
@@ -711,7 +736,7 @@ ${escapeHtml(stack)}
         }).join('');
       } else {
         document.getElementById('editor-lines-label').textContent = '';
-        container.innerHTML = '<p style="padding: 24px; color: var(--text-muted);">Source file not accessible or internal runtime frame.</p>';
+        container.innerHTML = '<p style="padding: 16px; color: #a1a1aa;">Source file not accessible or internal runtime frame.</p>';
       }
     }
 
@@ -722,25 +747,23 @@ ${escapeHtml(stack)}
     function copyDiagnosticReport() {
       const text = document.getElementById('markdown-preview-block').textContent;
       navigator.clipboard.writeText(text).then(() => {
-        const btn = document.querySelector('.btn-copy-main');
+        const btn = document.getElementById('copy-report-btn');
+        if (!btn) return;
         const orig = btn.textContent;
-        btn.textContent = '✓ COPIED!';
-        btn.style.background = '#15803d';
-        setTimeout(() => { btn.textContent = orig; btn.style.background = '#0f172a'; }, 2000);
+        btn.textContent = 'Copied Markdown';
+        setTimeout(() => { btn.textContent = orig; }, 2000);
       });
     }
 
     function copyJsonReport() {
       const data = {
-        name: ${JSON.stringify(errName)},
-        message: ${JSON.stringify(errMessage)},
-        status: ${status},
+        name: ${safeJson(errName)},
+        message: ${safeJson(errMessage)},
+        status: ${Number(status) || 500},
         frames: allFrames,
         timestamp: new Date().toISOString()
       };
-      navigator.clipboard.writeText(JSON.stringify(data, null, 2)).then(() => {
-        alert('Diagnostic JSON copied to clipboard!');
-      });
+      navigator.clipboard.writeText(JSON.stringify(data, null, 2));
     }
   </script>
 </body>

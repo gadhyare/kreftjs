@@ -17,9 +17,9 @@ Route.middleware('auth').group(() => {
   Route.get('/dashboard', (req) => ({ greeting: `Welcome back, ${req.user ? req.user.name : 'User'}.` }))
 })
 
-// User management endpoints
-Route.apiResource('admin/users', UserController, { only: ['index', 'update', 'destroy'] }).middleware('auth')
-Route.apiResource('users', UserController, { only: ['index', 'update', 'destroy'] }).middleware('auth')
+// User management endpoints (admin only)
+Route.apiResource('admin/users', UserController, { only: ['index', 'update', 'destroy'] }).middleware(['auth', 'admin'])
+Route.apiResource('users', UserController, { only: ['index', 'update', 'destroy'] }).middleware(['auth', 'admin'])
 
 // Example public endpoint: GET /api/hello?name=World
 Route.get('/hello', (req) => ({ hello: req.input('name', 'world'), app: process.env.APP_NAME }))

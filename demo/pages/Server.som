@@ -69,10 +69,18 @@ exports.post = (ctx) => \{
 
   <section class="card">
     <h2>npm packages and CSS libraries in .som files</h2>
-    <pre>import dayjs from 'dayjs'                         // npm i dayjs
+    <pre>import dayjs from 'dayjs'                         // som add dayjs
 import \{ nanoid } from 'nanoid'
 import 'bootstrap/dist/css/bootstrap.min.css'     // a CSS file becomes a &lt;link&gt;</pre>
-    <p>Install the package in your project, then import it. <code>som dev</code> prepares it for the browser (with <code>npm i -D esbuild</code>), and <code>som build</code> puts it in <code>dist/deps</code>. A library from a CDN is one line in <code>index.html</code>, or start with <code>som new my-app --ui bootstrap</code> (also <code>tailwind</code>, <code>bulma</code>, <code>pico</code>).</p>
+    <p>Install packages safely with <code>som add</code> (blocks untrusted lifecycle scripts and checks for typosquatting), then import them. <code>som dev</code> prepares them for the browser (with <code>som add -D esbuild</code>), and <code>som build</code> puts them in <code>dist/deps</code>. A library from a CDN is one line in <code>index.html</code>, or start with <code>som new my-app --ui bootstrap</code> (also <code>tailwind</code>, <code>bulma</code>, <code>pico</code>).</p>
+  </section>
+
+  <section class="card">
+    <h2>AI Agent Integration (Model Context Protocol — <code>/mcp</code>)</h2>
+    <p class="muted">Som.js includes a built-in JSON-RPC 2.0 MCP server at <code>/mcp</code> so AI assistants (Cursor, Claude Desktop, Windsurf) can inspect routes, database schemas, and components or scaffold files directly.</p>
+    <pre>// Connect any MCP client to http://localhost:8000/mcp
+// Resources: som://routes · som://schema · som://components · som://docs
+// Tools:     list_routes · query_database (read-only) · make_resource · read_component</pre>
   </section>
 </view>
 

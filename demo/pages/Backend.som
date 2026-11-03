@@ -31,6 +31,12 @@ action remove(task) {
     message = e.status + ': ' + e.message // 403 from the DemoKey middleware
   }
 }
+action completeAll() {
+  await api.post('/api/tasks/complete-all')
+  tasks.reload()
+  summary.reload()
+  bus.send('toast', 'All tasks marked done via DB.transaction')
+}
 
 state files = {
   routes: `// demo/routes/api.js
@@ -67,7 +73,10 @@ const { Model } = require('somjs/server')
 
 class Task extends Model {
   static fillable = ['title', 'priority', 'done']
-  static casts = { done: 'boolean' }
+  static casts = {
+    title: 'strip_tags', // automatically strips HTML tags before saving
+    done: 'boolean',
+  }
 }`,
   migration: `// demo/database/migrations/2026_10_29_000001_create_tasks_table.js
 module.exports = {
@@ -90,6 +99,19 @@ class DemoKey {
     return response.header('X-Checked-By', 'DemoKey')
   }
 }`,
+  'cache & redis': `// Atomic Locks, Transactions, Cache & Redis (bin/backend/redis.js)
+const { DB, Cache, Redis, config } = require('somjs/server')
+
+// 1) Distributed Atomic Lock + Database Transaction
+await Cache.lock('tasks:bulk-complete', 5).block(2, async () => {
+  await DB.transaction(async () => {
+    await Task.where('done', false).update({ done: true })
+  })
+})
+
+// 2) Zero-dependency RESP2 Redis client (when CACHE_STORE=redis)
+await Redis.hset('metrics:tasks', { lastBulkRun: Date.now() })
+const driver = config('database.default', 'sqlite')`,
 }
 
 <view>
@@ -99,7 +121,10 @@ class DemoKey {
   <section class="card">
     <div class="head">
       <h2>Tasks</h2>
-      <p class="muted" s-if="summary.data">{summary.data.done} of {summary.data.total} done</p>
+      <p class="muted" s-if="summary.data">
+        {summary.data.done} of {summary.data.total} done
+        <span s-if="summary.data.heapMB"> · {summary.data.driver} · {summary.data.heapMB} MB heap</span>
+      </p>
     </div>
     <form @submit.prevent={add} class="add">
       <input s-model="draft.title" placeholder="A new task" aria-label="Task">
@@ -116,6 +141,7 @@ class DemoKey {
         <button class={priority === 'high' ? 'secondary sm' : 'ghost sm'} @click="priority = 'high'">High</button>
         <button class={priority === 'normal' ? 'secondary sm' : 'ghost sm'} @click="priority = 'normal'">Normal</button>
         <button class={priority === 'low' ? 'secondary sm' : 'ghost sm'} @click="priority = 'low'">Low</button>
+        <button class="ghost sm" @click={completeAll} title="Run atomic DB.transaction + Cache.lock">Complete all</button>
       </div>
       <label class="key"><input type="checkbox" s-model="sendKey"> Send <code>X-Demo-Key</code></label>
     </div>

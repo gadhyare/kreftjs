@@ -1,5 +1,7 @@
 const { response } = require('somjs/server')
 const Task = require('../../Models/Task')
+const StoreTaskRequest = require('../Requests/StoreTaskRequest')
+const UpdateTaskRequest = require('../Requests/UpdateTaskRequest')
 
 class TaskController {
   // GET /api/tasks?priority=high
@@ -13,10 +15,7 @@ class TaskController {
 
   // POST /api/tasks   (422 with { message, errors } when a rule fails)
   async store(req) {
-    const data = await req.validate({
-      title: 'required|min:3|max:120|unique:tasks,title',
-      priority: 'required|in:low,normal,high',
-    })
+    const data = await StoreTaskRequest.validate(req)
     return response(await Task.create(data), 201)
   }
 
@@ -28,11 +27,7 @@ class TaskController {
   // PATCH /api/tasks/5
   async update(req, id) {
     const task = await Task.findOrFail(id)
-    const data = await req.validate({
-      title: `sometimes|required|min:3|max:120|unique:tasks,title,${id}`,
-      priority: 'sometimes|in:low,normal,high',
-      done: 'sometimes|boolean',
-    })
+    const data = await UpdateTaskRequest.validate(req)
     return task.update(data)
   }
 

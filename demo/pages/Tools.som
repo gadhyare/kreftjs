@@ -6,35 +6,57 @@ action openTools() { if (window.__somOpenDevtools) window.__somOpenDevtools() }
 
 <view>
   <section class="card">
-    <h1>Dev tools</h1>
-    <p class="lead">Everything here comes with Som.js. No plugins to install.</p>
+    <h1>Dev tools &amp; Ecosystem</h1>
+    <p class="lead">Everything here comes built into Som.js v2.4. Zero external plugins required.</p>
 
-    <h2>Hot reload</h2>
-    <p>While <code>npm run dev</code> runs, save a <code>.som</code> file and only that component is swapped on the page. Its state stays. Try it: count up, then change this file's text and save.</p>
+    <h2>Hot reload (State-Preserving HMR)</h2>
+    <p>While <code>npm run dev</code> runs, save a <code>.som</code> file and only that component is swapped on the page. Its state stays intact. Try it: count up, then change this file's text and save.</p>
     <button class="primary" @click="count++">Count: {count}</button>
-    <p class="muted">A <code>.css</code> file reloads its styles only; other files reload the page. Mistakes show in a box on the page.</p>
+    <p class="muted">A <code>.css</code> file reloads its styles only; other files reload the page. Mistakes show in an interactive overlay on the page.</p>
 
-    <h2>Som DevTools</h2>
-    <p>The <b>S</b> button (or <kbd>Alt</kbd>+<kbd>Shift</kbd>+<kbd>D</kbd>) opens a panel with the component tree, each component's props, state and derived values (you can change state there), the stores, the route and a timeline of store actions and bus messages.</p>
-    <button @click={openTools} disabled={!devServer}>Open DevTools</button>
-    <span class="muted" s-if="!devServer"> (only with <code>som dev</code>)</span>
+    <h2>Som DevTools &amp; Interactive Error Monitor</h2>
+    <p>The <b>S</b> button (or <kbd>Alt</kbd>+<kbd>Shift</kbd>+<kbd>D</kbd>) opens a panel with the component tree, props, state, derived values, stores, current route, and a timeline of store actions and bus messages.</p>
+    <div class="row">
+      <button @click={openTools} disabled={!devServer}>Open Som DevTools</button>
+      <som-link to="/error-monitor" class="btn secondary">Launch Interactive Error Monitor</som-link>
+      <span class="muted" s-if="!devServer"> (DevTools panel requires <code>som dev</code>)</span>
+    </div>
   </section>
 
   <section class="card">
-    <h2>In your editor</h2>
+    <h2>Security-Hardened Package Manager (<code>som add</code>)</h2>
+    <p class="muted">Sandboxes lifecycle scripts (<code>--ignore-scripts</code>), blocks typosquatting, checks package age on the npm registry, and warns when a capability is already built into Som.js.</p>
+    <pre>som add dayjs nanoid       # installs with exact version lock &amp; script sandboxing
+som add --dry-run lodash   # inspect security &amp; redundancy report without installing
+som update --check         # check outdated packages &amp; refresh embedded som.js</pre>
+  </section>
+
+  <section class="card">
+    <h2>Auto Garbage Collector &amp; Memory Watchdog</h2>
+    <p class="muted">Keeps long-running Node.js servers at a lean 40–60 MB footprint by pruning stale caches and triggering V8 major GC cycles when heap usage crosses your threshold.</p>
+    <pre>som dev --gc                      # enable V8 --expose-gc &amp; memory watchdog in dev
+AUTO_GC=1 som serve dist          # enable in production (default threshold: 250 MB)</pre>
+  </section>
+
+  <section class="card">
+    <h2>Desktop Apps (Electron) &amp; Vite Bundling</h2>
+    <pre>som electron:init &amp;&amp; som electron:dev   # run your .som app as a native desktop window
+som electron:build                      # package .dmg, .exe, and .AppImage installers
+som vite:init &amp;&amp; som vite:dev           # optional Vite HMR + Rollup build pipeline</pre>
+  </section>
+
+  <section class="card">
+    <h2>In your editor &amp; When you ship</h2>
     <ul>
-      <li><code>som vscode</code> adds colors, folding and snippets for <code>.som</code> files to VS Code (and Cursor, VSCodium).</li>
-      <li><code>som.d.ts</code> has the types of everything in <code>Som</code>, for TypeScript and for hints in plain JavaScript.</li>
+      <li><code>som vscode</code> adds syntax highlighting, folding and snippets for <code>.som</code> files to VS Code, Cursor and VSCodium.</li>
+      <li><code>som.d.ts</code> and <code>server.d.ts</code> provide full TypeScript and IntelliSense definitions.</li>
     </ul>
-  </section>
-
-  <section class="card">
-    <h2>When you ship</h2>
-    <pre>som build               # .som files compiled ahead, works under a strict CSP
-som build --prerender   # also every page as ready HTML, for search engines (npm i -D jsdom)</pre>
+    <pre>som build               # .som files compiled ahead of time, works under strict CSP
+som build --prerender   # prerenders every route as static HTML for SEO</pre>
   </section>
 </view>
 
 <style scoped>
 kbd { padding: 1px 6px; border: 1px solid var(--input); border-bottom-width: 2px; font-size: 0.9em; }
+.row { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
 </style>

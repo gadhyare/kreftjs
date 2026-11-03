@@ -1,0 +1,10 @@
+{
+  "welcome": "أهلاً بك في Som.js",
+  "hello": "مرحباً، :name",
+  "items": "{0} لا توجد عناصر|{1} عنصر واحد|{2} عنصران|[3,10] :count عناصر|[11,*] :count عنصراً",
+  "pagination": {
+    "previous": "&laquo; السابق",
+    "next": "التالي &raquo;"
+  }
+}
+

@@ -14,6 +14,7 @@ const fs = require('fs');
 const path = require('path');
 const crypto = require('crypto');
 const { Builder, getConnection } = require('./query.js');
+const { parseJson } = require('../safe-json.js');
 
 const nowSec = () => Math.floor(Date.now() / 1000);
 const expiry = (seconds) => (seconds == null ? 0 : nowSec() + Math.max(1, Math.floor(seconds instanceof Date ? (seconds - Date.now()) / 1000 : seconds)));
@@ -32,7 +33,7 @@ function fileStore(dir) {
   const file = (key) => path.join(dir, crypto.createHash('sha1').update(key).digest('hex'));
   return {
     async get(key) {
-      try { const e = JSON.parse(fs.readFileSync(file(key), 'utf8')); if (e.exp && e.exp <= nowSec()) { fs.rmSync(file(key), { force: true }); return undefined; } return e.value; } catch (_) { return undefined; }
+      try { const e = parseJson(fs.readFileSync(file(key), 'utf8')); if (e.exp && e.exp <= nowSec()) { fs.rmSync(file(key), { force: true }); return undefined; } return e.value; } catch (_) { return undefined; }
     },
     async put(key, value, exp) { fs.mkdirSync(dir, { recursive: true }); fs.writeFileSync(file(key), JSON.stringify({ value, exp })); },
     async add(key, value, exp) {
@@ -51,7 +52,7 @@ function databaseStore() {
       const row = await table().where('key', key).first();
       if (!row) return undefined;
       if (Number(row.expiration) && Number(row.expiration) <= nowSec()) { await table().where('key', key).delete(); return undefined; }
-      try { return JSON.parse(row.value); } catch (_) { return row.value; }
+      try { return parseJson(row.value); } catch (_) { return row.value; }
     },
     async put(key, value, exp) { await table().updateOrInsert({ key }, { value: JSON.stringify(value), expiration: exp }); },
     async add(key, value, exp) {
@@ -70,7 +71,7 @@ function redisStore() {
     async get(key) {
       const v = await redis.get(key);
       if (v == null) return undefined;
-      try { return JSON.parse(v); } catch (_) { return v; }
+      try { return parseJson(v); } catch (_) { return v; }
     },
     async put(key, value, exp) {
       const val = JSON.stringify(value);
@@ -146,11 +147,45 @@ function makeCache(storeName) {
     decrement(key, by = 1) { return Cache.increment(key, -by); },
     async flush() { await (await store(storeName)).flush(); return true; },
     // an atomic lock: only one process gets it until it is released or expires
-    async lock(name, seconds = 10) {
+    // Supports:
+    //   const lock = await Cache.lock('report', 30); if (lock) { ...; await lock.release(); }
+    //   await Cache.lock('report', 30, async () => { ... })
+    //   await Cache.lock('report', 30).get(async () => { ... })
+    //   await Cache.lock('report', 30).block(5, async () => { ... })
+    lock(name, seconds = 10, callback = null) {
       const owner = crypto.randomUUID();
-      const ok = await (await store(storeName)).add(k('lock:' + name), owner, expiry(seconds));
-      if (!ok) return null;
-      return { owner, release: async () => { if ((await Cache.get('lock:' + name)) === owner) await Cache.forget('lock:' + name); } };
+      const lockKey = 'lock:' + name;
+      const release = async () => {
+        if ((await Cache.get(lockKey)) === owner) await Cache.forget(lockKey);
+      };
+      const tryAcquire = async () => {
+        const ok = await (await store(storeName)).add(k(lockKey), owner, expiry(seconds));
+        if (!ok) return null;
+        return { owner, release, forceRelease: () => Cache.forget(lockKey) };
+      };
+      const get = async (fn) => {
+        const acquired = await tryAcquire();
+        if (!acquired) return typeof fn === 'function' ? false : null;
+        if (typeof fn !== 'function') return acquired;
+        try { return await fn(acquired); } finally { await release(); }
+      };
+      const block = async (waitSeconds = 5, fn = null) => {
+        const deadline = Date.now() + Math.max(0, Number(waitSeconds) || 0) * 1000;
+        let acquired = await tryAcquire();
+        while (!acquired && Date.now() < deadline) {
+          await new Promise((r) => setTimeout(r, 50));
+          acquired = await tryAcquire();
+        }
+        if (!acquired) throw new Error(`Could not acquire lock "${name}" within ${waitSeconds}s.`);
+        if (typeof fn !== 'function') return acquired;
+        try { return await fn(acquired); } finally { await release(); }
+      };
+      const promise = typeof callback === 'function' ? get(callback) : tryAcquire();
+      promise.get = get;
+      promise.block = block;
+      promise.release = release;
+      promise.forceRelease = () => Cache.forget(lockKey);
+      return promise;
     },
   };
   return Cache;

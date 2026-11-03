@@ -169,10 +169,21 @@ function fetchNpmRegistryMetadata(packageName) {
         }
 
         let body = '';
-        res.on('data', (chunk) => { body += chunk; });
+        let bytes = 0;
+        const MAX_REGISTRY_BYTES = 10 * 1024 * 1024;
+        res.on('data', (chunk) => {
+          bytes += chunk.length;
+          if (bytes > MAX_REGISTRY_BYTES) {
+            req.destroy();
+            reject(new Error('NPM registry response exceeded size limit'));
+            return;
+          }
+          body += chunk;
+        });
         res.on('end', () => {
+          if (bytes > MAX_REGISTRY_BYTES) return;
           try {
-            const data = JSON.parse(body);
+            const data = JSON.parse(body, (k, v) => (k === '__proto__' || k === 'constructor' || k === 'prototype' ? undefined : v));
             resolve(data);
           } catch (e) {
             reject(new Error(`Failed to parse npm registry response: ${e.message}`));
@@ -196,10 +207,21 @@ function fetchWeeklyDownloads(packageName) {
     const req = https.get(url, { headers: { 'User-Agent': 'safe-add-security-gatekeeper/1.0.0' }, timeout: 4000 }, (res) => {
       if (res.statusCode !== 200) return resolve(0);
       let body = '';
-      res.on('data', (c) => { body += c; });
+      let bytes = 0;
+      const MAX_DOWNLOADS_BYTES = 1024 * 1024;
+      res.on('data', (c) => {
+        bytes += c.length;
+        if (bytes > MAX_DOWNLOADS_BYTES) {
+          req.destroy();
+          resolve(0);
+          return;
+        }
+        body += c;
+      });
       res.on('end', () => {
+        if (bytes > MAX_DOWNLOADS_BYTES) return;
         try {
-          const json = JSON.parse(body);
+          const json = JSON.parse(body, (k, v) => (k === '__proto__' || k === 'constructor' || k === 'prototype' ? undefined : v));
           resolve(json.downloads || 0);
         } catch (_) {
           resolve(0);

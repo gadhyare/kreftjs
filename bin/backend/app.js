@@ -6,7 +6,7 @@
  */
 const fs = require('fs');
 const path = require('path');
-const { EXTS } = require('./typescript.js');
+const { EXTS, registerTypeScript } = require('./typescript.js');
 
 const state = { baseDir: null, index: new Map(), booted: false };
 const unwrap = (m) => (m && m.default ? m.default : m);
@@ -62,9 +62,29 @@ const KINDS = {
 
 // boot(baseDir): index the classes, register listeners, observers and policies (again after a change)
 function boot(baseDir) {
+  registerTypeScript(baseDir);
   state.baseDir = baseDir;
   state.index = new Map();
-  for (const [folder, kind] of Object.entries(KINDS)) scan(path.join(baseDir, 'app', ...folder.split('/')), kind, state.index);
+  const appDirs = [
+    path.join(baseDir, 'app'),
+    path.join(baseDir, 'backend', 'app')
+  ];
+  try {
+    const { layout } = require('../layout.js');
+    const lay = layout(baseDir);
+    if (lay.backend) appDirs.push(path.join(lay.backend, 'app'));
+  } catch (_) {}
+
+  const seen = new Set();
+  for (const aDir of appDirs) {
+    let real = aDir;
+    try { real = fs.realpathSync(aDir); } catch (_) {}
+    if (fs.existsSync(aDir) && !seen.has(real)) {
+      seen.add(real);
+      for (const [folder, kind] of Object.entries(KINDS)) scan(path.join(aDir, ...folder.split('/')), kind, state.index);
+    }
+  }
+
   require('./model.js').setBaseDir(baseDir);
   require('./support.js').Log.setDirectory(path.join(baseDir, 'storage', 'logs'));
   require('./support.js').Lang.setDirectory(path.join(baseDir, 'lang'));
@@ -93,8 +113,21 @@ function boot(baseDir) {
   return state;
 }
 function filesOf(kind) { return [...state.index].filter(([k]) => k.startsWith(kind + ':')).map(([, f]) => f); }
+function isInsideDir(targetPath, baseDir) {
+  const resolvedTarget = path.resolve(targetPath);
+  const resolvedBase = path.resolve(baseDir);
+  if (resolvedTarget === resolvedBase || resolvedTarget.startsWith(resolvedBase + path.sep)) return true;
+  try {
+    const realTarget = fs.realpathSync(resolvedTarget);
+    const realBase = fs.realpathSync(resolvedBase);
+    return realTarget === realBase || realTarget.startsWith(realBase + path.sep);
+  } catch (_) {
+    return false;
+  }
+}
 function find(name, kind) {
-  if (!name || typeof name !== 'string') return null;
+  if (!name || typeof name !== 'string' || name.includes('\0')) return null;
+  if (name === '__proto__' || name === 'constructor' || name === 'prototype') return null;
   const normal = name.replace(/\\/g, '/').replace(/^\/+/, '');
   const backslash = normal.replace(/\//g, '\\');
   const key = kind ? `${kind}:${name}` : name;
@@ -105,10 +138,21 @@ function find(name, kind) {
 
   if (!file && state.baseDir) {
     const rel = normal.replace(/^App\//i, '');
+    const segments = rel.split('/');
+    if (segments.some((seg) => !seg || seg === '.' || seg === '..' || seg === '__proto__' || seg === 'constructor' || seg === 'prototype')) {
+      return null;
+    }
+    let appRoot = path.join(state.baseDir, 'app');
+    if (!fs.existsSync(appRoot) && fs.existsSync(path.join(state.baseDir, 'backend', 'app'))) {
+      appRoot = path.join(state.baseDir, 'backend', 'app');
+    }
     const { findFile } = require('./typescript.js');
-    file = findFile(path.join(state.baseDir, 'app', rel))
-      || (kind === 'model' ? findFile(path.join(state.baseDir, 'app', 'Models', rel)) : null)
-      || (kind === 'http_controller' ? findFile(path.join(state.baseDir, 'app', 'Http', 'Controllers', rel)) : null);
+    const candidate = findFile(path.join(appRoot, rel))
+      || (kind === 'model' ? findFile(path.join(appRoot, 'Models', rel)) : null)
+      || (kind === 'http_controller' ? findFile(path.join(appRoot, 'Http', 'Controllers', rel)) : null);
+    if (candidate && isInsideDir(candidate, appRoot)) {
+      file = candidate;
+    }
   }
   return file ? unwrap(require(file)) : null;
 }

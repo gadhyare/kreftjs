@@ -23,24 +23,39 @@ let policyFiles = new Map(); // model name → file
 const unwrap = (m) => (m && m.default ? m.default : m);
 const modelName = (target) => (typeof target === 'function' ? target.name : target && target.constructor ? target.constructor.name : null);
 
+function hasPolicyMethod(policy, method) {
+  if (!policy || typeof method !== 'string' || !method) return false;
+  if (method === 'constructor' || method === '__proto__' || method === 'prototype') return false;
+  if (Object.prototype.hasOwnProperty.call(policy, method) && typeof policy[method] === 'function') return true;
+  let proto = Object.getPrototypeOf(policy);
+  while (proto && proto !== Object.prototype) {
+    if (Object.prototype.hasOwnProperty.call(proto, method) && typeof policy[method] === 'function') return true;
+    proto = Object.getPrototypeOf(proto);
+  }
+  return false;
+}
+
 async function check(user, ability, args) {
+  if (!ability || typeof ability !== 'string' || ability === 'constructor' || ability === '__proto__' || ability === 'prototype') {
+    return false;
+  }
   const target = args[0];
   const name = target != null && typeof target !== 'string' ? modelName(target) : null;
   const file = name && policyFiles.get(name);
   if (file) {
     const Policy = typeof file === 'string' ? unwrap(require(file)) : file;
     const policy = typeof Policy === 'function' ? new Policy() : Policy;
-    if (typeof policy.before === 'function') {
+    if (hasPolicyMethod(policy, 'before') && (user != null || policy.before.allowGuest)) {
       const b = await policy.before(user, ability, ...args);
       if (b === true || b === false) return b;
     }
-    if (typeof policy[ability] === 'function') {
-      if (!user && !policy[ability].length) return false;
+    if (hasPolicyMethod(policy, ability)) {
+      if (user == null && !policy[ability].allowGuest) return false;
       return Boolean(await policy[ability](user, ...(typeof target === 'function' ? args.slice(1) : args)));
     }
   }
   const fn = gates.get(ability);
-  if (fn) return user ? Boolean(await fn(user, ...args)) : false;
+  if (fn) return user != null || fn.allowGuest ? Boolean(await fn(user, ...args)) : false;
   return false; // nothing says yes: no
 }
 

@@ -572,6 +572,16 @@ function httpsRedirectTarget(req) {
   return `https://${host}${url}`;
 }
 
+// Is the machine that opened this connection one whose X-Forwarded-* headers can be believed? This computer (nginx,
+// Caddy … next to the app), or a proxy listed in TRUSTED_PROXIES in .env ("*" or "10.0.0.1,10.0.0.2"; same list as req.ip()).
+function isTrustedProxy(req) {
+  const strip = (a) => String(a).replace(/^::ffff:/, '');
+  const direct = strip((req.socket && req.socket.remoteAddress) || '');
+  if (direct === '127.0.0.1' || direct === '::1') return true;
+  const trusted = String(process.env.TRUSTED_PROXIES || '').split(',').map((x) => strip(x.trim())).filter(Boolean);
+  return trusted.includes('*') || trusted.includes(direct);
+}
+
 const generateCsrfToken = () => crypto.randomBytes(20).toString('hex');
 const verifyCsrfToken = (token, expected) => same(token, expected);
 
@@ -638,5 +648,5 @@ const builtIn = {
 module.exports = {
   cookieSecure, createRouter, Request, Response, response, noContent, abort, abortIf, abortUnless,
   HttpError, ValidationError, toResponse, builtIn, singularize,
-  VerifyCsrfToken, csrf: builtIn.csrf, httpsRedirectTarget, generateCsrfToken, verifyCsrfToken, same,
+  VerifyCsrfToken, csrf: builtIn.csrf, httpsRedirectTarget, isTrustedProxy, generateCsrfToken, verifyCsrfToken, same,
 };

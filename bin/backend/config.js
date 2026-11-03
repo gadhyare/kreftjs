@@ -123,12 +123,13 @@ class ConfigRepository {
     this.configDir = foundDir;
     const loadedConfigs = {};
 
-    // 1. Load from config/*.js, config/*.cjs, config/*.json
+    // 1. Load from config/*.js, config/*.cjs, config/*.ts, config/*.mts, config/*.cts, config/*.json
     if (foundDir) {
       try {
+        require('./typescript.js').registerTypeScript(root);
         const files = fs.readdirSync(foundDir);
         for (const file of files) {
-          if (!/\.(js|cjs|json)$/i.test(file)) continue;
+          if (!/\.(c?js|[mc]?ts|json)$/i.test(file) || file.endsWith('.d.ts')) continue;
           const configKey = path.basename(file, path.extname(file)).toLowerCase();
           const fullPath = path.join(foundDir, file);
           try {

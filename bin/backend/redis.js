@@ -32,6 +32,7 @@
  * Seamlessly wraps ioredis or redis npm packages when installed.
  */
 const net = require('net');
+const tls = require('tls');
 const EventEmitter = require('events');
 
 function parseRedisUrl(urlStr) {
@@ -43,6 +44,7 @@ function parseRedisUrl(urlStr) {
       port: Number(u.port) || 6379,
       password: u.password ? decodeURIComponent(u.password) : undefined,
       username: u.username && u.username !== 'default' ? decodeURIComponent(u.username) : undefined,
+      tls: u.protocol === 'rediss:',
     };
     if (u.pathname && u.pathname.length > 1) {
       const db = parseInt(u.pathname.slice(1), 10);
@@ -63,11 +65,16 @@ function resolveConfig(options = {}) {
     username: options.username !== undefined ? options.username : (fromEnvUrl.username || process.env.REDIS_USERNAME || null),
     db: Number(options.db !== undefined ? options.db : (fromEnvUrl.db !== undefined ? fromEnvUrl.db : (process.env.REDIS_DB || 0))),
     prefix: options.prefix !== undefined ? options.prefix : (process.env.REDIS_PREFIX || ''),
+    tls: options.tls !== undefined ? Boolean(options.tls) : Boolean(fromEnvUrl.tls || process.env.REDIS_TLS === 'true'),
     connectTimeout: Number(options.connectTimeout || 5000),
   };
 }
 
 // Low-level lightweight RESP (Redis Serialization Protocol) parser & serializer
+const MAX_RESP_BUFFER = 64 * 1024 * 1024; // 64 MB cap against unbounded memory growth
+const MAX_RESP_ARRAY_ITEMS = 1048576;
+const isBadKey = (k) => k === '__proto__' || k === 'constructor' || k === 'prototype';
+
 class RespParser {
   static serialize(args) {
     let out = '*' + args.length + '\r\n';
@@ -107,6 +114,9 @@ class RespParser {
     if (prefix === '$') {
       const len = parseInt(buffer.toString('utf8', start + 1, crlf), 10);
       if (len === -1) return { complete: true, value: null, offset: crlf + 2 };
+      if (!Number.isInteger(len) || len < -1 || len > MAX_RESP_BUFFER) {
+        return { complete: true, error: new Error(`Invalid RESP bulk string length: ${len}`), offset: crlf + 2 };
+      }
       const strStart = crlf + 2;
       const strEnd = strStart + len;
       if (buffer.length < strEnd + 2) return { complete: false, offset: start };
@@ -118,6 +128,9 @@ class RespParser {
     if (prefix === '*') {
       const count = parseInt(buffer.toString('utf8', start + 1, crlf), 10);
       if (count === -1) return { complete: true, value: null, offset: crlf + 2 };
+      if (!Number.isInteger(count) || count < -1 || count > MAX_RESP_ARRAY_ITEMS) {
+        return { complete: true, error: new Error(`Invalid RESP array length: ${count}`), offset: crlf + 2 };
+      }
       let offset = crlf + 2;
       const items = [];
       for (let i = 0; i < count; i++) {
@@ -161,28 +174,32 @@ class NativeRedisClient extends EventEmitter {
 
     this.connecting = true;
     return new Promise((resolve, reject) => {
-      const s = net.createConnection({ host: this.config.host, port: this.config.port }, async () => {
+      const onSocketReady = async () => {
         s.setTimeout(0);
-        this.connecting = false;
-        this.connected = true;
         this.socket = s;
 
-        // Handle authentication if password is provided
+        // Complete AUTH and SELECT before marking connected = true to prevent command interleaving
         try {
           if (this.config.password) {
-            if (this.config.username) await this.call('AUTH', this.config.username, this.config.password);
-            else await this.call('AUTH', this.config.password);
+            if (this.config.username) await this._sendOnSocket('AUTH', this.config.username, this.config.password);
+            else await this._sendOnSocket('AUTH', this.config.password);
           }
           if (this.config.db && this.config.db > 0) {
-            await this.call('SELECT', this.config.db);
+            await this._sendOnSocket('SELECT', this.config.db);
           }
+          this.connecting = false;
+          this.connected = true;
           this.emit('ready');
           resolve(this);
         } catch (err) {
           this.destroy();
           reject(err);
         }
-      });
+      };
+
+      const s = this.config.tls
+        ? tls.connect({ host: this.config.host, port: this.config.port, servername: this.config.host }, onSocketReady)
+        : net.createConnection({ host: this.config.host, port: this.config.port }, onSocketReady);
 
       s.setTimeout(this.config.connectTimeout);
       s.on('timeout', () => {
@@ -214,10 +231,22 @@ class NativeRedisClient extends EventEmitter {
   }
 
   _onData(chunk) {
+    if (this.buffer.length + chunk.length > MAX_RESP_BUFFER) {
+      this.buffer = Buffer.alloc(0);
+      const err = new Error('Redis response buffer exceeded maximum size limit');
+      this.emit('error', err);
+      this._flushQueue(err);
+      if (this.socket) this.socket.destroy(err);
+      return;
+    }
     this.buffer = Buffer.concat([this.buffer, chunk]);
     while (this.buffer.length > 0) {
       const res = RespParser.parse(this.buffer, 0);
       if (!res.complete) break;
+      if (!Number.isInteger(res.offset) || res.offset <= 0) {
+        this.buffer = Buffer.alloc(0);
+        break;
+      }
       this.buffer = this.buffer.slice(res.offset);
 
       // Pub/Sub messages: ['message', channel, payload]
@@ -244,8 +273,7 @@ class NativeRedisClient extends EventEmitter {
     }
   }
 
-  async call(cmd, ...args) {
-    if (!this.connected) await this.connect();
+  _sendOnSocket(cmd, ...args) {
     return new Promise((resolve, reject) => {
       this.queue.push({ resolve, reject });
       try {
@@ -256,6 +284,35 @@ class NativeRedisClient extends EventEmitter {
         if (p) p.reject(err);
       }
     });
+  }
+
+  async call(cmd, ...args) {
+    if (!this.connected) await this.connect();
+    return this._sendOnSocket(cmd, ...args);
+  }
+
+  async eval(script, numKeys = 0, ...args) {
+    return this.call('EVAL', script, numKeys, ...args);
+  }
+
+  async pipeline(fn) {
+    const commands = [];
+    const pipe = new Proxy({}, {
+      get: (_, method) => (...args) => {
+        commands.push({ method, args });
+        return pipe;
+      },
+    });
+    if (typeof fn === 'function') await fn(pipe);
+    const results = [];
+    for (const c of commands) {
+      if (typeof this[c.method] === 'function') {
+        results.push(await this[c.method](...c.args));
+      } else {
+        results.push(await this.call(String(c.method).toUpperCase(), ...c.args));
+      }
+    }
+    return results;
   }
 
   // Key operations
@@ -296,7 +353,9 @@ class NativeRedisClient extends EventEmitter {
     const arr = await this.call('HGETALL', this.config.prefix + key);
     if (!Array.isArray(arr)) return {};
     const obj = {};
-    for (let i = 0; i < arr.length; i += 2) obj[arr[i]] = arr[i + 1];
+    for (let i = 0; i < arr.length; i += 2) {
+      if (!isBadKey(arr[i])) obj[arr[i]] = arr[i + 1];
+    }
     return obj;
   }
   async hkeys(key) { return this.call('HKEYS', this.config.prefix + key); }
@@ -417,4 +476,4 @@ const Redis = new Proxy(
   }
 );
 
-module.exports = { Redis, NativeRedisClient, resolveConfig };
+module.exports = { Redis, NativeRedisClient, RespParser, resolveConfig };

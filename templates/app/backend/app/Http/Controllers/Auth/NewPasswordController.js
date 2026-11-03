@@ -1,4 +1,4 @@
-const { DB, Hash, ValidationError } = require('somjs/server')
+const { DB, Hash, ValidationError, same } = require('somjs/server')
 const User = require('../../../Models/User')
 const PersonalAccessToken = require('../../../Models/PersonalAccessToken')
 
@@ -16,7 +16,7 @@ class NewPasswordController {
     const row = await DB.table('password_reset_tokens').where('email', email).first()
     const madeAt = row && new Date(String(row.created_at instanceof Date ? row.created_at.toISOString() : row.created_at).replace(' ', 'T').replace(/(T[\d:]+)$/, '$1Z'))
     const user = row && await User.where('email', email).first()
-    if (!row || !user || row.token !== Hash.sha256(data.token) || Date.now() - madeAt.getTime() > MINUTES * 60000) {
+    if (!row || !user || !same(String(row.token || ''), Hash.sha256(data.token)) || Date.now() - madeAt.getTime() > MINUTES * 60000) {
       throw new ValidationError({ email: ['This password reset link is not valid any more. Ask for a new one.'] })
     }
     await user.update({ password: Hash.make(data.password) })

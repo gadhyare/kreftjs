@@ -1,7 +1,6 @@
 /*
- * ui.css: High-precision, developer-focused design system inspired by Next.js, Nuxt, and AdonisJS.
- * STRICT CONSTRAINTS: ZERO border-radius and ZERO box-shadow across all components.
- * Razor-sharp 1px geometry, technical typography, high-contrast states, and built-in dark mode.
+ * ui.css: Clean, eye-friendly design system inspired by shadcn/ui (Zinc palette).
+ * Subtle 1px zinc borders, smooth 6px/8px radii, crisp Geist/Inter typography, and dark mode.
  */
 
 :root {
@@ -10,54 +9,57 @@
   --foreground: #09090b;
   --card: #ffffff;
   --card-border: #e4e4e7;
-  --primary: #09090b;
+  --primary: #18181b;
   --primary-hover: #27272a;
   --primary-foreground: #fafafa;
   --accent: #f4f4f5;
   --accent-strong: #e4e4e7;
-  --muted: #71717a;
+  --muted: #52525b;
   --border: #e4e4e7;
-  --border-subtle: #f0f0f2;
-  --grid-line: rgba(0, 0, 0, 0.04);
+  --border-subtle: #f4f4f5;
   --input: #e4e4e7;
-  --ring: #09090b;
+  --ring: #18181b;
+  --radius: 6px;
+  --radius-lg: 8px;
   --destructive: #dc2626;
   --destructive-bg: #fef2f2;
-  --success: #10b981;
+  --success: #059669;
   --success-bg: #ecfdf5;
   --terminal-bg: #09090b;
   --terminal-fg: #f4f4f5;
-  --font: 'Geist', ui-sans-serif, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-  --mono: 'Geist Mono', ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  --font: 'Geist', 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+  --mono: 'Geist Mono', 'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
   /* compatibility aliases */
   --ink: var(--foreground);
   --ember: var(--primary);
   --fog: var(--background);
+  /* one page width for every Som.js page (like Bootstrap's .container) */
+  --container: 1240px;
+  --container-pad: 28px;
 }
 
 @media (prefers-color-scheme: dark) {
   :root:not([data-theme="light"]) {
     color-scheme: dark;
     --background: #09090b;
-    --foreground: #f4f4f5;
-    --card: #111115;
+    --foreground: #fafafa;
+    --card: #09090b;
     --card-border: #27272a;
-    --primary: #f4f4f5;
-    --primary-hover: #ffffff;
-    --primary-foreground: #09090b;
+    --primary: #fafafa;
+    --primary-hover: #e4e4e7;
+    --primary-foreground: #18181b;
     --accent: #18181b;
     --accent-strong: #27272a;
     --muted: #a1a1aa;
     --border: #27272a;
-    --border-subtle: #1c1c20;
-    --grid-line: rgba(255, 255, 255, 0.04);
+    --border-subtle: #18181b;
     --input: #27272a;
-    --ring: #f4f4f5;
+    --ring: #d4d4d8;
     --destructive: #ef4444;
     --destructive-bg: #450a0a;
     --success: #10b981;
     --success-bg: #064e3b;
-    --terminal-bg: #050507;
+    --terminal-bg: #09090b;
     --terminal-fg: #f4f4f5;
   }
 }
@@ -65,25 +67,24 @@
 :root[data-theme="dark"], [data-theme="dark"], html.dark, .dark, [data-bs-theme="dark"] {
   color-scheme: dark;
   --background: #09090b;
-  --foreground: #f4f4f5;
-  --card: #111115;
+  --foreground: #fafafa;
+  --card: #09090b;
   --card-border: #27272a;
-  --primary: #f4f4f5;
-  --primary-hover: #ffffff;
-  --primary-foreground: #09090b;
+  --primary: #fafafa;
+  --primary-hover: #e4e4e7;
+  --primary-foreground: #18181b;
   --accent: #18181b;
   --accent-strong: #27272a;
   --muted: #a1a1aa;
   --border: #27272a;
-  --border-subtle: #1c1c20;
-  --grid-line: rgba(255, 255, 255, 0.04);
+  --border-subtle: #18181b;
   --input: #27272a;
-  --ring: #f4f4f5;
+  --ring: #d4d4d8;
   --destructive: #ef4444;
   --destructive-bg: #450a0a;
   --success: #10b981;
   --success-bg: #064e3b;
-  --terminal-bg: #050507;
+  --terminal-bg: #09090b;
   --terminal-fg: #f4f4f5;
   /* UI library compatibility bridge */
   --bs-body-bg: var(--background);
@@ -101,20 +102,19 @@
   --foreground: #09090b;
   --card: #ffffff;
   --card-border: #e4e4e7;
-  --primary: #09090b;
+  --primary: #18181b;
   --primary-hover: #27272a;
   --primary-foreground: #fafafa;
   --accent: #f4f4f5;
   --accent-strong: #e4e4e7;
-  --muted: #71717a;
+  --muted: #52525b;
   --border: #e4e4e7;
-  --border-subtle: #f0f0f2;
-  --grid-line: rgba(0, 0, 0, 0.04);
+  --border-subtle: #f4f4f5;
   --input: #e4e4e7;
-  --ring: #09090b;
+  --ring: #18181b;
   --destructive: #dc2626;
   --destructive-bg: #fef2f2;
-  --success: #10b981;
+  --success: #059669;
   --success-bg: #ecfdf5;
   --terminal-bg: #09090b;
   --terminal-fg: #f4f4f5;
@@ -128,11 +128,20 @@
   --bs-tertiary-bg: var(--accent);
 }
 
-/* STRICT RULE: Zero rounded corners and zero shadows across all elements */
 *, *::before, *::after {
   box-sizing: border-box;
-  border-radius: 0 !important;
-  box-shadow: none !important;
+}
+
+/* .container — centered, same width as the built-in pages */
+.container {
+  width: 100%;
+  max-width: calc(var(--container) + var(--container-pad) * 2);
+  margin-inline: auto;
+  padding-inline: var(--container-pad);
+}
+
+@media (max-width: 760px) {
+  :root { --container-pad: 16px; }
 }
 
 html {
@@ -143,14 +152,11 @@ html {
 body {
   margin: 0;
   font-family: var(--font);
-  font-size: 14px;
-  line-height: 1.6;
+  font-size: 14.5px;
+  font-weight: 400;
+  line-height: 1.65;
+  letter-spacing: -0.011em;
   background-color: var(--background);
-  background-image: 
-    linear-gradient(to right, var(--grid-line) 1px, transparent 1px),
-    linear-gradient(to bottom, var(--grid-line) 1px, transparent 1px);
-  background-size: 32px 32px;
-  background-position: top center;
   color: var(--foreground);
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
@@ -158,48 +164,49 @@ body {
 
 h1, h2, h3, h4, h5, h6 {
   margin: 0 0 12px;
-  line-height: 1.15;
-  letter-spacing: -0.035em;
+  font-family: var(--font);
+  line-height: 1.2;
+  letter-spacing: -0.03em;
   font-weight: 700;
   color: var(--foreground);
 }
 
-h1 { font-size: clamp(32px, 5vw, 48px); font-weight: 800; letter-spacing: -0.045em; }
-h2 { font-size: 24px; letter-spacing: -0.03em; }
-h3 { font-size: 18px; letter-spacing: -0.02em; }
-h4 { font-size: 15px; }
+h1 { font-size: clamp(30px, 4vw, 40px); font-weight: 800; letter-spacing: -0.035em; }
+h2 { font-size: 24px; font-weight: 700; letter-spacing: -0.025em; }
+h3 { font-size: 18px; font-weight: 600; letter-spacing: -0.015em; }
+h4 { font-size: 15px; font-weight: 600; }
 
-p { margin: 0 0 16px; }
-a { color: var(--foreground); text-underline-offset: 4px; transition: color .15s ease; }
-a:hover { color: var(--muted); }
+p { margin: 0 0 16px; color: var(--foreground); }
+a { color: var(--foreground); font-weight: 500; text-underline-offset: 4px; transition: color .15s ease, background .15s ease; }
+a:hover { color: var(--foreground); }
 hr { border: 0; border-top: 1px solid var(--border); margin: 32px 0; }
 ::selection { background: var(--accent-strong); color: var(--foreground); }
 
-/* ---- High-Precision Geometric Buttons ---- */
+/* ---- shadcn/ui Buttons ---- */
 button, .btn {
   display: inline-flex;
   align-items: center;
   justify-content: center;
   gap: 8px;
-  height: 38px;
-  padding: 0 18px;
+  height: 36px;
+  padding: 0 16px;
   font-family: var(--font);
-  font-size: 13px;
-  font-weight: 600;
-  letter-spacing: -0.01em;
+  font-size: 13.5px;
+  font-weight: 500;
   white-space: nowrap;
   color: var(--foreground);
   background: var(--background);
   border: 1px solid var(--border);
+  border-radius: var(--radius);
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.03);
   cursor: pointer;
   text-decoration: none;
-  transition: all .15s ease;
+  transition: background .15s ease, border-color .15s ease, color .15s ease;
   user-select: none;
 }
 
 button:hover, .btn:hover {
   background: var(--accent);
-  border-color: var(--foreground);
   color: var(--foreground);
 }
 
@@ -278,14 +285,16 @@ dialog::backdrop {
 /* ---- Form Fields & Controls ---- */
 input, select, textarea, .input {
   font-family: var(--font);
-  font-size: 13px;
+  font-size: 13.5px;
   color: var(--foreground);
   background: var(--background);
   border: 1px solid var(--input);
+  border-radius: var(--radius);
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.03);
   padding: 0 12px;
-  height: 38px;
+  height: 36px;
   min-width: 0;
-  transition: border-color .15s ease, background .15s ease;
+  transition: border-color .15s ease, box-shadow .15s ease;
 }
 
 textarea { height: auto; min-height: 96px; padding: 10px 12px; line-height: 1.5; resize: vertical; }
@@ -299,35 +308,33 @@ input[type=checkbox], input[type=radio] {
   vertical-align: middle;
 }
 
-input::placeholder, textarea::placeholder { color: var(--muted); }
-.label, label.label { display: block; font-size: 12px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.04em; margin-bottom: 6px; color: var(--muted); }
-.field { display: grid; gap: 4px; margin-bottom: 18px; }
+input::placeholder, textarea::placeholder { color: var(--muted); opacity: 0.7; }
+.label, label.label { display: block; font-size: 13px; font-weight: 500; margin-bottom: 6px; color: var(--foreground); }
+.field { display: grid; gap: 6px; margin-bottom: 18px; }
 .field small { color: var(--muted); font-size: 12px; }
 
 :focus-visible {
   outline: 2px solid var(--ring);
-  outline-offset: 1px;
+  outline-offset: 2px;
 }
 
 input:focus-visible, select:focus-visible, textarea:focus-visible {
   outline: none;
-  border-color: var(--ring);
+  border-color: #71717a;
+  box-shadow: 0 0 0 3px rgba(24, 24, 27, 0.08);
   background: var(--background);
 }
 
-/* ---- Bento Grid & Technical Cards ---- */
+/* ---- shadcn/ui Cards ---- */
 .card {
   background: var(--card);
   color: var(--foreground);
   border: 1px solid var(--card-border);
+  border-radius: var(--radius-lg);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.02);
   padding: 24px;
   margin-bottom: 16px;
   position: relative;
-  transition: border-color .2s ease;
-}
-
-.card:hover {
-  border-color: var(--foreground);
 }
 
 .card > h2:first-child, .card > h1:first-child { margin-top: 0; }
@@ -336,15 +343,14 @@ input:focus-visible, select:focus-visible, textarea:focus-visible {
   display: inline-flex;
   align-items: center;
   gap: 6px;
-  height: 24px;
-  padding: 0 10px;
-  font-family: var(--mono);
-  font-size: 11px;
+  height: 22px;
+  padding: 0 8px;
+  font-family: var(--font);
+  font-size: 11.5px;
   font-weight: 600;
-  letter-spacing: 0.02em;
-  text-transform: uppercase;
   border: 1px solid var(--border);
-  background: var(--background);
+  border-radius: 5px;
+  background: var(--accent);
   color: var(--foreground);
   text-decoration: none;
 }

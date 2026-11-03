@@ -27,6 +27,26 @@ const isDev = !app.isPackaged || process.env.NODE_ENV === 'development';
 const DEV_PORT = process.env.PORT || 8000;
 const DEV_URL = \`http://localhost:\${DEV_PORT}\`;
 
+// Electron DevTools sidebar configuration:
+// Control with ELECTRON_DEVTOOLS, SOM_ELECTRON_DEVTOOLS or CLI flags:
+//   ELECTRON_DEVTOOLS=true | 1 | right | show     -> open DevTools as right sidebar
+//   ELECTRON_DEVTOOLS=bottom | left | detach     -> open DevTools in chosen position
+//   ELECTRON_DEVTOOLS=false | 0 | hide | off     -> hide DevTools
+function getDevToolsConfig() {
+  const arg = process.argv.find((a) => a.startsWith('--devtools='));
+  const raw = (arg ? arg.split('=')[1] : null) ||
+    (process.argv.includes('--devtools') ? 'right' : null) ||
+    (process.argv.includes('--no-devtools') ? 'false' : null) ||
+    process.env.ELECTRON_DEVTOOLS ||
+    process.env.SOM_ELECTRON_DEVTOOLS ||
+    '';
+  const val = String(raw).trim().toLowerCase();
+  if (!val) return { show: false, mode: 'right' };
+  if (['false', '0', 'hide', 'off', 'no'].includes(val)) return { show: false, mode: 'right' };
+  const mode = ['bottom', 'left', 'detach', 'undocked'].includes(val) ? (val === 'undocked' ? 'detach' : val) : 'right';
+  return { show: true, mode };
+}
+
 let mainWindow = null;
 
 function waitForServer(url, timeout = 15000) {
@@ -40,7 +60,7 @@ function waitForServer(url, timeout = 15000) {
     };
     const retry = () => {
       if (Date.now() - start > timeout) return resolve(false);
-      setTimeout(check, 300);
+      setTimeout(check, 100); // the window opens as soon as the dev server answers
     };
     check();
   });
@@ -69,14 +89,37 @@ async function createWindow() {
     mainWindow.show();
   });
 
-  // Open external links in default system browser, not in Electron window
+  // Open external links in default system browser, never inside the Electron window
   mainWindow.webContents.setWindowOpenHandler(({ url }) => {
-    if (url.startsWith('http:') || url.startsWith('https:')) {
-      shell.openExternal(url);
-      return { action: 'deny' };
-    }
-    return { action: 'allow' };
+    try {
+      const parsed = new URL(url);
+      if (parsed.protocol === 'http:' || parsed.protocol === 'https:') {
+        shell.openExternal(url);
+      }
+    } catch (_) {}
+    return { action: 'deny' };
   });
+
+  // Block navigation away from the local application origin
+  mainWindow.webContents.on('will-navigate', (event, targetUrl) => {
+    try {
+      const parsed = new URL(targetUrl);
+      if (isDev && parsed.origin === new URL(DEV_URL).origin) return;
+      if (!isDev && parsed.protocol === 'file:') {
+        const distRoot = path.resolve(__dirname, '..', 'dist');
+        const targetPath = path.resolve(decodeURIComponent(parsed.pathname));
+        if (targetPath === distRoot || targetPath.startsWith(distRoot + path.sep)) return;
+      }
+      event.preventDefault();
+      if (parsed.protocol === 'http:' || parsed.protocol === 'https:') {
+        shell.openExternal(targetUrl);
+      }
+    } catch (_) {
+      event.preventDefault();
+    }
+  });
+
+  const devTools = getDevToolsConfig();
 
   if (isDev) {
     const ready = await waitForServer(DEV_URL);
@@ -84,6 +127,9 @@ async function createWindow() {
       await mainWindow.loadURL(DEV_URL);
     } else {
       await mainWindow.loadURL(DEV_URL); // attempt anyway
+    }
+    if (devTools.show) {
+      mainWindow.webContents.openDevTools({ mode: devTools.mode });
     }
     // F12 or Cmd+Option+I toggles DevTools
     mainWindow.webContents.on('before-input-event', (event, input) => {
@@ -95,6 +141,9 @@ async function createWindow() {
     // Production: load static bundle from dist/
     const distPath = path.join(__dirname, '..', 'dist', 'index.html');
     await mainWindow.loadFile(distPath);
+    if (devTools.show) {
+      mainWindow.webContents.openDevTools({ mode: devTools.mode });
+    }
   }
 
   mainWindow.on('closed', () => {
@@ -125,16 +174,40 @@ ipcMain.handle('som:close', () => {
   if (mainWindow) mainWindow.close();
 });
 
+ipcMain.handle('som:devtools:open', (_, mode) => {
+  if (mainWindow) mainWindow.webContents.openDevTools({ mode: mode || 'right' });
+});
+
+ipcMain.handle('som:devtools:close', () => {
+  if (mainWindow) mainWindow.webContents.closeDevTools();
+});
+
+ipcMain.handle('som:devtools:toggle', () => {
+  if (mainWindow) mainWindow.webContents.toggleDevTools();
+});
+
+function pickAllowed(obj, allowed) {
+  const out = {};
+  if (!obj || typeof obj !== 'object') return out;
+  for (const k of allowed) {
+    if (Object.prototype.hasOwnProperty.call(obj, k) && obj[k] !== undefined) out[k] = obj[k];
+  }
+  return out;
+}
+
 ipcMain.handle('som:dialog:message', async (_, options) => {
-  return dialog.showMessageBox(mainWindow, options);
+  const safeOpts = pickAllowed(options, ['type', 'buttons', 'defaultId', 'title', 'message', 'detail', 'cancelId', 'noLink']);
+  return mainWindow ? dialog.showMessageBox(mainWindow, safeOpts) : dialog.showMessageBox(safeOpts);
 });
 
 ipcMain.handle('som:dialog:open', async (_, options) => {
-  return dialog.showOpenDialog(mainWindow, options);
+  const safeOpts = pickAllowed(options, ['title', 'defaultPath', 'buttonLabel', 'filters', 'properties', 'message']);
+  return mainWindow ? dialog.showOpenDialog(mainWindow, safeOpts) : dialog.showOpenDialog(safeOpts);
 });
 
 ipcMain.handle('som:dialog:save', async (_, options) => {
-  return dialog.showSaveDialog(mainWindow, options);
+  const safeOpts = pickAllowed(options, ['title', 'defaultPath', 'buttonLabel', 'filters', 'message', 'nameFieldLabel', 'showsTagField']);
+  return mainWindow ? dialog.showSaveDialog(mainWindow, safeOpts) : dialog.showSaveDialog(safeOpts);
 });
 
 app.whenReady().then(() => {
@@ -146,7 +219,7 @@ app.whenReady().then(() => {
 });
 
 app.on('window-all-closed', () => {
-  if (process.platform !== 'darwin') app.quit();
+  if (isDev || process.platform !== 'darwin') app.quit();
 });
 `,
 
@@ -159,12 +232,32 @@ contextBridge.exposeInMainWorld('somDesktop', {
   minimize: () => ipcRenderer.invoke('som:minimize'),
   maximize: () => ipcRenderer.invoke('som:maximize'),
   close: () => ipcRenderer.invoke('som:close'),
+  openDevTools: (mode) => ipcRenderer.invoke('som:devtools:open', mode),
+  closeDevTools: () => ipcRenderer.invoke('som:devtools:close'),
+  toggleDevTools: () => ipcRenderer.invoke('som:devtools:toggle'),
   showMessageBox: (options) => ipcRenderer.invoke('som:dialog:message', options),
   showOpenDialog: (options) => ipcRenderer.invoke('som:dialog:open', options),
   showSaveDialog: (options) => ipcRenderer.invoke('som:dialog:save', options),
 });
+
+contextBridge.exposeInMainWorld('__SOM_ELECTRON__', true);
 `,
 };
+
+// A new project's index.html loads Google Fonts: a style sheet from another site that the browser must download before it
+// draws anything (about 0.6 s on a first visit, and a failed request when offline). A desktop app does not need it.
+// Only the exact links Som.js wrote are removed; returns the file's relative path, or null when there was nothing to remove.
+function dropWebFonts(root) {
+  const lay = require('./layout.js').layout(root);
+  const file = path.join(lay.split ? lay.frontend : root, 'index.html');
+  if (!fs.existsSync(file)) return null;
+  const html = fs.readFileSync(file, 'utf8');
+  const links = /^[ \t]*<link\b[^>\n]*href="https:\/\/fonts\.(?:googleapis|gstatic)\.com[^">\n]*"[^>\n]*>[ \t]*\r?\n/gim;
+  const out = html.replace(links, '');
+  if (out === html) return null;
+  fs.writeFileSync(file, out);
+  return path.relative(root, file);
+}
 
 function init(args = []) {
   const target = typeof args === 'string' ? args : (args[0] && !args[0].startsWith('-') ? args[0] : process.cwd());
@@ -210,11 +303,14 @@ function init(args = []) {
 
   fs.writeFileSync(pkgFile, JSON.stringify(pkg, null, 2) + '\n');
 
+  const droppedFonts = dropWebFonts(root);
+
   console.log(`
   Electron configured for Som.js:
     CREATED  electron/main.js
     CREATED  electron/preload.js
-    UPDATED  package.json  (scripts: electron, electron:dev, electron:build)
+    UPDATED  package.json  (scripts: electron, electron:dev, electron:build)${droppedFonts ? `
+    UPDATED  ${droppedFonts}  (removed the Google Fonts links: a desktop app should start without the network; the system fonts are used)` : ''}
 
   Next:
     npm install            (install electron & electron-builder)
@@ -224,6 +320,25 @@ function init(args = []) {
 }
 
 function resolveElectronBinary(root) {
+  // 1. Resolve native Electron executable directly from node_modules/electron
+  // This bypasses npm's cli.js wrapper which noisily prints "...exited with signal SIGINT" on exit
+  try {
+    const pkgDir = path.join(root, 'node_modules', 'electron');
+    if (fs.existsSync(pkgDir)) {
+      const execPath = require(pkgDir);
+      if (typeof execPath === 'string' && fs.existsSync(execPath)) return execPath;
+    }
+  } catch (_) {}
+
+  try {
+    const pathTxt = path.join(root, 'node_modules', 'electron', 'path.txt');
+    if (fs.existsSync(pathTxt)) {
+      const rel = fs.readFileSync(pathTxt, 'utf8').trim();
+      const direct = path.join(root, 'node_modules', 'electron', 'dist', rel);
+      if (fs.existsSync(direct)) return direct;
+    }
+  } catch (_) {}
+
   const local = path.join(root, 'node_modules', '.bin', process.platform === 'win32' ? 'electron.cmd' : 'electron');
   if (fs.existsSync(local)) return local;
   return 'electron';
@@ -243,28 +358,51 @@ function dev(args = []) {
     init();
   }
 
+  // Load .env if present
+  try { require('./env.js').load(root); } catch (_) {}
+
   const bin = resolveElectronBinary(root);
+
+  // Extract devtools settings from CLI args or environment
+  let devToolsEnv = process.env.ELECTRON_DEVTOOLS || process.env.SOM_ELECTRON_DEVTOOLS || '';
+  const devToolsArg = args.find((a) => a === '--devtools' || a.startsWith('--devtools=') || a === '--no-devtools');
+  if (devToolsArg) {
+    if (devToolsArg === '--devtools') devToolsEnv = 'right';
+    else if (devToolsArg === '--no-devtools') devToolsEnv = 'false';
+    else devToolsEnv = devToolsArg.split('=')[1] || 'right';
+  }
+
+  const serverArgs = args.filter((a) => a !== '--devtools' && !a.startsWith('--devtools=') && a !== '--no-devtools');
 
   // 1. Start dev server child process
   console.log('  Starting Som.js dev server & Electron desktop window…');
   const somCli = path.join(__dirname, 'som.js');
-  const server = spawn(process.execPath, [somCli, 'dev', ...args], {
+  const server = spawn(process.execPath, [somCli, 'dev', ...serverArgs], {
     cwd: root,
     stdio: 'inherit',
-    env: { ...process.env, PORT: process.env.PORT || '8000' },
+    env: { ...process.env, PORT: process.env.PORT || '8000', SOM_ELECTRON: 'true' },
   });
 
   // 2. Launch Electron after small pause
   let electronProcess = null;
   setTimeout(() => {
-    electronProcess = spawn(bin, ['.'], {
+    const electronArgs = ['.'];
+    if (devToolsArg) electronArgs.push(devToolsArg);
+    electronProcess = spawn(bin, electronArgs, {
       cwd: root,
       stdio: 'inherit',
-      env: { ...process.env, NODE_ENV: 'development', PORT: process.env.PORT || '8000' },
+      env: {
+        ...process.env,
+        NODE_ENV: 'development',
+        PORT: process.env.PORT || '8000',
+        ...(devToolsEnv ? { ELECTRON_DEVTOOLS: devToolsEnv } : {}),
+      },
     });
 
     electronProcess.on('exit', (code) => {
-      server.kill('SIGINT');
+      if (server && !server.killed) {
+        try { server.kill('SIGTERM'); } catch (_) {}
+      }
       process.exit(code || 0);
     });
 
@@ -274,14 +412,20 @@ function dev(args = []) {
       } else {
         console.error('  Electron launch error: ' + err.message);
       }
-      server.kill('SIGINT');
+      if (server && !server.killed) {
+        try { server.kill('SIGTERM'); } catch (_) {}
+      }
       process.exit(1);
     });
   }, 1000);
 
   const cleanup = () => {
-    if (electronProcess) electronProcess.kill();
-    server.kill();
+    if (electronProcess && !electronProcess.killed) {
+      try { electronProcess.kill('SIGTERM'); } catch (_) {}
+    }
+    if (server && !server.killed) {
+      try { server.kill('SIGTERM'); } catch (_) {}
+    }
     process.exit(0);
   };
   process.on('SIGINT', cleanup);

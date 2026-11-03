@@ -1680,7 +1680,7 @@ SOM_SSR=off           # never
 SOM_SSR_TTL=300       # seconds a drawn page is kept (som dev never keeps them)
 ```
 
-At most two pages are drawn at a time; when the server is busy, jsdom is missing, or a page fails, the normal page is sent. Responses carry `Vary: User-Agent`.
+At most two pages are drawn at a time; the other crawlers wait for their turn (up to 15 seconds, 20 at once), and the same address asked twice is drawn once. A page that takes longer than 15 seconds, fails, or is not a page of the app is not tried again for 30 seconds, and the normal page is sent meanwhile, as it is when jsdom is missing. The query string is part of the address (`/search?q=sofa` is its own page). Images, styles and fonts from other sites are not downloaded while drawing, scripts are. Responses carry `Vary: User-Agent` and the same security headers as every other page. The simulated browser introduces itself with a secret `User-Agent` that changes on every start, so it is never drawn again.
 
 ### Sitemap and robots.txt: `som sitemap`
 
@@ -1868,7 +1868,7 @@ cleanHtml(userHtml)                          // keep a small set of tags and att
 
 #### Plain HTTP
 
-In production a request with `X-Forwarded-Proto: http` is redirected to `https`. The address in the redirect comes from `APP_URL` when set, otherwise from the `Host` header only if it looks like a host name; it cannot be used to send visitors to another site.
+In production a request with `X-Forwarded-Proto: http` is redirected to `https`, and one with `X-Forwarded-Proto: https` is served when it comes from this machine or from a proxy listed in `TRUSTED_PROXIES` (so a proxy that ends TLS works with `FORCE_HTTPS=true` or an `https://` `APP_URL`; anyone else could write that header, so from other addresses it is ignored, and the server says so once in its log). Without that header, `FORCE_HTTPS=true` or an `https://` `APP_URL` redirects every plain request. The address in the redirect comes from `APP_URL` when set, otherwise from the `Host` header only if it looks like a host name; it cannot be used to send visitors to another site.
 
 #### API tokens
 
@@ -2000,6 +2000,34 @@ Set these in `.env` (never commit it). Variables that start with `PUBLIC_` are c
 | Router | `Som.router()` with `.go` `.replace` `.back` `.before` `.after` `.route`, and `children` for nested routes |
 | Engine | `Som.render(view, data, options)` |
 | Server | `Route` `Model` `DB` `Seeder` `Hash` `Str` `Url` `Mail` `Crypt` `Cache` `Storage` `Schedule` `config` `response` `abort` and the helpers in `require('somjs/server')` |
+
+## Compared with other frameworks
+
+Som.js is one framework for the browser and the server. The others below each cover part of that, so the honest comparison is "what do you put next to them". This is a map to help you choose, not a ranking: all of them are good, and most are older, bigger and better known than Som.js.
+
+| | **Som.js** | **Next.js** | **Nuxt** | **Astro** | **AdonisJS** | **NestJS** |
+|---|---|---|---|---|---|---|
+| **What it is** | Frontend and backend in one | React framework | Vue framework | Content sites with islands of interactivity | Backend (MVC) | Backend (modules, dependency injection) |
+| **Components** | `.som` files, no Virtual DOM | React | Vue | Astro files; React, Vue, Svelte … inside | none (Edge templates, or Inertia) | none |
+| **Pages drawn on the server** | At build time (`--prerender`), and for crawlers and link previews on request | Yes, for every visitor | Yes, for every visitor | Yes, mostly at build time | Only with Inertia | no |
+| **Database layer** | Active Record `Model`, migrations, seeders, factories | none (use Prisma, Drizzle …) | none | none | Lucid (Active Record) | none (TypeORM, Prisma, MikroORM …) |
+| **Sign-in, 2FA, API tokens** | Built in, in every new project | none (Auth.js …) | none (a module) | none | Built in | none (Passport, your own) |
+| **Queues, mail, scheduler, cache** | Built in | none | none | none | Built in | Modules |
+| **AI agent access (MCP)** | Built in | none | none | none | none | none |
+| **Runtime dependencies** | None | Many | Many | Many | Some | Some |
+| **Language** | JavaScript or TypeScript | TypeScript first | TypeScript first | TypeScript first | TypeScript first | TypeScript first |
+| **Ecosystem and hiring** | Small, new | Very large | Large | Large | Medium | Large |
+
+**Choose Som.js when** you want a whole application (screens, database, sign-in, jobs, mail) from one tool with almost no dependencies, in the Laravel style, and your team is small enough to learn one framework.
+
+**Choose something else when:**
+
+- **Next.js or Nuxt:** your team already knows React or Vue, you need the libraries of that ecosystem, or every visitor must get server-drawn HTML with streaming and incremental updates. Som.js draws whole pages on the server only for crawlers and link previews (see "Whole pages for crawlers").
+- **Astro:** the site is mostly content (blog, documentation, marketing) and ships almost no JavaScript. Som.js apps always ship the framework.
+- **AdonisJS:** you want the same Laravel-like backend with a larger community and years of production use, and you will bring your own frontend.
+- **NestJS:** you build a large API or microservices with many teams, and you want strict structure and dependency injection.
+
+**Things to weigh before choosing Som.js:** it is young and has one small community, few third-party packages are made for `.som` files, and nobody has run it at large scale yet. See [Known limits](#known-limits).
 
 ## Coming from Vue
 

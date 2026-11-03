@@ -1,130 +1,96 @@
 <!--
-  ErrorMonitor Page: Interactive Developer Exception & Error Monitoring Showcase
-  Allows developers to test and inspect the runtime error monitor with live examples.
+  ErrorMonitor Page — Interactive Som.js Diagnostic Inspector Showcase
+  Uses Som.js's own minimalist geometric UI and authentic JavaScript/.som stack traces.
 -->
-import ErrorMonitor from '../../errors/ErrorMonitor.som'
+import ErrorMonitor from '../errors/ErrorMonitor.som'
 
-state currentScenario = 'method'
+state scenario = 'method'
 
-derive sampleError = currentScenario === 'method' ? {
-  name: 'BadMethodCallException',
-  message: 'Call to undefined method App\\Models\\Post::qquery()',
+derive sampleError = scenario === 'method' ? {
+  name: 'TypeError',
+  message: 'Post.qquery is not a function',
   frames: [
-    { fn: 'HomeController.__invoke', file: 'app/Http/Controllers/Discovery/HomeController.som', line: 14, col: 5, isApp: true, snippet: [
-      { num: 10, code: 'class HomeController {' },
-      { num: 11, code: '  action index() {' },
-      { num: 12, code: '    // Query active records' },
-      { num: 13, code: '    load posts = Post.qquery()' },
-      { num: 14, code: '    return view("pages/Home.som", { posts })', isTarget: true },
+    { fn: 'PostController.index', file: 'backend/app/Http/Controllers/PostController.js', line: 13, col: 25, isApp: true, snippet: [
+      { num: 10, code: 'class PostController {' },
+      { num: 11, code: '  async index(req) {' },
+      { num: 12, code: '    // Typo in static query builder call' },
+      { num: 13, code: '    const posts = await Post.qquery().orderByDesc("id").get()', isTarget: true },
+      { num: 14, code: '    return { posts }' },
       { num: 15, code: '  }' },
       { num: 16, code: '}' }
     ]},
-    { fn: 'Route.dispatch', file: 'bin/backend/http.js', line: 182, col: 12, isApp: false },
-    { fn: 'Server.handleRequest', file: 'bin/som.js', line: 412, col: 9, isApp: false },
-    { fn: 'processTicksAndRejections', file: 'node:internal/process/task_queues', line: 95, col: 5, isApp: false }
+    { fn: 'Router.dispatch', file: 'bin/backend/http.js', line: 182, col: 12, isApp: false },
+    { fn: 'Server.handleRequest', file: 'bin/som.js', line: 412, col: 9, isApp: false }
   ],
   solution: {
-    title: 'Bad Method Call',
-    message: 'Did you mean to call App\\Models\\Post::query() instead of ::qquery()?'
+    title: 'Unknown Model Method',
+    message: 'Did you mean Post.query() instead of Post.qquery()?'
   }
-} : currentScenario === 'null' ? {
+} : scenario === 'null' ? {
   name: 'TypeError',
   message: "Cannot read properties of undefined (reading 'email')",
   frames: [
-    { fn: 'ProfileController.update', file: 'app/Http/Controllers/ProfileController.js', line: 32, col: 21, isApp: true, snippet: [
-      { num: 28, code: '  async update(req, res) {' },
-      { num: 29, code: '    const user = req.user;' },
-      { num: 30, code: '    // Attempting direct access without null check' },
-      { num: 31, code: '    const currentEmail = user.account.email;', isTarget: true },
-      { num: 32, code: '    return res.json({ success: true, email: currentEmail });' },
+    { fn: 'ProfileController.update', file: 'backend/app/Http/Controllers/ProfileController.js', line: 31, col: 32, isApp: true, snippet: [
+      { num: 28, code: '  async update(req) {' },
+      { num: 29, code: '    const user = req.user' },
+      { num: 30, code: '    // Accessing nested property without optional chaining' },
+      { num: 31, code: '    const email = user.account.email', isTarget: true },
+      { num: 32, code: '    return { ok: true, email }' },
       { num: 33, code: '  }' }
     ]},
-    { fn: 'Route.dispatch', file: 'bin/backend/http.js', line: 210, col: 14, isApp: false }
+    { fn: 'Router.dispatch', file: 'bin/backend/http.js', line: 210, col: 14, isApp: false }
   ],
   solution: {
-    title: 'Null Reference Protection',
-    message: 'user.account is undefined. Use optional chaining: user.account?.email or verify req.user before accessing.'
+    title: 'Null Reference Guard',
+    message: 'user.account is undefined. Use optional chaining (user.account?.email) or verify req.user before reading.'
   }
 } : {
-  name: 'QueryException',
-  message: 'SQLITE_ERROR: no such table: analytics_reports',
+  name: 'DatabaseError',
+  message: 'SQLITE_ERROR: no such table: tasks_archive',
   frames: [
-    { fn: 'DashboardController.metrics', file: 'app/Http/Controllers/Admin/DashboardController.js', line: 45, col: 18, isApp: true, snippet: [
-      { num: 42, code: '  async metrics(req, res) {' },
-      { num: 43, code: '    // Query missing table' },
-      { num: 44, code: "    const data = await DB.table('analytics_reports').get();", isTarget: true },
-      { num: 45, code: '    return res.json(data);' },
-      { num: 46, code: '  }' }
+    { fn: 'TaskController.archive', file: 'backend/app/Http/Controllers/TaskController.js', line: 44, col: 18, isApp: true, snippet: [
+      { num: 41, code: '  async archive(req) {' },
+      { num: 42, code: '    // Querying a table whose migration has not run yet' },
+      { num: 43, code: "    const rows = await DB.table('tasks_archive').get()", isTarget: true },
+      { num: 44, code: '    return { rows }' },
+      { num: 45, code: '  }' }
     ]},
-    { fn: 'DatabaseConnection.query', file: 'bin/backend/db.js', line: 120, col: 9, isApp: false }
+    { fn: 'Database.query', file: 'bin/backend/db.js', line: 120, col: 9, isApp: false }
   ],
   solution: {
-    title: 'Missing Database Migration',
-    message: "Run 'som db migrate' or create a migration for table 'analytics_reports' with 'som make:migration create_analytics_reports_table'."
+    title: 'Pending Database Migration',
+    message: "Run 'som db:migrate' or create the table with 'som make:migration create_tasks_archive_table'."
   }
 }
 
 <view>
-  <div class="monitor-page-container">
-    <!-- Quick Scenario Switcher Bar for Developers -->
-    <div class="scenario-bar">
-      <span class="scenario-label">Developer Error Scenarios:</span>
-      <button class={'btn-scenario' + (currentScenario === 'method' ? ' active' : '')} @click="currentScenario = 'method'">
-        1. Typo Method Call (qquery)
-      </button>
-      <button class={'btn-scenario' + (currentScenario === 'null' ? ' active' : '')} @click="currentScenario = 'null'">
-        2. Undefined Property (TypeError)
-      </button>
-      <button class={'btn-scenario' + (currentScenario === 'sql' ? ' active' : '')} @click="currentScenario = 'sql'">
-        3. Missing Table (QueryException)
-      </button>
-    </div>
+  <h1>Error Monitor</h1>
+  <p class="lead">Som.js catches unhandled server and component exceptions with its own geometric inspector: interactive stack frames, terminal code preview, and fix suggestions.</p>
 
-    <!-- Error Monitor Interactive View -->
-    <error-monitor
-      error={sampleError}
-      title={sampleError.name}
-      message={sampleError.message}
-      frames={sampleError.frames}
-      solution={sampleError.solution}>
-    </error-monitor>
+  <div class="switcher" role="group" aria-label="Exception Scenarios">
+    <span class="label-inline">Simulate Exception:</span>
+    <button class={scenario === 'method' ? 'primary sm' : 'secondary sm'} @click="scenario = 'method'">
+      1. Method Typo (Post.qquery)
+    </button>
+    <button class={scenario === 'null' ? 'primary sm' : 'secondary sm'} @click="scenario = 'null'">
+      2. Null Reference (TypeError)
+    </button>
+    <button class={scenario === 'sql' ? 'primary sm' : 'secondary sm'} @click="scenario = 'sql'">
+      3. Missing Table (DatabaseError)
+    </button>
   </div>
+
+  <error-monitor
+    error={sampleError}
+    status={500}
+    title={sampleError.name}
+    message={sampleError.message}
+    frames={sampleError.frames}
+    solution={sampleError.solution}>
+  </error-monitor>
 </view>
 
 <style scoped>
-.monitor-page-container {
-  display: flex;
-  flex-direction: column;
-  min-height: 100vh;
-}
-.scenario-bar {
-  background: #0f172a;
-  color: #f8fafc;
-  padding: 8px 24px;
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  font-size: 12px;
-  border-bottom: 1px solid #334155;
-}
-.scenario-label {
-  font-weight: 700;
-  color: #94a3b8;
-  text-transform: uppercase;
-  letter-spacing: 0.05em;
-}
-.btn-scenario {
-  background: #1e293b;
-  color: #cbd5e1;
-  border: 1px solid #334155;
-  padding: 4px 10px;
-  font-size: 11px;
-  cursor: pointer;
-  font-weight: 600;
-}
-.btn-scenario.active {
-  background: #ef4444;
-  color: #ffffff;
-  border-color: #ef4444;
-}
+.switcher { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; padding: 12px 16px; border: 1px solid var(--border); background: var(--accent); margin-bottom: 16px; }
+.label-inline { font-family: var(--mono); font-size: 12px; font-weight: 600; color: var(--muted); margin-inline-end: 4px; }
 </style>

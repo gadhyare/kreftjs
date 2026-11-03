@@ -12,16 +12,26 @@
 const tasks = [];
 
 function field(spec, value, min, max) {
+  if (spec == null || spec === '') return false;
   return String(spec).split(',').some((part) => {
     let [range, step] = part.split('/');
-    step = step ? Number(step) : 1;
+    step = step !== undefined ? Number(step) : 1;
+    if (!Number.isInteger(step) || step <= 0) return false;
     let lo = min, hi = max;
-    if (range !== '*') { const [a, b] = range.split('-').map(Number); lo = a; hi = b === undefined ? (part.includes('/') ? max : a) : b; }
+    if (range !== '*') {
+      const [a, b] = range.split('-').map(Number);
+      lo = a;
+      hi = b === undefined ? (part.includes('/') ? max : a) : b;
+    }
+    if (!Number.isFinite(lo) || !Number.isFinite(hi) || lo > hi) return false;
     return value >= lo && value <= hi && (value - lo) % step === 0;
   });
 }
 function due(expr, d = new Date()) {
-  const [m, h, dom, mon, dow] = expr.trim().split(/\s+/);
+  if (typeof expr !== 'string') return false;
+  const parts = expr.trim().split(/\s+/);
+  if (parts.length < 5) return false;
+  const [m, h, dom, mon, dow] = parts;
   return field(m, d.getMinutes(), 0, 59) && field(h, d.getHours(), 0, 23) && field(dom, d.getDate(), 1, 31) && field(mon, d.getMonth() + 1, 1, 12) && field(dow, d.getDay(), 0, 6);
 }
 
@@ -55,7 +65,7 @@ class Task {
   name(n) { this.label = n; return this; }
   description(n) { return this.name(n); }
   isDue(d) { return due(this.expr, d); }
-  async execute(log = () => {}) {
+  async execute(log = () => { }) {
     if (!this.overlap && this.running) return log(`  skipped   ${this.label} (still running)`);
     if (this.condition && !(await this.condition())) return;
     this.running = true;

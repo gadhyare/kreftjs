@@ -2,8 +2,15 @@ const { Crypt, TOTP, QR, ValidationError, abort, noContent } = require('somjs/se
 
 // Two-factor authentication with an authenticator app (pages/Profile.som → Two-factor authentication)
 class TwoFactorController {
+  ensureSession(req) {
+    if (req.accessToken && req.accessToken.type !== 'session' && !req.accessToken.can('*')) {
+      abort(403, 'Two-factor authentication management requires a browser session.')
+    }
+  }
+
   // POST /api/user/two-factor   ('password.confirm'): a new secret, not on yet → scan the QR code, then confirm
   async enable(req) {
+    this.ensureSession(req)
     const user = req.user
     if (user.hasTwoFactor()) abort(409, 'Two-factor authentication is already on.')
     const secret = TOTP.secret()
@@ -17,6 +24,7 @@ class TwoFactorController {
 
   // POST /api/user/two-factor/confirm  { code }: the first code from the app turns it on
   async confirm(req) {
+    this.ensureSession(req)
     const { code } = await req.validate({ code: 'required' })
     const user = req.user
     if (!user.two_factor_secret) abort(409, 'Start two-factor authentication first.')
@@ -28,6 +36,7 @@ class TwoFactorController {
 
   // DELETE /api/user/two-factor   ('password.confirm')
   async disable(req) {
+    this.ensureSession(req)
     const user = req.user
     user.two_factor_secret = null
     user.two_factor_recovery_codes = null
@@ -38,11 +47,13 @@ class TwoFactorController {
 
   // GET /api/user/two-factor/recovery-codes   ('password.confirm')
   async recoveryCodes(req) {
+    this.ensureSession(req)
     return { recovery_codes: req.user.recoveryCodes() }
   }
 
   // POST /api/user/two-factor/recovery-codes   ('password.confirm'): new ones; the old ones stop working
   async regenerate(req) {
+    this.ensureSession(req)
     req.user.two_factor_recovery_codes = Crypt.encrypt(TOTP.recoveryCodes())
     await req.user.save()
     return { recovery_codes: req.user.recoveryCodes() }

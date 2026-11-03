@@ -37,15 +37,17 @@ class Fail extends Error {
 }
 
 function createServerRoutes(dir, { db = null, production = false, prefix = '/api', log = console } = {}) {
+  const isProd = Boolean(production || process.env.APP_ENV === 'production' || process.env.NODE_ENV === 'production');
   let routes = [], scannedAt = 0;
+  require('./backend/typescript.js').registerTypeScript(dir);
   const scan = () => {
     const out = [];
     const walk = (d) => {
       for (const e of fs.readdirSync(d, { withFileTypes: true })) {
         const full = path.join(d, e.name);
         if (e.isDirectory()) { if (!e.name.startsWith('_') && e.name !== 'node_modules') walk(full); continue; }
-        if (!/\.(c|m)?js$/.test(e.name) || e.name.startsWith('_')) continue; // _helpers.js are not routes
-        const rel = path.relative(dir, full).split(path.sep).join('/').replace(/\.(c|m)?js$/, '').replace(/(^|\/)index$/, '');
+        if (!/\.(c|m)?(js|ts)$/.test(e.name) || e.name.endsWith('.d.ts') || e.name.startsWith('_')) continue; // _helpers.js are not routes
+        const rel = path.relative(dir, full).split(path.sep).join('/').replace(/\.(c|m)?(js|ts)$/, '').replace(/(^|\/)index$/, '');
         const keys = [];
         const pattern = rel.split('/').filter(Boolean).map((part) => {
           const m = part.match(/^\[(\.\.\.)?(\w+)\]$/);
@@ -69,8 +71,13 @@ function createServerRoutes(dir, { db = null, production = false, prefix = '/api
     const mtime = fs.statSync(file).mtimeMs;
     const hit = loaded.get(file);
     if (hit && (production || hit.mtime === mtime)) return hit.mod;
-    delete require.cache[require.resolve(file)]; // so a changed CommonJS file is read again
-    const mod = await import(pathToFileURL(file).href + (production ? '' : '?t=' + mtime));
+    delete require.cache[require.resolve(file)]; // so a changed CommonJS or TypeScript file is read again
+    let mod;
+    if (/\.[mc]?ts$/i.test(file)) {
+      mod = require(file);
+    } else {
+      mod = await import(pathToFileURL(file).href + (production ? '' : '?t=' + mtime));
+    }
     const m = mod.default && typeof mod.default === 'object' && !mod.get && !mod.post && !mod.handle ? { ...mod.default } : mod;
     loaded.set(file, { mtime, mod: m });
     return m;
@@ -92,7 +99,7 @@ function createServerRoutes(dir, { db = null, production = false, prefix = '/api
   });
   const send = (res, status, data, headers = {}) => {
     if (res.headersSent) return;
-    res.writeHead(status, { 'Content-Type': 'application/json; charset=utf-8', 'Cache-Control': 'no-store', ...headers });
+    res.writeHead(status, { 'Content-Type': 'application/json; charset=utf-8', 'Cache-Control': 'no-store', 'X-Content-Type-Options': 'nosniff', 'X-Frame-Options': 'DENY', 'Referrer-Policy': 'same-origin', ...headers });
     res.end(data === undefined ? '' : JSON.stringify(data));
   };
 
@@ -108,9 +115,9 @@ function createServerRoutes(dir, { db = null, production = false, prefix = '/api
         || (method === 'DELETE' && (mod.destroy || mod.remove)) || mod.handle || (typeof mod.default === 'function' ? mod.default : null);
       if (!fn) { send(res, 405, { message: `${method} is not supported here.` }); return true; }
       const m = (sub === '/' ? '' : sub.replace(/\/$/, '')).match(route.regex) || sub.match(route.regex);
-      const params = Object.fromEntries(route.keys.map((k, i) => [k, m[i + 1]])); // the path is decoded already
-      const url = new URL(req.url, 'http://x');
       const { safeObjectFromEntries } = require('./safe-json.js');
+      const params = safeObjectFromEntries(route.keys.map((k, i) => [k, m[i + 1]])); // the path is decoded already
+      const url = new URL(req.url, 'http://x');
       const ctx = {
         method, params, req, res, db, env: process.env,
         path: urlPath,
@@ -135,7 +142,7 @@ function createServerRoutes(dir, { db = null, production = false, prefix = '/api
         send(res, e.status, { message: e.message, ...(e.errors ? { errors: e.errors } : {}) });
       } else {
         log.error(`  Error in ${path.relative(process.cwd(), route.file)}: ${e && e.stack || e}`);
-        send(res, 500, { message: production ? 'Server error.' : String(e && e.message || e) });
+        send(res, 500, { message: isProd ? 'Server error.' : String(e && e.message || e) });
       }
     }
     return true;
