@@ -1,5 +1,5 @@
 // 'role:editor,admin' in the routes (after 'auth'): the user has one of these roles (admins have all)
-const { abort } = require('somjs/server')
+const { abort } = require('kreft/server')
 
 class EnsureHasRole {
   async handle(req, next, ...roles) {

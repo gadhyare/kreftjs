@@ -1,0 +1,8 @@
+saved dense = false as 'settings.dense'
+<view>
+  <div>
+    <h3>Look</h3>
+    <label class="check"><input type="checkbox" k-model="dense"> Dense lists</label>
+    <p class="muted">{dense ? 'Dense' : 'Roomy'} it is. Saved, like the other two.</p>
+  </div>
+</view>

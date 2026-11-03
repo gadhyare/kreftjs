@@ -1,6 +1,6 @@
-# My Som.js Application
+# My Kreft Application
 
-Welcome to your **Som.js v2.4** full-stack application.
+Welcome to your **Kreft** full-stack application.
 
 ## Quick Commands
 
@@ -22,12 +22,12 @@ Your project cleanly isolates client-side UI (`frontend/`) from server-side busi
 ```text
 ├── frontend/                  # Public client application (the only folder served to browsers)
 │   ├── index.html             # HTML entry, auth store, router & app bootstrap
-│   ├── App.som                # Root reactive shell
-│   ├── routes/web.som         # Client-side routes (Dashboard, Users, Profile, Auth)
-│   ├── layouts/               # app.som (authenticated shell) & guest.som (auth pages)
+│   ├── App.kreft              # Root reactive shell
+│   ├── routes/web.kreft       # Client-side routes (Dashboard, Users, Profile, Auth)
+│   ├── layouts/               # app.kreft (authenticated shell) & guest.kreft (auth pages)
 │   ├── pages/                 # Route views (Home, Dashboard, Users, Profile, auth/*)
-│   ├── components/            # Reusable widgets (Field.som, StatCard.som, profile/*)
-│   ├── errors/                # Custom HTTP error views (404.som, 500.som, ErrorMonitor.som)
+│   ├── components/            # Reusable widgets (Field.kreft, StatCard.kreft, profile/*)
+│   ├── errors/                # Custom HTTP error views (404.kreft, 500.kreft, ErrorMonitor.kreft)
 │   ├── docs/                  # Built-in documentation (accessible at /docs)
 │   └── ui.css                 # Design system tokens & component styles
 │
@@ -50,39 +50,39 @@ Your project cleanly isolates client-side UI (`frontend/`) from server-side busi
 Generate full-stack features from the terminal:
 
 ```bash
-# Generate Model + Migration + Factory + Seeder + Controller + .som Page + Route:
-som make:model Post --all
+# Generate Model + Migration + Factory + Seeder + Controller + .kreft Page + Route:
+kreft make:model Post --all
 
 # Or pick specific layers (-m migration, -f factory, -s seeder, -c controller, -p page, -r route):
-som make:model Post -mfscpr --route=api --auth
+kreft make:model Post -mfscpr --route=api --auth
 
 # Individual generators:
-som make:controller OrderController --api
-som make:request StorePostRequest --model Post
-som make:resource PostResource
-som make:rule StrongPassword
-som make:observer PostObserver --model Post
-som make:middleware EnsureSubscribed
-som make:job ProcessWebhook
-som make:mail InvoiceReady
-som make:routes billing        # Creates frontend/routes/billing.som & backend/routes/billing.js
+kreft make:controller OrderController --api
+kreft make:request StorePostRequest --model Post
+kreft make:resource PostResource
+kreft make:rule StrongPassword
+kreft make:observer PostObserver --model Post
+kreft make:middleware EnsureSubscribed
+kreft make:job ProcessWebhook
+kreft make:mail InvoiceReady
+kreft make:routes billing        # Creates frontend/routes/billing.kreft & backend/routes/billing.js
 
 # Database & inspection tools:
-som db:migrate                 # Run pending migrations
-som db:seed                    # Run database seeders
-som route:list                 # List all registered backend API routes
-som redis:ping                 # Verify Redis connectivity
-som tinker                     # Interactive REPL with your Models, DB, Cache & Redis preloaded
+kreft db:migrate                 # Run pending migrations
+kreft db:seed                    # Run database seeders
+kreft route:list                 # List all registered backend API routes
+kreft redis:ping                 # Verify Redis connectivity
+kreft tinker                     # Interactive REPL with your Models, DB, Cache & Redis preloaded
 ```
 
 ---
 
-## Writing `.som` Components
+## Writing `.kreft` Components
 
-Every `.som` file combines reactive state, actions, `<view>`, and optional `<style scoped>`:
+Every `.kreft` file combines reactive state, actions, `<view>`, and optional `<style scoped>`:
 
 ```html
-<!-- frontend/pages/Posts.som -->
+<!-- frontend/pages/Posts.kreft -->
 state title = ''
 load posts = api.get('/api/posts')
 
@@ -95,11 +95,11 @@ action create() {
 <view>
   <h1>Posts</h1>
   <form @submit.prevent={create} class="row">
-    <input s-model="title" placeholder="Post title" required>
+    <input k-model="title" placeholder="Post title" required>
     <button class="primary">Publish</button>
   </form>
 
-  <ul s-if="posts.data">
+  <ul k-if="posts.data">
     {for post in posts.data key post.id}
       <li>{post.title}</li>
     {/for}
@@ -111,17 +111,17 @@ action create() {
 
 ## Installing & Updating Packages
 
-Use `som add` to install npm packages safely (blocks untrusted lifecycle scripts, checks for typosquatting, and skips redundant packages already built into Som.js):
+Use `kreft add` to install npm packages safely (blocks untrusted lifecycle scripts, checks for typosquatting, and skips redundant packages already built into Kreft):
 
 ```bash
-som add dayjs nanoid
-som add -D esbuild             # Bundles browser packages into import-mapped modules
+kreft add dayjs nanoid
+kreft add -D esbuild             # Bundles browser packages into import-mapped modules
 ```
 
-Keep dependencies and your embedded Som.js runtime up to date:
+Keep dependencies and your embedded Kreft runtime up to date:
 
 ```bash
-som update                     # Update npm dependencies & refresh som.js / som.d.ts
-som update --check             # Check for outdated packages without modifying files
-som update --core              # Refresh only Som.js runtime & TypeScript definitions
+kreft update                     # Update npm dependencies & refresh kreft.js / kreft.d.ts
+kreft update --check             # Check for outdated packages without modifying files
+kreft update --core              # Refresh only Kreft runtime & TypeScript definitions
 ```

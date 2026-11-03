@@ -1,19 +1,19 @@
 /*
  * The backend commands:
  *
- *   som migrate                      run new migrations
- *   som migrate:rollback [--step 2]  undo the last batch (or the last 2 migrations)
- *   som migrate:fresh [--seed]       drop every table, migrate again (and seed)
- *   som migrate:status               which migrations ran
- *   som db:seed [--class PostSeeder] run database/seeders/DatabaseSeeder.js (or another seeder)
- *   som route:list                   the routes in routes/api.js
- *   som make:model Post [-m -f -s -c -p -r] [--route=file] [--auth] [--all]
- *   som make:controller PostController [--api] [--model Post] [--route=file] [--auth]
- *   som make:page Post [--model Post] [--route=file] [--auth]
- *   som make:migration create_posts_table
- *   som make:seeder PostSeeder
- *   som make:factory PostFactory
- *   som make:middleware EnsureIsAdmin
+ *   kreft migrate                      run new migrations
+ *   kreft migrate:rollback [--step 2]  undo the last batch (or the last 2 migrations)
+ *   kreft migrate:fresh [--seed]       drop every table, migrate again (and seed)
+ *   kreft migrate:status               which migrations ran
+ *   kreft db:seed [--class PostSeeder] run database/seeders/DatabaseSeeder.js (or another seeder)
+ *   kreft route:list                   the routes in routes/api.js
+ *   kreft make:model Post [-m -f -s -c -p -r] [--route=file] [--auth] [--all]
+ *   kreft make:controller PostController [--api] [--model Post] [--route=file] [--auth]
+ *   kreft make:page Post [--model Post] [--route=file] [--auth]
+ *   kreft make:migration create_posts_table
+ *   kreft make:seeder PostSeeder
+ *   kreft make:factory PostFactory
+ *   kreft make:middleware EnsureIsAdmin
  *
  * Every command takes --db <url> (or DATABASE_URL in .env) and --backend <folder> (default: the project).
  */
@@ -65,7 +65,7 @@ function context(o) {
   return { project, base, frontend: lay.split ? lay.frontend : project };
 }
 async function withDb(o, ctx, fn) {
-  const { readConfig } = require('./som-config.js');
+  const { readConfig } = require('./kreft-config.js');
   const config = readConfig(ctx.base);
   const url = o.db || process.env.DATABASE_URL || config.db;
   if (!url) { console.error('  Which database? Set DATABASE_URL in .env (for example sqlite:database/app.db), or add --db.'); process.exit(1); }
@@ -168,13 +168,13 @@ async function runSeed(db, b, ctx, className) {
   // an older project: database/seed.sql
   const sql = path.join(ctx.base, 'database', 'seed.sql');
   if (!className && fs.existsSync(sql)) { await db.exec(fs.readFileSync(sql, 'utf8')); return console.log('  Seeded from database/seed.sql'); }
-  console.log(`  No database/seeders/${className || 'DatabaseSeeder'}.js. Make one with:  som make:seeder ${className || 'DatabaseSeeder'}`);
+  console.log(`  No database/seeders/${className || 'DatabaseSeeder'}.js. Make one with:  kreft make:seeder ${className || 'DatabaseSeeder'}`);
 }
 
 /* ------------------------------------------------------------------ make:… */
 const pascal = (s) => s.replace(/(^|[-_\s])(\w)/g, (_, __, c) => c.toUpperCase()).replace(/[^\w]/g, '');
 // 'User/ProfileController', 'user\\profile-controller' or 'User.ProfileController' → { dirs: ['User'], name: 'ProfileController' }
-// (folders are made when they don't exist yet, e.g. som make:controller User/ProfileController)
+// (folders are made when they don't exist yet, e.g. kreft make:controller User/ProfileController)
 function nested(raw) {
   const parts = String(raw || '').split(/[\\/]+/).map((p) => pascal(p)).filter(Boolean);
   const name = parts.pop() || '';
@@ -193,7 +193,7 @@ function nextStamp(dir) {
 }
 const stamp = (d = new Date()) => { const p = (n) => String(n).padStart(2, '0'); return `${d.getFullYear()}_${p(d.getMonth() + 1)}_${p(d.getDate())}_${p(d.getHours())}${p(d.getMinutes())}${p(d.getSeconds())}`; };
 
-// a project with a tsconfig.json (or --ts flag) gets TypeScript files from som make:* (import/export instead of require)
+// a project with a tsconfig.json (or --ts flag) gets TypeScript files from kreft make:* (import/export instead of require)
 function isTsProject(file) {
   if (process.argv.includes('--ts') || process.argv.includes('--typescript')) return true;
   if (process.argv.includes('--js') || process.argv.includes('--javascript')) return false;
@@ -214,21 +214,21 @@ function write(file, content, base) {
 }
 
 const stubs = {
-  webRoutes: (name) => `// The ${name} pages. index.html loads it: Som.router({ routes: ['routes/web.som', 'routes/${name}.som'] })
-// Route.view(address, page) · .name() · .title() · .layout() · .middleware()   — see routes/web.som
+  webRoutes: (name) => `// The ${name} pages. index.html loads it: Kreft.router({ routes: ['routes/web.kreft', 'routes/${name}.kreft'] })
+// Route.view(address, page) · .name() · .title() · .layout() · .middleware()   — see routes/web.kreft
 
 Route.prefix('/${name}').name('${name}.').middleware('auth').group(() => {
-  // Route.view('/', 'pages/${name}/Index.som').name('index').title('${name[0].toUpperCase() + name.slice(1)}')
+  // Route.view('/', 'pages/${name}/Index.kreft').name('index').title('${name[0].toUpperCase() + name.slice(1)}')
 })
 `,
   apiRoutes: (name) => `// The ${name} API, a route file of its own. routes/api.js loads it with require('./${name}'), so every address starts with /api.
-const { Route } = require('somjs/server')
+const { Route } = require('kreft/server')
 
 Route.prefix('/${name}').middleware('auth').group(() => {
   // Route.get('/', [${name[0].toUpperCase() + name.slice(1)}Controller, 'index'])
 })
 `,
-  model: (name) => `const { Model } = require('somjs/server')
+  model: (name) => `const { Model } = require('kreft/server')
 
 // The ${plural(snake(name))} table. ${name}.all(), ${name}.find(id), ${name}.where(…).get(), ${name}.create({…})
 class ${name} extends Model {
@@ -244,7 +244,7 @@ class ${name} extends Model {
 
 module.exports = ${name}
 `,
-  controller: (name, model, modelReq) => model ? `const { abort, response, slug } = require('somjs/server')
+  controller: (name, model, modelReq) => model ? `const { abort, response, slug } = require('kreft/server')
 const ${model} = require('${modelReq || '../../Models/' + model}')
 
 // Route.apiResource('${plural(snake(model)).replace(/_/g, '-')}', ${name})  in routes/api.js
@@ -284,7 +284,7 @@ class ${name} {
 }
 
 module.exports = ${name}
-` : `const { abort, response } = require('somjs/server')
+` : `const { abort, response } = require('kreft/server')
 
 // In routes/api.js:  Route.get('/something', [${name}, 'index'])
 class ${name} {
@@ -298,7 +298,7 @@ module.exports = ${name}
   migration: (name) => {
     const create = name.match(/^create_(\w+?)_table$/);
     const change = name.match(/^\w+_(?:to|from|in)_(\w+?)_table$/);
-    if (create) return `// som migrate runs up(); som migrate:rollback runs down()
+    if (create) return `// kreft migrate runs up(); kreft migrate:rollback runs down()
 module.exports = {
   up(schema) {
     schema.create('${create[1]}', (table) => {
@@ -313,7 +313,7 @@ module.exports = {
 }
 `;
     const t = change ? change[1] : 'table_name';
-    return `// som migrate runs up(); som migrate:rollback runs down()
+    return `// kreft migrate runs up(); kreft migrate:rollback runs down()
 module.exports = {
   up(schema) {
     schema.table('${t}', (table) => {
@@ -329,9 +329,9 @@ module.exports = {
 }
 `;
   },
-  seeder: (name, model, modelReq) => `const { Seeder, DB } = require('somjs/server')
+  seeder: (name, model, modelReq) => `const { Seeder, DB } = require('kreft/server')
 ${model ? `const ${model} = require('${modelReq || '../../app/Models/' + model}')\n` : ''}
-// som db:seed --class ${name}  (or this.call(${name}) from DatabaseSeeder)
+// kreft db:seed --class ${name}  (or this.call(${name}) from DatabaseSeeder)
 class ${name} extends Seeder {
   async run() {
 ${model ? `    // await ${model}.factory().count(10).create()\n    // await ${model}.create({ … })\n` : name === 'DatabaseSeeder' ? '    // await this.call([UserSeeder, PostSeeder])\n' : "    // await DB.table('posts').insert({ … })\n"}  }
@@ -339,7 +339,7 @@ ${model ? `    // await ${model}.factory().count(10).create()\n    // await ${mo
 
 module.exports = ${name}
 `,
-  middleware: (name) => `const { abort } = require('somjs/server')
+  middleware: (name) => `const { abort } = require('kreft/server')
 
 // Use it in routes/api.js: Route.middleware('${name.replace(/Middleware$/, '').replace(/^[A-Z]/, (c) => c.toLowerCase())}').group(() => { … })
 // Arguments after a colon arrive after next: 'role:admin' → handle(req, next, 'admin')
@@ -364,7 +364,7 @@ module.exports = ${name}
       rulesStr = `      // title: 'required|string|max:255',\n      // body: 'required|string',`;
     }
     if (isTs) {
-      return `import { FormRequest } from 'somjs/server'
+      return `import { FormRequest } from 'kreft/server'
 
 export default class ${name} extends FormRequest {
   /**
@@ -392,7 +392,7 @@ ${rulesStr}
 }
 `;
     }
-    return `const { FormRequest } = require('somjs/server')
+    return `const { FormRequest } = require('kreft/server')
 
 class ${name} extends FormRequest {
   /**
@@ -424,7 +424,7 @@ module.exports = ${name}
   },
   resource: (name, isTs = false) => {
     if (isTs) {
-      return `import { JsonResource } from 'somjs/server'
+      return `import { JsonResource } from 'kreft/server'
 
 export default class ${name} extends JsonResource {
   toArray(req: any) {
@@ -437,7 +437,7 @@ export default class ${name} extends JsonResource {
 }
 `;
     }
-    return `const { JsonResource } = require('somjs/server')
+    return `const { JsonResource } = require('kreft/server')
 
 class ${name} extends JsonResource {
   toArray(req) {
@@ -517,7 +517,7 @@ module.exports = ${name}
   is_active: true,`;
     }
 
-    return `const { Factory } = require('somjs/server')
+    return `const { Factory } = require('kreft/server')
 const ${model} = require('${modelReq || '../../app/Models/' + model}')
 
 // await ${model}.factory().count(10).create()
@@ -526,8 +526,8 @@ ${fields}
 }))
 `;
   },
-  page: (name, endpoint, dirs = [], isTs = false) => `<!-- frontend/pages/${[...dirs, name].join('/')}.som -->
-layout 'layouts/app.som'
+  page: (name, endpoint, dirs = [], isTs = false) => `<!-- frontend/pages/${[...dirs, name].join('/')}.kreft -->
+layout 'layouts/app.kreft'
 ${isTs ? `
 interface ${name}Item {
   id: number
@@ -657,23 +657,23 @@ action removeItem(item) {
       </div>
     </header>
 
-    <p s-if="notice" class="p-3 bg-subtle border border-border text-sm flex justify-between items-center">
+    <p k-if="notice" class="p-3 bg-subtle border border-border text-sm flex justify-between items-center">
       <span>{notice}</span>
       <button class="text-muted hover:text-foreground text-xs" @click="notice = ''">✕</button>
     </p>
 
-    <p s-if="error" class="p-3 bg-red-500/10 border border-red-500/30 text-red-500 text-sm flex justify-between items-center">
+    <p k-if="error" class="p-3 bg-red-500/10 border border-red-500/30 text-red-500 text-sm flex justify-between items-center">
       <span>{error}</span>
       <button class="text-xs" @click="error = ''">✕</button>
     </p>
 
     <div class="flex flex-col sm:flex-row gap-3 items-stretch sm:items-center justify-between">
       <div class="relative flex-1">
-        <input type="search" s-model="search" placeholder="Search records by title, body, ID…" class="w-full px-3 py-2 bg-subtle border border-border text-sm outline-none focus:border-foreground" />
+        <input type="search" k-model="search" placeholder="Search records by title, body, ID…" class="w-full px-3 py-2 bg-subtle border border-border text-sm outline-none focus:border-foreground" />
       </div>
       <div class="flex items-center gap-2">
         <label class="text-xs text-muted whitespace-nowrap">Sort:</label>
-        <select s-model="sortBy" class="px-3 py-2 bg-subtle border border-border text-sm outline-none">
+        <select k-model="sortBy" class="px-3 py-2 bg-subtle border border-border text-sm outline-none">
           <option value="newest">Newest first</option>
           <option value="oldest">Oldest first</option>
           <option value="az">A-Z</option>
@@ -684,15 +684,15 @@ action removeItem(item) {
 
     <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
       <div class="lg:col-span-2 border border-border bg-subtle overflow-hidden">
-        <div s-if="loading" class="p-8 text-center text-muted text-sm">
+        <div k-if="loading" class="p-8 text-center text-muted text-sm">
           Loading ${plural(snake(name)).replace(/_/g, ' ')}…
         </div>
 
-        <div s-elif="!filteredItems.length" class="p-8 text-center text-muted text-sm">
+        <div k-elif="!filteredItems.length" class="p-8 text-center text-muted text-sm">
           No records match the filter criteria.
         </div>
 
-        <table s-else class="w-full text-left text-sm border-collapse">
+        <table k-else class="w-full text-left text-sm border-collapse">
           <thead>
             <tr class="border-b border-border bg-card text-xs text-muted">
               <th class="p-3">ID</th>
@@ -702,11 +702,11 @@ action removeItem(item) {
             </tr>
           </thead>
           <tbody>
-            <tr s-each="item in filteredItems" class="border-b border-border/50 hover:bg-card/50 cursor-pointer" @click="selectItem(item)">
+            <tr k-each="item in filteredItems" class="border-b border-border/50 hover:bg-card/50 cursor-pointer" @click="selectItem(item)">
               <td class="p-3 font-mono text-xs">{item.id}</td>
               <td class="p-3">
                 <div class="font-medium">{item.title || item.name || 'Untitled'}</div>
-                <div s-if="item.body || item.description" class="text-xs text-muted line-clamp-1">
+                <div k-if="item.body || item.description" class="text-xs text-muted line-clamp-1">
                   {item.body || item.description}
                 </div>
               </td>
@@ -724,12 +724,12 @@ action removeItem(item) {
       </div>
 
       <div class="border border-border bg-card p-5 h-fit">
-        <div s-if="!selected" class="text-center py-12 text-muted text-sm">
+        <div k-if="!selected" class="text-center py-12 text-muted text-sm">
           <p class="font-medium text-foreground mb-1">No Record Selected</p>
           <p class="text-xs">Select any row from the table to view or inspect its full data.</p>
         </div>
 
-        <div s-else class="space-y-4">
+        <div k-else class="space-y-4">
           <div class="flex justify-between items-start pb-3 border-b border-border">
             <div>
               <span class="font-mono text-xs text-muted">ID: {selected.id}</span>
@@ -745,10 +745,10 @@ action removeItem(item) {
                 {selected.body || selected.description || JSON.stringify(selected, null, 2)}
               </div>
             </div>
-            <div s-if="selected.created_at" class="text-muted">
+            <div k-if="selected.created_at" class="text-muted">
               Created: <code>{selected.created_at}</code>
             </div>
-            <div s-if="selected.updated_at" class="text-muted">
+            <div k-if="selected.updated_at" class="text-muted">
               Updated: <code>{selected.updated_at}</code>
             </div>
           </div>
@@ -762,7 +762,7 @@ action removeItem(item) {
     </div>
 
     <!-- Create Modal -->
-    <div s-if="showCreate" class="fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-4">
+    <div k-if="showCreate" class="fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-4">
       <div class="bg-card border border-border w-full max-w-lg p-6 space-y-4">
         <div class="flex justify-between items-center pb-2 border-b border-border">
           <h3 class="text-lg font-bold">Create New ${name}</h3>
@@ -772,11 +772,11 @@ action removeItem(item) {
         <div class="space-y-3 text-sm">
           <div>
             <label class="block text-xs text-muted mb-1">Title / Name</label>
-            <input type="text" s-model="form.title" placeholder="Enter title…" class="w-full px-3 py-2 bg-subtle border border-border outline-none" />
+            <input type="text" k-model="form.title" placeholder="Enter title…" class="w-full px-3 py-2 bg-subtle border border-border outline-none" />
           </div>
           <div>
             <label class="block text-xs text-muted mb-1">Content / Description</label>
-            <textarea s-model="form.body" rows="4" placeholder="Enter description…" class="w-full px-3 py-2 bg-subtle border border-border outline-none"></textarea>
+            <textarea k-model="form.body" rows="4" placeholder="Enter description…" class="w-full px-3 py-2 bg-subtle border border-border outline-none"></textarea>
           </div>
         </div>
 
@@ -788,7 +788,7 @@ action removeItem(item) {
     </div>
 
     <!-- Edit Modal -->
-    <div s-if="showEdit" class="fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-4">
+    <div k-if="showEdit" class="fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-4">
       <div class="bg-card border border-border w-full max-w-lg p-6 space-y-4">
         <div class="flex justify-between items-center pb-2 border-b border-border">
           <h3 class="text-lg font-bold">Edit ${name} #{editForm.id}</h3>
@@ -798,11 +798,11 @@ action removeItem(item) {
         <div class="space-y-3 text-sm">
           <div>
             <label class="block text-xs text-muted mb-1">Title / Name</label>
-            <input type="text" s-model="editForm.title" class="w-full px-3 py-2 bg-subtle border border-border outline-none" />
+            <input type="text" k-model="editForm.title" class="w-full px-3 py-2 bg-subtle border border-border outline-none" />
           </div>
           <div>
             <label class="block text-xs text-muted mb-1">Content / Description</label>
-            <textarea s-model="editForm.body" rows="4" class="w-full px-3 py-2 bg-subtle border border-border outline-none"></textarea>
+            <textarea k-model="editForm.body" rows="4" class="w-full px-3 py-2 bg-subtle border border-border outline-none"></textarea>
           </div>
         </div>
 
@@ -837,7 +837,7 @@ function addApiRoute(ctx, name, dirs, { route, auth }) {
         }
       }
     } else {
-      write(routeFile, isTs ? "import { Route } from 'somjs/server'\n\n" : "const { Route } = require('somjs/server')\n\n");
+      write(routeFile, isTs ? "import { Route } from 'kreft/server'\n\n" : "const { Route } = require('kreft/server')\n\n");
     }
   }
 
@@ -855,8 +855,8 @@ function addApiRoute(ctx, name, dirs, { route, auth }) {
     : `const ${controllerName} = require('../app/Http/Controllers/${controllerRel}')\n`;
 
   if (!text.includes(controllerName)) {
-    if (text.includes("require('somjs/server')") || text.includes("from 'somjs/server'")) {
-      text = text.replace(/((?:const \{[^}]+\} = require\('somjs\/server'\)|import \{[^}]+\} from 'somjs\/server')[^\n]*\n)/, `$1${requireLine}`);
+    if (text.includes("require('kreft/server')") || text.includes("from 'kreft/server'")) {
+      text = text.replace(/((?:const \{[^}]+\} = require\('kreft\/server'\)|import \{[^}]+\} from 'kreft\/server')[^\n]*\n)/, `$1${requireLine}`);
     } else {
       text = requireLine + text;
     }
@@ -869,7 +869,7 @@ function addApiRoute(ctx, name, dirs, { route, auth }) {
 }
 
 function addSidebarLink(ctx, routeNameTag, label) {
-  const layoutFile = path.join(ctx.frontend, 'layouts', 'app.som');
+  const layoutFile = path.join(ctx.frontend, 'layouts', 'app.kreft');
   if (!fs.existsSync(layoutFile)) return;
   let text = fs.readFileSync(layoutFile, 'utf8');
   if (text.includes(`'${routeNameTag}'`) || text.includes(`"${routeNameTag}"`)) return;
@@ -884,17 +884,17 @@ function addSidebarLink(ctx, routeNameTag, label) {
 }
 
 function addWebRoute(ctx, name, dirs, { route, auth }) {
-  const routeName = route ? String(route).replace(/\.(som|js)$/, '').replace(/^[\\/]+/, '') : 'web';
+  const routeName = route ? String(route).replace(/\.(kreft|som|js)$/, '').replace(/^[\\/]+/, '') : 'web';
   const routeBaseName = routeName.split(/[\\/]/).pop();
   const fileTargetName = routeBaseName === 'api' ? 'web' : routeBaseName;
-  const routeFile = path.join(ctx.frontend, 'routes', fileTargetName + '.som');
+  const routeFile = path.join(ctx.frontend, 'routes', fileTargetName + '.kreft');
 
   if (!fs.existsSync(routeFile)) {
     write(routeFile, stubs.webRoutes(fileTargetName));
   }
 
   const endpoint = '/' + [...(dirs.length ? dirs.map((d) => snake(d).replace(/_/g, '-')) : []), plural(snake(name)).replace(/_/g, '-')].join('/');
-  const pageRel = `pages/${[...dirs, name].join('/')}.som`;
+  const pageRel = `pages/${[...dirs, name].join('/')}.kreft`;
   let text = fs.readFileSync(routeFile, 'utf8');
 
   if (text.includes(`'${endpoint}'`) || text.includes(`"${endpoint}"`)) {
@@ -1007,16 +1007,16 @@ function removeApiRoute(ctx, name, dirs, { route, dryRun = false }) {
 }
 
 function removeWebRoute(ctx, name, dirs, { route, dryRun = false }) {
-  const routeName = route ? String(route).replace(/\.(som|js)$/, '').replace(/^[\\/]+/, '') : 'web';
+  const routeName = route ? String(route).replace(/\.(kreft|som|js)$/, '').replace(/^[\\/]+/, '') : 'web';
   const routeBaseName = routeName.split(/[\\/]/).pop();
   const fileTargetName = routeBaseName === 'api' ? 'web' : routeBaseName;
   const routeFiles = [
-    path.join(ctx.frontend, 'routes', fileTargetName + '.som'),
-    path.join(ctx.project, 'frontend', 'routes', fileTargetName + '.som'),
-    path.join(ctx.frontend, 'routes', 'web.som'),
-    path.join(ctx.project, 'frontend', 'routes', 'web.som'),
-    path.join(ctx.project, 'routes', fileTargetName + '.som'),
-    path.join(ctx.project, 'routes', 'web.som')
+    path.join(ctx.frontend, 'routes', fileTargetName + '.kreft'),
+    path.join(ctx.project, 'frontend', 'routes', fileTargetName + '.kreft'),
+    path.join(ctx.frontend, 'routes', 'web.kreft'),
+    path.join(ctx.project, 'frontend', 'routes', 'web.kreft'),
+    path.join(ctx.project, 'routes', fileTargetName + '.kreft'),
+    path.join(ctx.project, 'routes', 'web.kreft')
   ];
 
   const seenFiles = new Set();
@@ -1024,8 +1024,8 @@ function removeWebRoute(ctx, name, dirs, { route, dryRun = false }) {
 
   const ep1 = '/' + [...(dirs.length ? dirs.map((d) => snake(d).replace(/_/g, '-')) : []), plural(snake(name)).replace(/_/g, '-')].join('/');
   const ep2 = '/' + plural(snake(name)).replace(/_/g, '-');
-  const pageRel1 = `pages/${[...dirs, name].join('/')}.som`;
-  const pageRel2 = `pages/${name}.som`;
+  const pageRel1 = `pages/${[...dirs, name].join('/')}.kreft`;
+  const pageRel2 = `pages/${name}.kreft`;
   const routeNameTag1 = [...dirs.map(snake), plural(snake(name)).replace(/_/g, '-')].join('.');
   const routeNameTag2 = plural(snake(name)).replace(/_/g, '-');
 
@@ -1064,9 +1064,9 @@ function removeWebRoute(ctx, name, dirs, { route, dryRun = false }) {
 
 function removeSidebarLink(ctx, name, dirs, { dryRun = false }) {
   const layoutFiles = [
-    path.join(ctx.frontend, 'layouts', 'app.som'),
-    path.join(ctx.project, 'frontend', 'layouts', 'app.som'),
-    path.join(ctx.project, 'layouts', 'app.som')
+    path.join(ctx.frontend, 'layouts', 'app.kreft'),
+    path.join(ctx.project, 'frontend', 'layouts', 'app.kreft'),
+    path.join(ctx.project, 'layouts', 'app.kreft')
   ];
 
   const seenFiles = new Set();
@@ -1186,15 +1186,15 @@ const make = {
   model(args) {
     const o = options(args), ctx = context(o);
     let { dirs, name, rel } = nested(o._[0]);
-    if (!name) return console.error('  som make:model Post [-m -f -s -c -p -r] [--route=file] [--auth] [--all] [--folder=Admin]   (Shop/Product: app/Models/Shop/Product.js)');
+    if (!name) return console.error('  kreft make:model Post [-m -f -s -c -p -r] [--route=file] [--auth] [--all] [--folder=Admin]   (Shop/Product: app/Models/Shop/Product.js)');
     const all = o.flags.has('a') || o.flags.has('all');
     const auth = o.flags.has('auth');
     const hasRoute = all || o.flags.has('r') || o.flags.has('route') || Boolean(o.route);
 
     // Support placing all auxiliary files (controllers, pages, routes) in a specific folder [except model]:
-    // e.g. som make:model Post --all --folder=Admin
-    //      som make:model Post --all Admin
-    //      som make:model Admin/Post --all --flat-model
+    // e.g. kreft make:model Post --all --folder=Admin
+    //      kreft make:model Post --all Admin
+    //      kreft make:model Admin/Post --all --flat-model
     const targetFolder = o.folder || o.subfolder || o['in'] || o.group || o.path || (o._[1] && !o._[1].startsWith('-') ? o._[1] : null);
     const flatModel = o.flags.has('flat-model') || o.flags.has('except-model') || o.flags.has('no-model-dir') || Boolean(targetFolder);
 
@@ -1222,7 +1222,7 @@ const make = {
   controller(args) {
     const o = options(args), ctx = context(o);
     let { dirs, name } = nested(o._[0]);
-    if (!name) return console.error('  som make:controller PostController [--api] [--model Post] [--route=file] [--auth]');
+    if (!name) return console.error('  kreft make:controller PostController [--api] [--model Post] [--route=file] [--auth]');
     if (!/Controller$/.test(name)) name += 'Controller';
     const m = o.model ? nested(o.model) : o.flags.has('api') || o.flags.has('resource') ? { dirs: [], name: name.replace(/Controller$/, '') } : null;
     const model = m ? m.name : null;
@@ -1250,27 +1250,27 @@ const make = {
   page(args) {
     const o = options(args), ctx = context(o);
     let { dirs, name } = nested(o._[0]);
-    if (!name) return console.error('  som make:page Post [--model Post] [--route=file] [--auth]');
+    if (!name) return console.error('  kreft make:page Post [--model Post] [--route=file] [--auth]');
     const m = o.model ? nested(o.model) : { dirs, name };
     const modelDirs = m.dirs && m.dirs.length ? m.dirs : dirs;
     const endpoint = [...(modelDirs.length ? modelDirs.map((d) => snake(d).replace(/_/g, '-')) : []), plural(snake(m.name)).replace(/_/g, '-')].join('/');
     const auth = o.flags.has('auth');
     const hasRoute = o.flags.has('r') || o.flags.has('route') || Boolean(o.route);
 
-    const pageFile = path.join(ctx.frontend, 'pages', ...dirs, name + '.som');
+    const pageFile = path.join(ctx.frontend, 'pages', ...dirs, name + '.kreft');
     const isTs = isTsProject(pageFile);
     if (write(pageFile, stubs.page(name, endpoint, dirs, isTs))) {
       if (hasRoute) {
         addWebRoute(ctx, name, dirs, { route: o.route, auth });
       } else {
-        console.log(dim(`  Add to frontend/routes/web.som:  Route.view('/${endpoint}', 'pages/${[...dirs, name].join('/')}.som')${auth ? ".middleware('auth')" : ''}`));
+        console.log(dim(`  Add to frontend/routes/web.kreft:  Route.view('/${endpoint}', 'pages/${[...dirs, name].join('/')}.kreft')${auth ? ".middleware('auth')" : ''}`));
       }
     }
   },
   factory(args) {
     const o = options(args), ctx = context(o);
     let { dirs, name } = nested(o._[0]);
-    if (!name) return console.error('  som make:factory PostFactory [--model Post]');
+    if (!name) return console.error('  kreft make:factory PostFactory [--model Post]');
     if (!name.endsWith('Factory')) name += 'Factory';
     const m = o.model ? nested(o.model) : { dirs: [], name: name.replace(/Factory$/, '') };
     const modelReq = '../../app/Models/' + [...m.dirs, m.name].join('/');
@@ -1279,14 +1279,14 @@ const make = {
   migration(args) {
     const o = options(args), ctx = context(o);
     const name = snake(o._[0] || '').replace(/[^a-z0-9_]/g, '_');
-    if (!name) return console.error('  som make:migration create_posts_table');
+    if (!name) return console.error('  kreft make:migration create_posts_table');
     const dir = migrationsOf(o, ctx);
     write(path.join(dir, `${nextStamp(dir)}_${name}.js`), stubs.migration(name));
   },
   seeder(args) {
     const o = options(args), ctx = context(o);
     let { dirs, name } = nested(o._[0]);
-    if (!name) return console.error('  som make:seeder PostSeeder');
+    if (!name) return console.error('  kreft make:seeder PostSeeder');
     if (!/Seeder$/.test(name)) name += 'Seeder';
     const m = o.model ? nested(o.model) : null;
     const modelReq = m ? up(2 + dirs.length) + ['app', 'Models', ...m.dirs, m.name].join('/') : null;
@@ -1295,14 +1295,14 @@ const make = {
   middleware(args) {
     const o = options(args), ctx = context(o);
     const { dirs, name } = nested(o._[0]);
-    if (!name) return console.error('  som make:middleware EnsureIsAdmin');
+    if (!name) return console.error('  kreft make:middleware EnsureIsAdmin');
     write(path.join(ctx.base, 'app', 'Http', 'Middleware', ...dirs, name + '.js'), stubs.middleware(name));
     if (dirs.length) console.log(dim(`  In a folder, give it a name in app/Http/Kernel.js:  aliases: { '${snake(name).replace(/_/g, '-')}': 'Middleware/${[...dirs, name].join('/')}.js' }`));
   },
   request(args) {
     const o = options(args), ctx = context(o);
     let { dirs, name } = nested(o._[0]);
-    if (!name) return console.error('  som make:request StorePostRequest [--model Post]');
+    if (!name) return console.error('  kreft make:request StorePostRequest [--model Post]');
     if (!/Request$/.test(name)) name += 'Request';
     const reqDir = path.join(ctx.base, 'app', 'Http', 'Requests');
     if (!fs.existsSync(reqDir)) fs.mkdirSync(reqDir, { recursive: true });
@@ -1317,7 +1317,7 @@ const make = {
   resource(args) {
     const o = options(args), ctx = context(o);
     let { dirs, name } = nested(o._[0]);
-    if (!name) return console.error('  som make:resource PostResource');
+    if (!name) return console.error('  kreft make:resource PostResource');
     if (!/Resource$/.test(name)) name += 'Resource';
     const resDir = path.join(ctx.base, 'app', 'Http', 'Resources');
     if (!fs.existsSync(resDir)) fs.mkdirSync(resDir, { recursive: true });
@@ -1331,7 +1331,7 @@ const make = {
   rule(args) {
     const o = options(args), ctx = context(o);
     let { dirs, name } = nested(o._[0]);
-    if (!name) return console.error('  som make:rule Uppercase');
+    if (!name) return console.error('  kreft make:rule Uppercase');
     const ruleDir = path.join(ctx.base, 'app', 'Rules');
     if (!fs.existsSync(ruleDir)) fs.mkdirSync(ruleDir, { recursive: true });
     const isTs = isTsProject(path.join(ruleDir, ...dirs, name + '.js'));
@@ -1345,7 +1345,7 @@ const make = {
     const o = options(args), ctx = context(o);
     const locale = (o._[0] || '').toLowerCase().trim();
     if (!locale || /[\/\\]|\.\./.test(locale)) {
-      console.error('  som make:lang <locale>   (e.g. som make:lang ar)');
+      console.error('  kreft make:lang <locale>   (e.g. kreft make:lang ar)');
       return;
     }
     // Place in project root lang/ (matching standard Laravel 9/10/11) or backend/lang/ if already existing
@@ -1408,11 +1408,11 @@ const make = {
     const msgPath = path.join(langDir, 'messages.json');
     if (!fs.existsSync(msgPath)) {
       const msgData = isAr ? {
-        welcome: 'أهلاً بك في Som.js',
+        welcome: 'أهلاً بك في Kreft',
         hello: 'مرحباً، :name',
         items: '{0} لا توجد عناصر|{1} عنصر واحد|{2} عنصران|[3,10] :count عناصر|[11,*] :count عنصراً'
       } : {
-        welcome: 'Welcome to Som.js',
+        welcome: 'Welcome to Kreft',
         hello: 'Hello, :name',
         items: '{0} No items|{1} One item|[2,*] :count items'
       };
@@ -1494,7 +1494,7 @@ const make = {
     console.log(dim(`  Use in frontend: { __('auth.failed') } or { t('Sign In') }`));
   },
 };
-// som make:errors — the error pages (errors/404.som, 403, 500…)
+// kreft make:errors — the error pages (errors/404.kreft, 403, 500…)
 make.errors = function (args) {
   const o = options(args), ctx = context(o);
   const from = path.join(__dirname, '..', 'templates', 'errors');
@@ -1504,19 +1504,19 @@ make.errors = function (args) {
   const index = path.join(o.dir ? path.resolve(o.dir) : ctx.frontend, 'index.html');
   if (fs.existsSync(index)) {
     const html = fs.readFileSync(index, 'utf8');
-    if (!/errors\s*:/.test(html) && /Som\.router\(\{/.test(html)) {
-      fs.writeFileSync(index, html.replace(/Som\.router\(\{/, (m) => `${m}\n      errors: '${path.relative(path.dirname(index), to).split(path.sep).join('/')}', // error pages: errors/404.som, abort(403) → errors/403.som`));
-      console.log(`  ${green('UPDATED')}  ${path.relative(process.cwd(), index) || 'index.html'}  (errors: '${path.relative(path.dirname(index), to).split(path.sep).join('/')}' in Som.router)`);
+    if (!/errors\s*:/.test(html) && /Kreft\.router\(\{/.test(html)) {
+      fs.writeFileSync(index, html.replace(/Kreft\.router\(\{/, (m) => `${m}\n      errors: '${path.relative(path.dirname(index), to).split(path.sep).join('/')}', // error pages: errors/404.kreft, abort(403) → errors/403.kreft`));
+      console.log(`  ${green('UPDATED')}  ${path.relative(process.cwd(), index) || 'index.html'}  (errors: '${path.relative(path.dirname(index), to).split(path.sep).join('/')}' in Kreft.router)`);
     }
   }
 };
 
-// som make:routes admin        → frontend/routes/admin.som (pages), listed in Som.router({ routes: […] }) in index.html
-// som make:routes admin --api  → backend/routes/admin.js (API), loaded by routes/api.js
+// kreft make:routes admin        → frontend/routes/admin.kreft (pages), listed in Kreft.router({ routes: […] }) in index.html
+// kreft make:routes admin --api  → backend/routes/admin.js (API), loaded by routes/api.js
 make.routes = function (args) {
   const o = options(args), ctx = context(o);
-  const name = String(o._[0] || '').replace(/\.(som|js)$/, '').replace(/[^\w-]/g, '');
-  if (!name) return console.error('  som make:routes admin        (pages)\n  som make:routes admin --api  (API)');
+  const name = String(o._[0] || '').replace(/\.(kreft|som|js)$/, '').replace(/[^\w-]/g, '');
+  if (!name) return console.error('  kreft make:routes admin        (pages)\n  kreft make:routes admin --api  (API)');
   if (o.flags.has('api')) {
     const file = path.join(ctx.base, 'routes', name + '.js');
     if (!write(file, stubs.apiRoutes(name))) return;
@@ -1526,35 +1526,35 @@ make.routes = function (args) {
       const isTs = api.endsWith('.ts');
       if (!text.includes(`require('./${name}')`) && !text.includes(`import './${name}'`)) {
         const updated = isTs
-          ? text.replace(/(import \{[^}]*Route[^}]*\} from ['"]somjs\/server['"][^\n]*\n)/, `$1\n// ${name} routes (routes/${name}.ts)\nimport './${name}'\n`)
-          : text.replace(/(const \{ Route \} = require\('somjs\/server'\)\n)/, `$1\n// ${name} routes (routes/${name}.js)\nrequire('./${name}')\n`);
+          ? text.replace(/(import \{[^}]*Route[^}]*\} from ['"]kreft\/server['"][^\n]*\n)/, `$1\n// ${name} routes (routes/${name}.ts)\nimport './${name}'\n`)
+          : text.replace(/(const \{ Route \} = require\('kreft\/server'\)\n)/, `$1\n// ${name} routes (routes/${name}.js)\nrequire('./${name}')\n`);
         fs.writeFileSync(api, updated !== text ? updated : text + `\n${isTs ? `import './${name}'` : `require('./${name}')`}\n`);
         console.log(`  ${green('UPDATED')}  ${path.relative(process.cwd(), api)}  (${isTs ? `import './${name}'` : `require('./${name}')`})`);
       }
     }
     return;
   }
-  const file = path.join(ctx.frontend, 'routes', name + '.som');
+  const file = path.join(ctx.frontend, 'routes', name + '.kreft');
   if (!write(file, stubs.webRoutes(name))) return;
   const index = path.join(ctx.frontend, 'index.html');
   if (!fs.existsSync(index)) return;
   const html = fs.readFileSync(index, 'utf8');
-  const entry = `'routes/${name}.som'`;
+  const entry = `'routes/${name}.kreft'`;
   if (html.includes(entry)) return;
   let next = html;
   if (/routes:\s*\[\s*'routes\//.test(html)) next = html.replace(/(routes:\s*\[[^\]]*?)(\s*\])/, (_, list, end) => `${list.replace(/,\s*$/, '')}, ${entry}${end}`);
   else if (/routes:\s*'routes\/[^']+'/.test(html)) next = html.replace(/routes:\s*('routes\/[^']+')/, (_, first) => `routes: [${first}, ${entry}]`);
-  if (next === html) return console.log(`  Add ${entry} to the routes in Som.router({ routes: [...] }) in index.html.`);
+  if (next === html) return console.log(`  Add ${entry} to the routes in Kreft.router({ routes: [...] }) in index.html.`);
   fs.writeFileSync(index, next);
-  console.log(`  ${green('UPDATED')}  ${path.relative(process.cwd(), index)}  (${entry} in Som.router)`);
+  console.log(`  ${green('UPDATED')}  ${path.relative(process.cwd(), index)}  (${entry} in Kreft.router)`);
 };
 
-// som make:admin you@example.com      → that user may open the admin panel (/admin)
-// som make:admin you@example.com --remove
+// kreft make:admin you@example.com      → that user may open the admin panel (/admin)
+// kreft make:admin you@example.com --remove
 commands['make:admin'] = async function (args) {
   const o = options(args), ctx = context(o);
   const email = String(o._[0] || '').trim().toLowerCase(); // Register keeps emails in lowercase
-  if (!email) return console.error('  som make:admin you@example.com   (--remove takes the rights away)');
+  if (!email) return console.error('  kreft make:admin you@example.com   (--remove takes the rights away)');
   await withDb(o, ctx, async (db) => {
     const value = o.flags.has('remove') ? 0 : 1;
     const r = await db.run(`UPDATE ${db.q('users')} SET ${db.q('is_admin')} = ? WHERE LOWER(${db.q('email')}) = ?`, [db.kind === 'postgres' ? Boolean(value) : value, email]);
@@ -1615,9 +1615,9 @@ async function removeModel(args) {
   }
 
   if (!targetModelName) {
-    console.error('  Usage: som remove:model <Name> [--all] [--controller] [--request] [--route] [--migration] [--seeder] [--factory] [--page] [--folder=Folder]');
-    console.error('         som remove model <Name> [options]');
-    console.error('         som:remove model <Name> [options]');
+    console.error('  Usage: kreft remove:model <Name> [--all] [--controller] [--request] [--route] [--migration] [--seeder] [--factory] [--page] [--folder=Folder]');
+    console.error('         kreft remove model <Name> [options]');
+    console.error('         kreft:remove model <Name> [options]');
     return;
   }
 
@@ -1722,17 +1722,17 @@ async function removeModel(args) {
 
   // 6. Page
   if (wantsPage) {
-    checkFile(path.join(ctx.frontend, 'pages', ...otherDirs, `${name}.som`));
+    checkFile(path.join(ctx.frontend, 'pages', ...otherDirs, `${name}.kreft`));
     if (dirs.length && dirs.join('/') !== otherDirs.join('/')) {
-      checkFile(path.join(ctx.frontend, 'pages', ...dirs, `${name}.som`));
+      checkFile(path.join(ctx.frontend, 'pages', ...dirs, `${name}.kreft`));
     }
-    checkFile(path.join(ctx.frontend, 'pages', `${name}.som`));
-    checkFile(path.join(ctx.project, 'frontend', 'pages', ...otherDirs, `${name}.som`));
-    checkFile(path.join(ctx.project, 'frontend', 'pages', ...dirs, `${name}.som`));
-    checkFile(path.join(ctx.project, 'frontend', 'pages', `${name}.som`));
-    checkFile(path.join(ctx.project, 'pages', ...otherDirs, `${name}.som`));
-    checkFile(path.join(ctx.project, 'pages', ...dirs, `${name}.som`));
-    checkFile(path.join(ctx.project, 'pages', `${name}.som`));
+    checkFile(path.join(ctx.frontend, 'pages', `${name}.kreft`));
+    checkFile(path.join(ctx.project, 'frontend', 'pages', ...otherDirs, `${name}.kreft`));
+    checkFile(path.join(ctx.project, 'frontend', 'pages', ...dirs, `${name}.kreft`));
+    checkFile(path.join(ctx.project, 'frontend', 'pages', `${name}.kreft`));
+    checkFile(path.join(ctx.project, 'pages', ...otherDirs, `${name}.kreft`));
+    checkFile(path.join(ctx.project, 'pages', ...dirs, `${name}.kreft`));
+    checkFile(path.join(ctx.project, 'pages', `${name}.kreft`));
   }
 
   // 7. Migration
@@ -1855,7 +1855,7 @@ const remove = {
 };
 
 commands['remove:model'] = remove.model;
-commands['som:remove:model'] = remove.model;
+commands['kreft:remove:model'] = remove.model;
 commands['remove'] = async function (args) {
   const o = options(args);
   const first = (o._[0] || '').toLowerCase();
@@ -1867,6 +1867,9 @@ commands['remove'] = async function (args) {
   }
   return await remove.model(args);
 };
+commands['kreft:remove'] = commands['remove'];
+// the Som.js names
+commands['som:remove:model'] = remove.model;
 commands['som:remove'] = commands['remove'];
 
 module.exports = { commands, stubs, make, remove, helpers: { options, context, withDb, write, nested, green, red, yellow, dim, migrationsOf, nextStamp, up, pascal, runSeed } };

@@ -1,4 +1,4 @@
-const { Model, Hash, Str, Mail, Url, Crypt } = require('somjs/server')
+const { Model, Hash, Str, Mail, Url, Crypt } = require('kreft/server')
 const PersonalAccessToken = require('./PersonalAccessToken')
 
 // The users table. The password is stored as a hash (Hash.make) and never sent to the browser.

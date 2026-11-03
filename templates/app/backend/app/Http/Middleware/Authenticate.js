@@ -1,7 +1,7 @@
 // 'auth' in the routes: only signed-in users get through, and req.user is the user.
-// A browser is signed in with the HttpOnly som_session cookie (app/Auth/Session.js);
+// A browser is signed in with the HttpOnly kreft_session cookie (app/Auth/Session.js);
 // an app or script with  Authorization: Bearer 5|k3J9…  (an API token, see /profile → API tokens).
-const { abort, Hash, Str, Crypt, response, cookieSecure } = require('somjs/server')
+const { abort, Hash, Str, Crypt, response, cookieSecure } = require('kreft/server')
 const crypto = require('crypto')
 const PersonalAccessToken = require('../../Models/PersonalAccessToken')
 const User = require('../../Models/User')

@@ -1,9 +1,9 @@
-const { Hash } = require('somjs/server')
+const { Hash } = require('kreft/server')
 const User = require('../../../Models/User')
 const { signIn } = require('../../../Auth/Session')
 
 class RegisteredUserController {
-  // POST /api/register   (pages/auth/Register.som)
+  // POST /api/register   (pages/auth/Register.kreft)
   async store(req) {
     const data = await req.validate({
       name: 'required|string|max:255',

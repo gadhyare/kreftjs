@@ -2,7 +2,7 @@
  * Jobs and background queue workers.
  *
  *   // app/Jobs/SendWelcomeEmail.js
- *   const { Job, Mail } = require('somjs/server')
+ *   const { Job, Mail } = require('kreft/server')
  *   class SendWelcomeEmail extends Job {
  *     static tries = 3          // try again after an error, up to 3 times
  *     static backoff = 10       // seconds to wait before trying again
@@ -15,7 +15,7 @@
  *   await dispatch(new SendWelcomeEmail(user), { delay: 60 })        // in a minute
  *   await dispatchSync(new SendWelcomeEmail(user))                   // now
  *
- * QUEUE_CONNECTION in .env: database (the jobs table; som dev and `som queue:work` run them) or sync (at once).
+ * QUEUE_CONNECTION in .env: database (the jobs table; kreft dev and `kreft queue:work` run them) or sync (at once).
  */
 const crypto = require('crypto');
 const fs = require('fs');
@@ -165,7 +165,7 @@ async function connection() {
   return (await tablesReady()) ? 'database' : 'sync';
 }
 
-/* ---- models become { __som_model, id } on the queue, and models again when the job runs */
+/* ---- models become { __kreft_model, id } on the queue, and models again when the job runs */
 const { isBadKey, parseJson } = require('../safe-json.js');
 
 function hydrateInstance(Proto, data) {
@@ -181,8 +181,8 @@ function hydrateInstance(Proto, data) {
 
 function serialize(value) {
   const { Model } = require('./model.js');
-  if (value instanceof Model) return { __som_model: value.constructor.name, id: value[value.constructor.primaryKey] };
-  if (value instanceof Date) return { __som_date: value.toISOString() };
+  if (value instanceof Model) return { __kreft_model: value.constructor.name, id: value[value.constructor.primaryKey] };
+  if (value instanceof Date) return { __kreft_date: value.toISOString() };
   if (Array.isArray(value)) return value.map(serialize);
   if (value && typeof value === 'object') return Object.fromEntries(Object.entries(value).filter(([k]) => !isBadKey(k)).map(([k, v]) => [k, serialize(v)]));
   return value;
@@ -190,14 +190,14 @@ function serialize(value) {
 async function restore(value) {
   if (Array.isArray(value)) return Promise.all(value.map(restore));
   if (value && typeof value === 'object') {
-    if (value.__som_model) {
-      const M = require('./app.js').find(value.__som_model, 'model');
-      if (!M) throw new Error(`The model ${value.__som_model} is not in app/Models.`);
+    if (value.__kreft_model) {
+      const M = require('./app.js').find(value.__kreft_model, 'model');
+      if (!M) throw new Error(`The model ${value.__kreft_model} is not in app/Models.`);
       const m = await M.query().withTrashed().find(value.id);
-      if (!m) throw Object.assign(new Error(`${value.__som_model} ${value.id} no longer exists.`), { missingModel: true });
+      if (!m) throw Object.assign(new Error(`${value.__kreft_model} ${value.id} no longer exists.`), { missingModel: true });
       return m;
     }
-    if (value.__som_date) return new Date(value.__som_date);
+    if (value.__kreft_date) return new Date(value.__kreft_date);
     const out = {};
     for (const [k, v] of Object.entries(value)) {
       if (isBadKey(k)) continue;
@@ -219,6 +219,7 @@ async function push(kind, className, data, { delay = 0, queue } = {}) {
   const payload = payloadOf(kind, className, data);
 
   if (conn === 'redis') {
+    // TODO(3.1): the 'som:queue:' / 'som:delayed:' key names keep their Som.js spelling so waiting jobs survive the rename
     const { Redis } = require('./redis.js');
     const redis = Redis.connection('queue');
     if (delay > 0) {
@@ -376,7 +377,7 @@ async function workOne({ queues = ['default'], log = () => {} } = {}) {
   }
 }
 
-// som queue:work — runs jobs as they come (stop with Ctrl+C)
+// kreft queue:work — runs jobs as they come (stop with Ctrl+C)
 async function work({ queues = ['default'], once = false, sleep = 1, maxJobs = Infinity, log = console.log, stopWhenEmpty = false } = {}) {
   const workerStartedAt = Date.now();
   let n = 0;

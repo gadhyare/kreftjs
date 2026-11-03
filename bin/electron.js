@@ -1,13 +1,13 @@
 /*
- * Electron.js Desktop Support for Som.js
+ * Electron.js Desktop Support for Kreft
  *
  * Commands:
- *   som electron:init     Add Electron files to an existing project (alias: som make:electron)
- *   som electron:dev      Run the app in an Electron desktop window with hot reload (alias: som electron)
- *   som electron:build    Build static bundle (som build) and package desktop installer (electron-builder)
+ *   kreft electron:init     Add Electron files to an existing project (alias: kreft make:electron)
+ *   kreft electron:dev      Run the app in an Electron desktop window with hot reload (alias: kreft electron)
+ *   kreft electron:build    Build static bundle (kreft build) and package desktop installer (electron-builder)
  *
  * CLI flag:
- *   som new my-app --electron
+ *   kreft new my-app --electron
  */
 const fs = require('fs');
 const path = require('path');
@@ -28,7 +28,7 @@ const DEV_PORT = process.env.PORT || 8000;
 const DEV_URL = \`http://localhost:\${DEV_PORT}\`;
 
 // Electron DevTools sidebar configuration:
-// Control with ELECTRON_DEVTOOLS, SOM_ELECTRON_DEVTOOLS or CLI flags:
+// Control with ELECTRON_DEVTOOLS, KREFT_ELECTRON_DEVTOOLS or CLI flags:
 //   ELECTRON_DEVTOOLS=true | 1 | right | show     -> open DevTools as right sidebar
 //   ELECTRON_DEVTOOLS=bottom | left | detach     -> open DevTools in chosen position
 //   ELECTRON_DEVTOOLS=false | 0 | hide | off     -> hide DevTools
@@ -38,7 +38,7 @@ function getDevToolsConfig() {
     (process.argv.includes('--devtools') ? 'right' : null) ||
     (process.argv.includes('--no-devtools') ? 'false' : null) ||
     process.env.ELECTRON_DEVTOOLS ||
-    process.env.SOM_ELECTRON_DEVTOOLS ||
+    (process.env.KREFT_ELECTRON_DEVTOOLS || process.env.SOM_ELECTRON_DEVTOOLS) ||
     '';
   const val = String(raw).trim().toLowerCase();
   if (!val) return { show: false, mode: 'right' };
@@ -151,8 +151,8 @@ async function createWindow() {
   });
 }
 
-// IPC Handlers: Safe desktop bridge exposed to Som.js frontend
-ipcMain.handle('som:app-info', () => ({
+// IPC Handlers: Safe desktop bridge exposed to Kreft frontend
+ipcMain.handle('kreft:app-info', () => ({
   name: app.getName(),
   version: app.getVersion(),
   platform: process.platform,
@@ -160,29 +160,29 @@ ipcMain.handle('som:app-info', () => ({
   isPackaged: app.isPackaged,
 }));
 
-ipcMain.handle('som:minimize', () => {
+ipcMain.handle('kreft:minimize', () => {
   if (mainWindow) mainWindow.minimize();
 });
 
-ipcMain.handle('som:maximize', () => {
+ipcMain.handle('kreft:maximize', () => {
   if (!mainWindow) return;
   if (mainWindow.isMaximized()) mainWindow.unmaximize();
   else mainWindow.maximize();
 });
 
-ipcMain.handle('som:close', () => {
+ipcMain.handle('kreft:close', () => {
   if (mainWindow) mainWindow.close();
 });
 
-ipcMain.handle('som:devtools:open', (_, mode) => {
+ipcMain.handle('kreft:devtools:open', (_, mode) => {
   if (mainWindow) mainWindow.webContents.openDevTools({ mode: mode || 'right' });
 });
 
-ipcMain.handle('som:devtools:close', () => {
+ipcMain.handle('kreft:devtools:close', () => {
   if (mainWindow) mainWindow.webContents.closeDevTools();
 });
 
-ipcMain.handle('som:devtools:toggle', () => {
+ipcMain.handle('kreft:devtools:toggle', () => {
   if (mainWindow) mainWindow.webContents.toggleDevTools();
 });
 
@@ -195,17 +195,17 @@ function pickAllowed(obj, allowed) {
   return out;
 }
 
-ipcMain.handle('som:dialog:message', async (_, options) => {
+ipcMain.handle('kreft:dialog:message', async (_, options) => {
   const safeOpts = pickAllowed(options, ['type', 'buttons', 'defaultId', 'title', 'message', 'detail', 'cancelId', 'noLink']);
   return mainWindow ? dialog.showMessageBox(mainWindow, safeOpts) : dialog.showMessageBox(safeOpts);
 });
 
-ipcMain.handle('som:dialog:open', async (_, options) => {
+ipcMain.handle('kreft:dialog:open', async (_, options) => {
   const safeOpts = pickAllowed(options, ['title', 'defaultPath', 'buttonLabel', 'filters', 'properties', 'message']);
   return mainWindow ? dialog.showOpenDialog(mainWindow, safeOpts) : dialog.showOpenDialog(safeOpts);
 });
 
-ipcMain.handle('som:dialog:save', async (_, options) => {
+ipcMain.handle('kreft:dialog:save', async (_, options) => {
   const safeOpts = pickAllowed(options, ['title', 'defaultPath', 'buttonLabel', 'filters', 'message', 'nameFieldLabel', 'showsTagField']);
   return mainWindow ? dialog.showSaveDialog(mainWindow, safeOpts) : dialog.showSaveDialog(safeOpts);
 });
@@ -225,28 +225,31 @@ app.on('window-all-closed', () => {
 
   preload: () => `const { contextBridge, ipcRenderer } = require('electron');
 
-// Expose safe desktop bridge onto window.somDesktop
-contextBridge.exposeInMainWorld('somDesktop', {
+// Expose safe desktop bridge onto window.kreftDesktop (window.somDesktop is the same object: the Som.js name)
+const desktop = {
   isElectron: true,
-  getInfo: () => ipcRenderer.invoke('som:app-info'),
-  minimize: () => ipcRenderer.invoke('som:minimize'),
-  maximize: () => ipcRenderer.invoke('som:maximize'),
-  close: () => ipcRenderer.invoke('som:close'),
-  openDevTools: (mode) => ipcRenderer.invoke('som:devtools:open', mode),
-  closeDevTools: () => ipcRenderer.invoke('som:devtools:close'),
-  toggleDevTools: () => ipcRenderer.invoke('som:devtools:toggle'),
-  showMessageBox: (options) => ipcRenderer.invoke('som:dialog:message', options),
-  showOpenDialog: (options) => ipcRenderer.invoke('som:dialog:open', options),
-  showSaveDialog: (options) => ipcRenderer.invoke('som:dialog:save', options),
-});
+  getInfo: () => ipcRenderer.invoke('kreft:app-info'),
+  minimize: () => ipcRenderer.invoke('kreft:minimize'),
+  maximize: () => ipcRenderer.invoke('kreft:maximize'),
+  close: () => ipcRenderer.invoke('kreft:close'),
+  openDevTools: (mode) => ipcRenderer.invoke('kreft:devtools:open', mode),
+  closeDevTools: () => ipcRenderer.invoke('kreft:devtools:close'),
+  toggleDevTools: () => ipcRenderer.invoke('kreft:devtools:toggle'),
+  showMessageBox: (options) => ipcRenderer.invoke('kreft:dialog:message', options),
+  showOpenDialog: (options) => ipcRenderer.invoke('kreft:dialog:open', options),
+  showSaveDialog: (options) => ipcRenderer.invoke('kreft:dialog:save', options),
+};
+contextBridge.exposeInMainWorld('kreftDesktop', desktop);
+contextBridge.exposeInMainWorld('somDesktop', desktop);
 
+contextBridge.exposeInMainWorld('__KREFT_ELECTRON__', true);
 contextBridge.exposeInMainWorld('__SOM_ELECTRON__', true);
 `,
 };
 
 // A new project's index.html loads Google Fonts: a style sheet from another site that the browser must download before it
 // draws anything (about 0.6 s on a first visit, and a failed request when offline). A desktop app does not need it.
-// Only the exact links Som.js wrote are removed; returns the file's relative path, or null when there was nothing to remove.
+// Only the exact links Kreft wrote are removed; returns the file's relative path, or null when there was nothing to remove.
 function dropWebFonts(root) {
   const lay = require('./layout.js').layout(root);
   const file = path.join(lay.split ? lay.frontend : root, 'index.html');
@@ -264,7 +267,7 @@ function init(args = []) {
   const root = getProjectRoot(target);
   const pkgFile = path.join(root, 'package.json');
   if (!fs.existsSync(pkgFile)) {
-    console.error('  No package.json found. Run this inside a Som.js project.');
+    console.error('  No package.json found. Run this inside a Kreft project.');
     process.exit(1);
   }
 
@@ -283,17 +286,17 @@ function init(args = []) {
   const pkg = JSON.parse(fs.readFileSync(pkgFile, 'utf8'));
   pkg.main = 'electron/main.js';
   pkg.scripts = pkg.scripts || {};
-  pkg.scripts['electron'] = 'som electron';
-  pkg.scripts['electron:dev'] = 'som electron:dev';
-  pkg.scripts['electron:build'] = 'som electron:build';
+  pkg.scripts['electron'] = 'kreft electron';
+  pkg.scripts['electron:dev'] = 'kreft electron:dev';
+  pkg.scripts['electron:build'] = 'kreft electron:build';
 
   pkg.devDependencies = pkg.devDependencies || {};
   if (!pkg.devDependencies['electron']) pkg.devDependencies['electron'] = '^34.2.0';
   if (!pkg.devDependencies['electron-builder']) pkg.devDependencies['electron-builder'] = '^25.1.8';
 
   pkg.build = pkg.build || {
-    appId: `com.somjs.${(pkg.name || 'app').toLowerCase().replace(/[^a-z0-9]/g, '')}`,
-    productName: pkg.name ? pkg.name.replace(/-/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase()) : 'Som Desktop',
+    appId: `com.kreft.${(pkg.name || 'app').toLowerCase().replace(/[^a-z0-9]/g, '')}`,
+    productName: pkg.name ? pkg.name.replace(/-/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase()) : 'Kreft Desktop',
     directories: { output: 'dist-electron' },
     files: ['dist/**/*', 'electron/**/*', 'package.json'],
     mac: { target: ['dmg', 'zip'], category: 'public.app-category.developer-tools' },
@@ -306,7 +309,7 @@ function init(args = []) {
   const droppedFonts = dropWebFonts(root);
 
   console.log(`
-  Electron configured for Som.js:
+  Electron configured for Kreft:
     CREATED  electron/main.js
     CREATED  electron/preload.js
     UPDATED  package.json  (scripts: electron, electron:dev, electron:build)${droppedFonts ? `
@@ -314,8 +317,8 @@ function init(args = []) {
 
   Next:
     npm install            (install electron & electron-builder)
-    som electron:dev       (start dev server & launch desktop window)
-    som electron:build     (build production installer)
+    kreft electron:dev       (start dev server & launch desktop window)
+    kreft electron:build     (build production installer)
 `);
 }
 
@@ -364,7 +367,7 @@ function dev(args = []) {
   const bin = resolveElectronBinary(root);
 
   // Extract devtools settings from CLI args or environment
-  let devToolsEnv = process.env.ELECTRON_DEVTOOLS || process.env.SOM_ELECTRON_DEVTOOLS || '';
+  let devToolsEnv = process.env.ELECTRON_DEVTOOLS || (process.env.KREFT_ELECTRON_DEVTOOLS || process.env.SOM_ELECTRON_DEVTOOLS) || '';
   const devToolsArg = args.find((a) => a === '--devtools' || a.startsWith('--devtools=') || a === '--no-devtools');
   if (devToolsArg) {
     if (devToolsArg === '--devtools') devToolsEnv = 'right';
@@ -375,12 +378,12 @@ function dev(args = []) {
   const serverArgs = args.filter((a) => a !== '--devtools' && !a.startsWith('--devtools=') && a !== '--no-devtools');
 
   // 1. Start dev server child process
-  console.log('  Starting Som.js dev server & Electron desktop window…');
-  const somCli = path.join(__dirname, 'som.js');
-  const server = spawn(process.execPath, [somCli, 'dev', ...serverArgs], {
+  console.log('  Starting Kreft dev server & Electron desktop window…');
+  const kreftCli = path.join(__dirname, 'kreft.js');
+  const server = spawn(process.execPath, [kreftCli, 'dev', ...serverArgs], {
     cwd: root,
     stdio: 'inherit',
-    env: { ...process.env, PORT: process.env.PORT || '8000', SOM_ELECTRON: 'true' },
+    env: { ...process.env, PORT: process.env.PORT || '8000', KREFT_ELECTRON: 'true' },
   });
 
   // 2. Launch Electron after small pause
@@ -408,7 +411,7 @@ function dev(args = []) {
 
     electronProcess.on('error', (err) => {
       if (err.code === 'ENOENT') {
-        console.error('\n  Electron is not installed locally. Run:  som add -D electron\n');
+        console.error('\n  Electron is not installed locally. Run:  kreft add -D electron\n');
       } else {
         console.error('  Electron launch error: ' + err.message);
       }
@@ -440,10 +443,10 @@ function build(args = []) {
     init();
   }
 
-  // 1. Build Som.js frontend for desktop with relative base
-  console.log('\n  Step 1: Building Som.js static bundle with relative base (./)…');
-  const somCli = path.join(__dirname, 'som.js');
-  const buildProc = spawn(process.execPath, [somCli, 'build', '--base', './', ...args], {
+  // 1. Build Kreft frontend for desktop with relative base
+  console.log('\n  Step 1: Building Kreft static bundle with relative base (./)…');
+  const kreftCli = path.join(__dirname, 'kreft.js');
+  const buildProc = spawn(process.execPath, [kreftCli, 'build', '--base', './', ...args], {
     cwd: root,
     stdio: 'inherit',
   });
@@ -464,7 +467,7 @@ function build(args = []) {
 
     packProc.on('error', (err) => {
       if (err.code === 'ENOENT') {
-        console.error('\n  electron-builder is not installed. Run:  som add -D electron-builder\n');
+        console.error('\n  electron-builder is not installed. Run:  kreft add -D electron-builder\n');
       } else {
         console.error('  Packaging error: ' + err.message);
       }

@@ -1,0 +1,8 @@
+saved email = 'you@example.com' as 'settings.email'
+<view>
+  <div>
+    <h3>Account</h3>
+    <label>Email <input type="email" k-model="email"></label>
+    <p class="muted">The child route <code>account</code> lives inside <code>/settings</code>.</p>
+  </div>
+</view>

@@ -1,6 +1,6 @@
-const { Crypt, TOTP, QR, ValidationError, abort, noContent } = require('somjs/server')
+const { Crypt, TOTP, QR, ValidationError, abort, noContent } = require('kreft/server')
 
-// Two-factor authentication with an authenticator app (pages/Profile.som → Two-factor authentication)
+// Two-factor authentication with an authenticator app (pages/Profile.kreft → Two-factor authentication)
 class TwoFactorController {
   ensureSession(req) {
     if (req.accessToken && req.accessToken.type !== 'session' && !req.accessToken.can('*')) {

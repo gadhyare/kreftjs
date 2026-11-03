@@ -1,10 +1,10 @@
 /*
- * som add <packages...>  /  som install <packages...>
+ * kreft add <packages...>  /  kreft install <packages...>
  *
- * Enterprise-Grade Security Gatekeeper & Package Installer for Som.js:
+ * Enterprise-Grade Security Gatekeeper & Package Installer for Kreft:
  *
  *   1. Zero-Dependency Guard:
- *      Strictly blocks or warns against redundant external packages where Som.js
+ *      Strictly blocks or warns against redundant external packages where Kreft
  *      provides built-in, zero-dependency, high-performance native features
  *      (e.g., dotenv, cors, body-parser, redis, jsonwebtoken, bcrypt, multer, cookie-parser).
  *
@@ -58,28 +58,28 @@ const magenta = (s) => (process.stdout.isTTY ? `\x1b[35m${s}\x1b[0m` : s);
 // Strict npm package name regex (scoped or bare)
 const VALID_PKG_NAME_REGEX = /^(@[a-z0-9-~][a-z0-9-._~]*\/)?[a-z0-9-~][a-z0-9-._~]*$/;
 
-// Som.js already has native zero-dependency features for these
+// Kreft already has native zero-dependency features for these
 const BUILTIN_ALTERNATIVES = {
-  dotenv: 'Som.js automatically parses .env into process.env & Som.env natively out of the box.',
-  'body-parser': 'Som.js natively parses JSON, form-data, and raw payloads in request.js.',
-  cors: 'Som.js routes and dev server include built-in CORS origin and preflight validation.',
-  nodemon: 'Som.js includes built-in file watching, hot reloading, and dev tools (som dev).',
-  sqlite3: 'Som.js includes a native zero-dependency SQLite driver (built-in). Use better-sqlite3 only if you need C-bindings.',
-  'cookie-parser': 'Som.js natively parses, signs, and sets cookies on request/response objects.',
-  multer: 'Som.js natively handles multipart file uploads via request.file() and request.files().',
-  supertest: 'Som.js includes a native HTTP test suite runner in tests/.',
-  redis: 'Som.js 2.3.0 natively includes a zero-dependency Redis client with Cache & Queue (som redis:ping, Som.redis()).',
-  ioredis: 'Som.js 2.3.0 natively includes a zero-dependency Redis client with Cache & Queue (som redis:ping, Som.redis()).',
-  jsonwebtoken: 'Som.js includes built-in cryptographically signed tokens and session management (Session, Token).',
-  'jwt-simple': 'Som.js includes built-in cryptographically signed tokens and session management.',
-  bcrypt: 'Som.js includes built-in Hash.make() and Hash.check() with secure key derivation.',
-  bcryptjs: 'Som.js includes built-in Hash.make() and Hash.check() with secure key derivation.',
-  ws: 'Som.js includes a built-in WebSocket server and real-time pub/sub channels.',
-  'socket.io': 'Som.js includes a native WebSocket server and channels without heavy external runtime.',
-  validator: 'Som.js includes a rich native Validator engine with 30+ validation rules.',
-  validatorjs: 'Som.js includes a rich native Validator engine with 30+ validation rules.',
-  'node-fetch': 'Node.js 18+ and Som.js include native global fetch() out of the box.',
-  'cross-fetch': 'Node.js 18+ and Som.js include native global fetch() out of the box.',
+  dotenv: 'Kreft automatically parses .env into process.env & Kreft.env natively out of the box.',
+  'body-parser': 'Kreft natively parses JSON, form-data, and raw payloads in request.js.',
+  cors: 'Kreft routes and dev server include built-in CORS origin and preflight validation.',
+  nodemon: 'Kreft includes built-in file watching, hot reloading, and dev tools (kreft dev).',
+  sqlite3: 'Kreft includes a native zero-dependency SQLite driver (built-in). Use better-sqlite3 only if you need C-bindings.',
+  'cookie-parser': 'Kreft natively parses, signs, and sets cookies on request/response objects.',
+  multer: 'Kreft natively handles multipart file uploads via request.file() and request.files().',
+  supertest: 'Kreft includes a native HTTP test suite runner in tests/.',
+  redis: 'Kreft 2.3.0 natively includes a zero-dependency Redis client with Cache & Queue (kreft redis:ping, Kreft.redis()).',
+  ioredis: 'Kreft 2.3.0 natively includes a zero-dependency Redis client with Cache & Queue (kreft redis:ping, Kreft.redis()).',
+  jsonwebtoken: 'Kreft includes built-in cryptographically signed tokens and session management (Session, Token).',
+  'jwt-simple': 'Kreft includes built-in cryptographically signed tokens and session management.',
+  bcrypt: 'Kreft includes built-in Hash.make() and Hash.check() with secure key derivation.',
+  bcryptjs: 'Kreft includes built-in Hash.make() and Hash.check() with secure key derivation.',
+  ws: 'Kreft includes a built-in WebSocket server and real-time pub/sub channels.',
+  'socket.io': 'Kreft includes a native WebSocket server and channels without heavy external runtime.',
+  validator: 'Kreft includes a rich native Validator engine with 30+ validation rules.',
+  validatorjs: 'Kreft includes a rich native Validator engine with 30+ validation rules.',
+  'node-fetch': 'Node.js 18+ and Kreft include native global fetch() out of the box.',
+  'cross-fetch': 'Node.js 18+ and Kreft include native global fetch() out of the box.',
 };
 
 // Known typosquatting traps / malicious package names
@@ -119,7 +119,7 @@ const POPULAR_PACKAGES = [
   'multer', 'supertest'
 ];
 
-// Verified ecosystem packages known to work securely and reliably with Som.js
+// Verified ecosystem packages known to work securely and reliably with Kreft
 const VERIFIED_PACKAGES = new Set([
   'pg',
   'mysql2',
@@ -210,7 +210,7 @@ module.exports = async function add(args = []) {
   const lay = layout(targetDir);
   const project = lay.project || path.resolve(targetDir);
 
-  console.log(`\n  ${bold('Som.js Security Gatekeeper & Package Installer')} ${dim('v' + pkg.version)}`);
+  console.log(`\n  ${bold('Kreft Security Gatekeeper & Package Installer')} ${dim('v' + pkg.version)}`);
   console.log(`  ${dim('Enforcing strict zero-dependency & supply-chain security rules...')}\n`);
 
   // =========================================================================
@@ -261,7 +261,7 @@ module.exports = async function add(args = []) {
 
     // Zero-Dependency Built-In Redundancy Guard
     if (BUILTIN_ALTERNATIVES[baseName] && !flags.force) {
-      console.warn(`  ${yellow('🛡 REDUNDANCY GUARD BLOCKED:')} "${bold(baseName)}" is redundant in Som.js.`);
+      console.warn(`  ${yellow('🛡 REDUNDANCY GUARD BLOCKED:')} "${bold(baseName)}" is redundant in Kreft.`);
       console.warn(`    ${BUILTIN_ALTERNATIVES[baseName]}`);
       console.warn(`    External dependencies introduce supply-chain risks and bundle bloat.`);
       console.warn(`    To install anyway, rerun with: ${dim('--force')}\n`);
@@ -554,7 +554,7 @@ function evaluateTrustTier({ name, meta, downloads, typosquat, isBuiltin, isVeri
   if (meta.createdAgeDays !== null && meta.createdAgeDays < 14) return { tier: 4, label: 'TIER 4: HIGH RISK / BRAND NEW DISPOSABLE PACKAGE' };
   if (isBuiltin) return { tier: 4, label: 'TIER 4: REDUNDANT / BUILT-IN FEATURE' };
 
-  if (isVerified) return { tier: 1, label: 'TIER 1: VERIFIED SOM.JS ECOSYSTEM PARTNER' };
+  if (isVerified) return { tier: 1, label: 'TIER 1: VERIFIED KREFT ECOSYSTEM PARTNER' };
 
   const isOldEnough = meta.createdAgeDays === null || meta.createdAgeDays > 180;
   const hasGoodDownloads = downloads === null || downloads > 5000;
@@ -590,7 +590,7 @@ function fetchRegistryMeta(pkgName) {
     const req = https.get(
       url,
       {
-        headers: { 'User-Agent': 'somjs-security-verifier' },
+        headers: { 'User-Agent': 'kreft-security-verifier' },
         timeout: 4500,
       },
       (res) => {
@@ -685,7 +685,7 @@ function fetchWeeklyDownloads(pkgName) {
     const req = https.get(
       url,
       {
-        headers: { 'User-Agent': 'somjs-security-verifier' },
+        headers: { 'User-Agent': 'kreft-security-verifier' },
         timeout: 2500,
       },
       (res) => {
@@ -871,7 +871,7 @@ function displayPackageInfoCards(projectDir, evaluationReports, auditData) {
     const localPkg = getInstalledPackageJson(projectDir, name) || {};
     const installedVersion = localPkg.version || meta.latest || 'latest';
     const latestVersion = meta.latest || installedVersion;
-    const description = localPkg.description || meta.description || 'Modern JavaScript package integrated with Som.js.';
+    const description = localPkg.description || meta.description || 'Modern JavaScript package integrated with Kreft.';
     const author = formatAuthor(localPkg.author || meta.author, localPkg.maintainers || meta.maintainers);
     const lastUpdate = formatRelativeTime(meta.lastUpdateIso);
     const license = localPkg.license || meta.license || 'MIT / Open Source';
@@ -889,7 +889,7 @@ function displayPackageInfoCards(projectDir, evaluationReports, auditData) {
         type: 'update',
         icon: yellow('🔔 Update Available:'),
         message: `Version v${latestVersion} is out! (Installed: v${installedVersion})`,
-        action: `Run "som update ${name}" to upgrade to the latest version.`,
+        action: `Run "kreft update ${name}" to upgrade to the latest version.`,
       });
     } else {
       notifications.push({
@@ -1029,22 +1029,22 @@ function runSecurityAudit(npmCmd, project, auditData) {
 
 function printHelp() {
   console.log(`
-  ${bold('som add <packages...>') }  (alias: ${dim('som install')}, ${dim('som i')})
+  ${bold('kreft add <packages...>') }  (alias: ${dim('kreft install')}, ${dim('kreft i')})
 
-  Enterprise-Grade Security Gatekeeper & Package Installer for Som.js.
+  Enterprise-Grade Security Gatekeeper & Package Installer for Kreft.
 
   Usage:
-    som add <packages...>           Install package(s) with full security gatekeeper verification
-    som add pg mysql2               Install verified database drivers
-    som add -D vitest               Install as devDependency
-    som add --check <pkg>           Inspect package security report without installing (alias: --dry-run)
-    som add -y <pkg>                Auto-confirm unverified packages in CI/CD (alias: --yes)
-    som add --allow-scripts <pkg>   Allow lifecycle scripts (postinstall/build)
-    som add --force <pkg>           Bypass security warnings & redundancy checks
+    kreft add <packages...>           Install package(s) with full security gatekeeper verification
+    kreft add pg mysql2               Install verified database drivers
+    kreft add -D vitest               Install as devDependency
+    kreft add --check <pkg>           Inspect package security report without installing (alias: --dry-run)
+    kreft add -y <pkg>                Auto-confirm unverified packages in CI/CD (alias: --yes)
+    kreft add --allow-scripts <pkg>   Allow lifecycle scripts (postinstall/build)
+    kreft add --force <pkg>           Bypass security warnings & redundancy checks
 
   Security Protections & Verification Rules:
     1. Zero-Dependency Redundancy Guard:
-       Blocks unnecessary packages where Som.js natively provides built-in zero-dependency
+       Blocks unnecessary packages where Kreft natively provides built-in zero-dependency
        features (e.g. dotenv, cors, body-parser, redis, jsonwebtoken, bcrypt, multer).
 
     2. Homoglyph & Shell Injection Shield:

@@ -1,6 +1,6 @@
 /*
- * Developer Error Details & Interactive Error Monitoring Page for Som.js
- * Renders Som.js's own high-precision geometric UI (matching ui.css tokens, dark/light mode,
+ * Developer Error Details & Interactive Error Monitoring Page for Kreft
+ * Renders Kreft's own high-precision geometric UI (matching ui.css tokens, dark/light mode,
  * 1px borders, monochrome active states, and dark terminal code preview).
  */
 const fs = require('fs');
@@ -108,7 +108,7 @@ function generateSmartSolution(err, topFrame) {
   if (msg.includes('no such table') || msg.includes('does not exist')) {
     return {
       title: 'Pending Database Migration',
-      message: `The queried table does not exist yet. Run <code>som db:migrate</code> to apply pending migrations.`
+      message: `The queried table does not exist yet. Run <code>kreft db:migrate</code> to apply pending migrations.`
     };
   }
 
@@ -180,7 +180,7 @@ function renderErrorPage(err, req = null, { status = 500 } = {}) {
 
   const memory = Math.round(process.memoryUsage().heapUsed / 1024 / 1024) + ' MB';
   const nodeVersion = process.version;
-  const somVersion = require('../../package.json').version;
+  const kreftVersion = require('../../package.json').version;
   const internalCount = frames.filter((f) => !f.isApp).length;
 
   const safeJson = (val) => JSON.stringify(val).replace(/</g, '\\u003c').replace(/[\u2028\u2029]/g, (c) => '\\u' + c.charCodeAt(0).toString(16));
@@ -199,7 +199,7 @@ function renderErrorPage(err, req = null, { status = 500 } = {}) {
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>${escapeHtml(errName)} — Som.js Diagnostic</title>
+  <title>${escapeHtml(errName)} — Kreft Diagnostic</title>
   <style>
     :root {
       color-scheme: light dark;
@@ -565,7 +565,7 @@ function renderErrorPage(err, req = null, { status = 500 } = {}) {
         <div class="badges">
           <span class="badge danger">HTTP ${escapeHtml(status)}</span>
           <span class="badge solid">${escapeHtml(errName)}</span>
-          <span class="badge">Som.js v${escapeHtml(somVersion)}</span>
+          <span class="badge">Kreft v${escapeHtml(kreftVersion)}</span>
           <span class="badge">Node ${escapeHtml(nodeVersion)}</span>
         </div>
         <div class="actions">
@@ -654,9 +654,9 @@ function renderErrorPage(err, req = null, { status = 500 } = {}) {
         </div>
 
         <div class="card">
-          <h3 style="margin-top:0;">Som.js Runtime &amp; Headers</h3>
+          <h3 style="margin-top:0;">Kreft Runtime &amp; Headers</h3>
           <table style="margin-bottom: 16px;">
-            <tr><th>Som.js</th><td><code>v${escapeHtml(somVersion)}</code></td></tr>
+            <tr><th>Kreft</th><td><code>v${escapeHtml(kreftVersion)}</code></td></tr>
             <tr><th>Node.js</th><td><code>${escapeHtml(nodeVersion)}</code></td></tr>
             <tr><th>Heap Memory</th><td><code>${escapeHtml(memory)}</code></td></tr>
             <tr><th>Platform</th><td><code>${escapeHtml(process.platform)} (${escapeHtml(process.arch)})</code></td></tr>
@@ -678,7 +678,7 @@ function renderErrorPage(err, req = null, { status = 500 } = {}) {
             <button class="btn" onclick="copyJsonReport()">Copy JSON</button>
           </div>
         </div>
-        <pre class="json-code" id="markdown-preview-block"># Som.js Diagnostic Report
+        <pre class="json-code" id="markdown-preview-block"># Kreft Diagnostic Report
 - **Exception:** \`${escapeHtml(errName)}\` (HTTP ${escapeHtml(status)})
 - **Message:** ${escapeHtml(errMessage)}
 - **Location:** \`${escapeHtml(topAppFrame ? topAppFrame.file + ':' + topAppFrame.line : 'unknown')}\`

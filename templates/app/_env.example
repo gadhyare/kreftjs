@@ -1,21 +1,21 @@
 # Settings for this app. Copy this file to .env and fill it in.
-# .env is never sent to the browser, never copied by som build, and not committed (see .gitignore).
+# .env is never sent to the browser, never copied by kreft build, and not committed (see .gitignore).
 # Server code (routes/, app/, database/) reads it as process.env.NAME.
 APP_NAME="My app"
 
-# Signs the links in emails. som new makes one; keep it secret, and keep it the same once users have links.
+# Signs the links in emails. kreft new makes one; keep it secret, and keep it the same once users have links.
 APP_KEY=
 # Where the app runs: links in emails start with this
 APP_URL=http://localhost:8000
 
-# Only values that start with PUBLIC_ also reach the browser: {env.PUBLIC_APP_NAME} in any .som file.
+# Only values that start with PUBLIC_ also reach the browser: {env.PUBLIC_APP_NAME} in any .kreft file.
 # Never put a password or a secret key in a PUBLIC_ value.
 PUBLIC_APP_NAME="${APP_NAME}"
 
 # The database: sqlite:file.db, mysql://user:password@host:3306/name or postgres://user:password@host:5432/name
 DATABASE_URL=sqlite:backend/database/app.db
 
-# Background work: queued jobs, mail and notifications (redis, database: the jobs table, run by som dev / som queue:work; sync: at once)
+# Background work: queued jobs, mail and notifications (redis, database: the jobs table, run by kreft dev / kreft queue:work; sync: at once)
 QUEUE_CONNECTION=database
 # Cache.put / Cache.remember: redis, database, file or memory
 CACHE_STORE=database
@@ -52,7 +52,7 @@ SESSION_EXPIRE_ON_CLOSE=false
 SESSION_DRIVER=file
 
 # Frontend Inactivity Timer in minutes (auto-redirect to /login after inactivity)
-# Values starting with PUBLIC_ are sent to the browser and readable as {env.PUBLIC_...} in .som files
+# Values starting with PUBLIC_ are sent to the browser and readable as {env.PUBLIC_...} in .kreft files
 PUBLIC_SESSION_TIMEOUT=15
 PUBLIC_SESSION_WARNING=2
 

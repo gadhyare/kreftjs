@@ -1,4 +1,4 @@
-// Types for require('somjs/server'): routes, controllers, models, migrations, seeders, middleware.
+// Types for require('kreft/server'): routes, controllers, models, migrations, seeders, middleware.
 
 export type Rules = Record<string, string | string[]>
 
@@ -623,7 +623,7 @@ export declare const Crypt: {
   decryptString(payload: string): string
 }
 type LogFn = (message: string, context?: Record<string, any>) => void
-/** Log.info('Order placed', { id }) → the terminal and backend/storage/logs/som.log */
+/** Log.info('Order placed', { id }) → the terminal and backend/storage/logs/kreft.log */
 export declare const Log: { debug: LogFn; info: LogFn; notice: LogFn; warning: LogFn; error: LogFn; critical: LogFn; write(level: string, message: string, context?: any): void; clear(): boolean; path(): string; getDirectory(): string; setDirectory(dir: string): void }
 /** translations from backend/lang/<locale>.json or in-memory dictionary: __('welcome', { name }) */
 export declare const Lang: {
@@ -658,7 +658,7 @@ export interface ConfigFn {
   reload(projectRoot?: string): ConfigFn
   repository: any
 }
-/** configuration from config/*.js and som.config.json: config('app.name') */
+/** configuration from config/*.js and kreft.config.json: config('app.name') */
 export declare const config: ConfigFn
 export declare const Config: ConfigFn
 export declare const SEO: {
@@ -733,7 +733,7 @@ export declare const Event: {
 }
 export declare function event(event: object | string, ...payload: any[]): Promise<any[]>
 
-/** Queued jobs: await dispatch(new SendWelcome(user)); som dev or som queue:work runs them */
+/** Queued jobs: await dispatch(new SendWelcome(user)); kreft dev or kreft queue:work runs them */
 export declare class Job {
   static tries: number
   static backoff: number | number[]
@@ -931,7 +931,7 @@ interface Task {
 }
 export declare const Schedule: { call(fn: () => any): Task; job(job: Job): Task; command(line: string): Task }
 
-/** Your own commands in app/Console/Commands (som make:command SendReport) */
+/** Your own commands in app/Console/Commands (kreft make:command SendReport) */
 export declare class Command {
   static signature: string
   static description: string

@@ -1,4 +1,4 @@
-const { FormRequest } = require('somjs/server')
+const { FormRequest } = require('kreft/server')
 
 class UpdateTaskRequest extends FormRequest {
   /**

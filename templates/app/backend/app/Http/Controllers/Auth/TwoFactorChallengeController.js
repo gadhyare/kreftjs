@@ -1,4 +1,4 @@
-const { TOTP, ValidationError, abort, same } = require('somjs/server')
+const { TOTP, ValidationError, abort, same } = require('kreft/server')
 const User = require('../../../Models/User')
 const Throttle = require('../../../Auth/Throttle')
 const MAX_FAILURES = Number(process.env.TWO_FACTOR_MAX_FAILURES || 8)
@@ -34,7 +34,7 @@ class TwoFactorChallengeController {
     }
     await Throttle.clear('2fa', user.id)
     consumeTwoFactorTicket(pending)
-    return (await signIn(req, user, { remember: pending.remember })).withoutCookie('som_2fa')
+    return (await signIn(req, user, { remember: pending.remember })).withoutCookie('kreft_2fa')
   }
 }
 

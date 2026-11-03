@@ -26,7 +26,7 @@ module.exports = {
     lifetime: Number(process.env.SESSION_LIFETIME) || 120, // minutes
     expireOnClose: false,
     encrypt: true,
-    cookie: 'som_session',
+    cookie: 'kreft_session',
     secure: process.env.APP_ENV === 'production',
     httpOnly: true,
     sameSite: 'lax',

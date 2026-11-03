@@ -5,7 +5,7 @@
  *   const data = await req.validate({ avatar: 'required|image|max:2048' })    // KB
  *   const file = req.file('avatar')            // { name, size, type, extension() }
  *   const stored = await file.store('avatars') // 'avatars/3f9c…e1.jpg' on the public disk
- *   Storage.url(stored)                        // '/storage/avatars/3f9c…e1.jpg' — som dev and som serve send it
+ *   Storage.url(stored)                        // '/storage/avatars/3f9c…e1.jpg' — kreft dev and kreft serve send it
  *
  *   await Storage.put('reports/today.txt', 'hello')          // the local disk: backend/storage/app (private)
  *   await Storage.get('reports/today.txt')   Storage.exists(…)   Storage.delete(…)   Storage.files('reports')

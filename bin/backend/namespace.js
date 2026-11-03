@@ -1,7 +1,7 @@
 /*
- * PHP-style namespace loader and resolver for Som.js backend:
+ * PHP-style namespace loader and resolver for Kreft backend:
  *
- *   const { use, namespace } = require('somjs/server')
+ *   const { use, namespace } = require('kreft/server')
  *
  *   // 1. Single class import:
  *   const User = use('App\\Models\\User')

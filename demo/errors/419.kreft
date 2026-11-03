@@ -1,0 +1,11 @@
+<!-- errors/419.kreft: shown after abort(419), for example when a CSRF token is expired. Change the words as you like. -->
+layout 'errors/minimal.kreft'
+prop status = 419
+prop title = ''
+prop message = ''
+
+<view>
+  <kreft-section name="code">419</kreft-section>
+  <kreft-section name="title">Page Expired</kreft-section>
+  <kreft-section name="message">{message || 'This page expired. Reload it and try again.'}</kreft-section>
+</view>

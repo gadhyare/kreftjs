@@ -1,0 +1,110 @@
+<!-- Posts: every API action against /api/posts (npm run dev serves it from demo/db.json) -->
+
+// GET — loads when the page opens; posts.data, posts.loading, posts.error, posts.reload()
+load posts = api.get('/api/posts')
+
+// a form with rules: checked in the page first, so a form with mistakes is never sent.
+// The server has the same rules ("$rules" in demo/db.json); its 422 errors land in the same place.
+state draft = form({ title: '', body: '' }, { title: 'required|min:3|max:120', body: 'max:2000' })
+state editing = null
+
+// POST to create, PUT to replace
+action save() {
+  try {
+    const done = await draft.$submit(async (values) => {
+      if (editing) {
+        const updated = await api.put('/api/posts/' + editing, { ...values, likes: likesOf(editing) })
+        posts.data = posts.data.map((p) => (p.id === editing ? updated : p))
+        bus.send('toast', 'Post updated (PUT)')
+      } else {
+        posts.data.unshift(await api.post('/api/posts', { ...values, likes: 0 }))
+        bus.send('toast', 'Post created (POST)')
+      }
+    })
+    if (done) cancel()
+  } catch (e) {
+    bus.send('toast', e.message) // not a validation problem: the server is down, for example
+  }
+}
+
+// PATCH — change one field
+action like(post) {
+  const updated = await api.patch('/api/posts/' + post.id, { likes: (post.likes || 0) + 1 })
+  post.likes = updated.likes
+}
+
+// DELETE
+action remove(post) {
+  await api.delete('/api/posts/' + post.id)
+  posts.data = posts.data.filter((p) => p.id !== post.id)
+  bus.send('toast', 'Post deleted (DELETE)')
+}
+
+action edit(p) {
+  editing = p.id
+  draft.$reset({ title: p.title, body: p.body || '' })
+}
+
+action cancel() {
+  editing = null
+  draft.$reset()
+}
+
+function likesOf(id) {
+  const post = posts.data.find((p) => p.id === id)
+  return post ? post.likes : 0
+}
+
+<view>
+  <section class="card">
+    <h2>{editing ? 'Edit post #' + editing : 'New post'}</h2>
+    <form @submit.prevent={save}>
+      <input k-model="draft.title" placeholder="Title" aria-label="Title" aria-invalid={draft.$error('title') ? 'true' : 'false'} class={draft.$error('title') ? 'invalid' : ''}>
+      <p class="error" k-if="draft.$error('title')">{draft.$error('title')}</p>
+      <textarea k-model="draft.body" placeholder="Write something…" rows="3" aria-label="Text"></textarea>
+      <p class="error" k-if="draft.$error('body')">{draft.$error('body')}</p>
+      <div class="row">
+        <button class="primary" disabled={draft.$busy}>{draft.$busy ? 'Saving…' : editing ? 'Update (PUT)' : 'Create (POST)'}</button>
+        <button type="button" k-if="editing" @click={cancel}>Cancel</button>
+      </div>
+    </form>
+  </section>
+
+  <section class="card">
+    <div class="head">
+      <h2>Posts</h2>
+      <button @click={posts.reload}>Reload (GET)</button>
+    </div>
+    <p k-if="posts.loading && !posts.loaded" class="muted">Loading…</p>
+    <p k-elif="posts.error" class="error">Could not load posts: {posts.error.message}. Start the demo with npm run dev, which serves /api.</p>
+    <ul k-else>
+      {for post in posts.data key post.id}
+        <li>
+          <div>
+            <strong>{post.title}</strong>
+            <p class="muted">{post.body}</p>
+          </div>
+          <div class="actions">
+            <button @click="like(post)" aria-label="Like">♥ {post.likes || 0}</button>
+            <button @click="edit(post)">Edit</button>
+            <button @click="remove(post)">Delete</button>
+          </div>
+        </li>
+      {empty}
+        <li class="muted">No posts yet. Write the first one.</li>
+      {/for}
+    </ul>
+  </section>
+</view>
+
+<style scoped>
+form { display: flex; flex-direction: column; gap: 8px; }
+textarea { font: inherit; padding: 6px 10px; border: 1px solid var(--input); }
+.row, .actions, .head { display: flex; gap: 8px; align-items: center; }
+.head { justify-content: space-between; }
+ul { list-style: none; padding: 0; margin: 0; }
+li { display: flex; justify-content: space-between; gap: 12px; padding: 12px 0; border-bottom: 1px solid var(--border); }
+li p { margin: 4px 0 0; }
+.error { color: var(--destructive); margin: 0; }
+input.invalid { border-color: var(--destructive); outline-color: var(--destructive); }
+</style>

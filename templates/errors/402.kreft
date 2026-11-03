@@ -1,0 +1,11 @@
+<!-- errors/402.kreft: shown after abort(402). Change the words as you like. -->
+layout 'errors/minimal.kreft'
+prop status = 402
+prop title = ''
+prop message = ''
+
+<view>
+  <kreft-section name="code">402</kreft-section>
+  <kreft-section name="title">Payment Required</kreft-section>
+  <kreft-section name="message">{message || 'This needs a payment first.'}</kreft-section>
+</view>

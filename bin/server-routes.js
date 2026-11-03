@@ -17,12 +17,12 @@
  * Export get, post, put, patch and del (delete is a reserved word), or one `handle` for every method.
  * What you return goes back as JSON (nothing → 204). ctx.fail(status, message or { field: [...] })
  * stops with an error. ctx.res is Node's response, if you need it (stream, a file, a redirect).
- * som dev picks up changes to these files by itself.
+ * kreft dev picks up changes to these files by itself.
  */
 const fs = require('fs');
 const path = require('path');
 const { pathToFileURL } = require('url');
-const { validate } = require('../som.js');
+const { validate } = require('../kreft.js');
 
 const MAX_BODY = 5 * 1024 * 1024;
 
@@ -62,7 +62,7 @@ function createServerRoutes(dir, { db = null, production = false, prefix = '/api
     return out.sort((a, b) => a.dynamic - b.dynamic); // /users/me before /users/[id]
   };
   const list = () => {
-    // som dev looks for new files twice a second at most; som serve reads the folder once
+    // kreft dev looks for new files twice a second at most; kreft serve reads the folder once
     if (!scannedAt || (!production && Date.now() - scannedAt > 500)) { routes = scan(); scannedAt = Date.now(); }
     return routes;
   };

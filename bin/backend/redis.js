@@ -1,7 +1,7 @@
 /*
- * Redis client and connection manager for Som.js.
+ * Redis client and connection manager for Kreft.
  *
- *   const { Redis } = require('somjs/server')
+ *   const { Redis } = require('kreft/server')
  *
  *   await Redis.set('visits', 10)
  *   const visits = await Redis.get('visits')
@@ -440,7 +440,7 @@ function createConnection(name = 'default', options = {}) {
       return client;
     }
   } catch (_) {
-    // Fall back to Som native lightweight RESP client
+    // Fall back to Kreft native lightweight RESP client
   }
   return new NativeRedisClient(options);
 }

@@ -33,7 +33,7 @@
   --ink: var(--foreground);
   --ember: var(--primary);
   --fog: var(--background);
-  /* one page width for every Som.js page (like Bootstrap's .container) */
+  /* one page width for every Kreft page (like Bootstrap's .container) */
   --container: 1240px;
   --container-pad: 28px;
 }

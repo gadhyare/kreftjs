@@ -1,5 +1,5 @@
 // 'ability:posts:write,admin' in the routes (after 'auth'): the API token has at least one of them
-const { abort } = require('somjs/server')
+const { abort } = require('kreft/server')
 
 class CheckForAnyAbility {
   async handle(req, next, ...abilities) {

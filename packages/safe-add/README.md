@@ -1,15 +1,15 @@
-# @somjs/somjs
+# kreft
 
-> Enterprise-Grade Security Gatekeeper & Safe Package Installer for Som.js.  
+> Enterprise-Grade Security Gatekeeper & Safe Package Installer for Kreft.  
 > Works on any computer, server, or CI/CD environment with **zero external dependencies**.
 
 ---
 
-## 🔒 Why @somjs/somjs?
+## 🔒 Why kreft?
 
 Standard `npm install` blindly executes lifecycle scripts (`preinstall`, `install`, `postinstall`), allows disposable newly registered malicious packages, and is susceptible to **typosquatting** and **unicode homoglyph** attacks.
 
-`@somjs/somjs` acts as an intelligent, automated security firewall between your project and the public npm registry.
+`kreft` acts as an intelligent, automated security firewall between your project and the public npm registry.
 
 ---
 
@@ -17,18 +17,18 @@ Standard `npm install` blindly executes lifecycle scripts (`preinstall`, `instal
 
 ### Run instantly with NPX (No installation needed)
 ```bash
-npx @somjs/somjs add express lodash
+npx kreft add express lodash
 ```
 
 ### Install globally on any machine
 ```bash
-npm install -g @somjs/somjs
+npm install -g kreft
 ```
 
-Once installed globally, you use the standard `som` command:
+Once installed globally, you use the standard `kreft` command:
 ```bash
-som add express
-som add -D vitest
+kreft add express
+kreft add -D vitest
 ```
 
 ---
@@ -69,24 +69,24 @@ som add -D vitest
 
 ```bash
 # Basic installation with full verification
-som add <packages...>
+kreft add <packages...>
 
 # Install as development dependency
-som add -D vitest @types/node
+kreft add -D vitest @types/node
 
 # Dry-run security inspection without installing
-som add --check <package>
-som add --dry-run <package>
+kreft add --check <package>
+kreft add --dry-run <package>
 
 # Auto-confirm in CI/CD non-interactive pipelines
-som add -y <package>
-som add --yes <package>
+kreft add -y <package>
+kreft add --yes <package>
 
 # Allow lifecycle scripts for verified packages needing native C++ builds
-som add --allow-scripts <package>
+kreft add --allow-scripts <package>
 
 # Force installation (bypass warnings)
-som add --force <package>
+kreft add --force <package>
 ```
 
 ---

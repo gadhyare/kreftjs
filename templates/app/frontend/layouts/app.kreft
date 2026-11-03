@@ -1,0 +1,718 @@
+<!--
+  Default Application Shell: Dashboard layout with collapsible sidebar, technical navigation,
+  theme toggle, and user profile management.
+  Strictly zero border-radius and zero shadows across all elements.
+-->
+saved collapsed = false
+state open = false
+state userMenuOpen = false
+state sessionWarning = false
+state remainingMinutes = 5
+state inactivityTimer = null
+
+// SVG vector icon paths (24x24)
+state icons = {
+  dashboard: 'M3 13h8V3H3v10zm0 8h8v-6H3v6zm10 0h8V11h-8v10zm0-18v6h8V3h-8z',
+  users: 'M16 19v-1a4 4 0 0 0-4-4H7a4 4 0 0 0-4 4v1M9.5 10a3.5 3.5 0 1 0 0-7 3.5 3.5 0 0 0 0 7M21 19v-1a4 4 0 0 0-3-3.87M15.5 3.13a3.5 3.5 0 0 1 0 6.75',
+  profile: 'M20 21v-1a5 5 0 0 0-5-5H9a5 5 0 0 0-5 5v1M12 11a4 4 0 1 0 0-8 4 4 0 0 0 0 8',
+  showcase: 'M3 10.5 12 3l9 7.5V21h-6v-6H9v6H3z',
+  docs: 'M4 19.5A2.5 2.5 0 0 1 6.5 17H20V3H6.5A2.5 2.5 0 0 0 4 5.5zM4 19.5A2.5 2.5 0 0 0 6.5 22H20v-5',
+  tests: 'M14 3h7v7M10 14 21 3M19 14v5a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V7a2 2 0 0 1 2-2h5',
+  panel: 'M3 4h18v16H3zM9 4v16',
+  logout: 'M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4M16 17l5-5-5-5M21 12H9',
+}
+
+state navGroups = [
+  { label: 'Management', links: [
+    { to: 'dashboard', label: 'Dashboard', icon: 'dashboard', exact: true },
+    { to: 'users', label: 'Users', icon: 'users' },
+  ] },
+  { label: 'Account', links: [
+    { to: 'profile', label: 'Profile Settings', icon: 'profile' },
+  ] },
+  { label: 'Platform', links: [
+    { to: 'welcome', label: 'Showcase', icon: 'showcase' },
+    { to: 'error-monitor', label: 'Error Monitor', icon: 'panel' },
+    { to: 'docs', label: 'Documentation', icon: 'docs' },
+    { to: 'tests.index', label: 'Test Suite', icon: 'tests' },
+  ] },
+]
+
+derive user = $store.auth.user || {}
+derive initials = (user.name || 'Admin').split(/\s+/).filter(Boolean).slice(0, 2).map((w) => w[0].toUpperCase()).join('')
+
+action toggleTheme() { theme.toggle() }
+
+action toggleSidebar() {
+  if (window.matchMedia('(max-width: 768px)').matches) open = !open
+  else collapsed = !collapsed
+}
+
+action logout() {
+  userMenuOpen = false
+  await $store.auth.logout()
+  $router.replace('/login')
+}
+
+// Close drawer & menu on route change
+watch $route.path {
+  open = false
+  userMenuOpen = false
+}
+
+// Keyboard shortcuts: Ctrl+B / Cmd+B toggles sidebar
+action onKeydown(e) {
+  if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'b') {
+    e.preventDefault()
+    toggleSidebar()
+  }
+  if (e.key === 'Escape') {
+    open = false
+    userMenuOpen = false
+  }
+}
+
+on ready {
+  window.addEventListener('keydown', onKeydown)
+  const timeoutMin = Number(env.PUBLIC_SESSION_TIMEOUT) || 30
+  const warnMin = Number(env.PUBLIC_SESSION_WARNING) || 5
+  if (Kreft.useInactivityTimer && timeoutMin > 0) {
+    inactivityTimer = Kreft.useInactivityTimer({
+      timeoutMinutes: timeoutMin,
+      warningMinutes: warnMin,
+      onWarning(mins) {
+        remainingMinutes = mins
+        sessionWarning = true
+      },
+      onReset() {
+        sessionWarning = false
+      },
+      async onTimeout() {
+        sessionWarning = false
+        await logout()
+      },
+    })
+  }
+}
+on destroy {
+  window.removeEventListener('keydown', onKeydown)
+  if (inactivityTimer && inactivityTimer.stop) inactivityTimer.stop()
+}
+
+action extendSession() {
+  sessionWarning = false
+  if (inactivityTimer && inactivityTimer.reset) inactivityTimer.reset()
+}
+
+<view>
+  <div class={'dash-shell' + (collapsed ? ' collapsed' : '') + (open ? ' open' : '')}>
+    <!-- Mobile overlay -->
+    <div class="dash-overlay" @click="open = false" aria-hidden="true"></div>
+
+    <!-- Sidebar -->
+    <aside id="main-sidebar" class="dash-sidebar" aria-label="Dashboard Sidebar Navigation">
+      <div class="sidebar-brand-box">
+        <kreft-link to="dashboard" class="sidebar-brand">
+          <span class="brand-glyph-sq" aria-hidden="true">
+            <span class="glyph-core"></span>
+          </span>
+          <span class="brand-copy">
+            <strong>{env.PUBLIC_APP_NAME || 'Kreft'}</strong>
+            <small>Console</small>
+          </span>
+        </kreft-link>
+      </div>
+
+      <nav class="sidebar-nav">
+        {for group in navGroups}
+          <div class="nav-group">
+            <p class="group-heading">{group.label}</p>
+            <ul class="nav-list">
+              {for link in group.links}
+                <li>
+                  <kreft-link
+                    to={link.to}
+                    exact-class={link.exact ? 'active-link' : 'kreft-link-exact'}
+                    active-class={link.exact ? 'kreft-link-active' : 'active-link'}
+                    title={collapsed ? link.label : null}
+                    class="nav-item">
+                    <svg viewBox="0 0 24 24" aria-hidden="true" class="nav-icon"><path d={icons[link.icon] || icons.panel}></path></svg>
+                    <span class="nav-label">{link.label}</span>
+                  </kreft-link>
+                </li>
+              {/for}
+            </ul>
+          </div>
+        {/for}
+      </nav>
+
+      <!-- User Profile bar at sidebar bottom -->
+      <div class="sidebar-footer">
+        <div k-if="userMenuOpen" class="user-popup-menu" role="menu">
+          <div class="popup-user-info">
+            <strong>{user.name || 'Administrator'}</strong>
+            <span>{user.email || 'Admin Account'}</span>
+          </div>
+          <kreft-link to="profile" role="menuitem" class="popup-item">
+            Profile Settings
+          </kreft-link>
+          <button role="menuitem" @click={logout} class="popup-item logout-action">
+            Sign Out
+          </button>
+        </div>
+
+        <button
+          class="user-profile-button"
+          @click="userMenuOpen = !userMenuOpen"
+          aria-haspopup="menu"
+          aria-expanded={userMenuOpen ? 'true' : 'false'}
+          title={collapsed ? (user.name || 'Account') : null}>
+          <span class="user-avatar-initial" aria-hidden="true">{initials}</span>
+          <span class="user-info-text">
+            <strong>{user.name || 'Administrator'}</strong>
+            <small>{user.email || 'Admin'}</small>
+          </span>
+          <span class="user-role-badge">{user.is_admin ? 'Admin' : 'Active'}</span>
+        </button>
+      </div>
+    </aside>
+
+    <!-- Main Container -->
+    <div class="dash-viewport">
+      <header class="dash-topbar">
+        <button
+          class="btn ghost sm toggle-sidebar-btn"
+          @click={toggleSidebar}
+          aria-controls="main-sidebar"
+          aria-expanded={(open || !collapsed) ? 'true' : 'false'}
+          title="Toggle Sidebar (Ctrl+B)">
+          <svg viewBox="0 0 24 24" aria-hidden="true" class="topbar-icon"><path d={icons.panel}></path></svg>
+          <span class="sr-only">Toggle Sidebar</span>
+        </button>
+
+        <span class="topbar-divider" aria-hidden="true"></span>
+
+        <!-- Breadcrumbs -->
+        <div class="breadcrumbs">
+          <span class="crumb-root">Console</span>
+          <span class="crumb-sep">/</span>
+          <strong class="crumb-current">{$route.title || 'Dashboard'}</strong>
+        </div>
+
+        <div class="topbar-spacer"></div>
+
+        <!-- Page Actions Slot -->
+        <kreft-yield name="actions"></kreft-yield>
+
+        <!-- Theme Toggle -->
+        <button class="theme-switch-btn" @click={toggleTheme} aria-label="Toggle Theme" title="Toggle theme">
+          <span k-if="theme.dark">☀ Light</span>
+          <span k-else>🌙 Dark</span>
+        </button>
+      </header>
+
+      <div k-if="sessionWarning" class="session-warning-banner" role="alert">
+        <span>Your session will expire in {remainingMinutes} min due to inactivity.</span>
+        <button class="btn sm" @click={extendSession}>Stay Signed In</button>
+      </div>
+
+      <main class="dash-content-area">
+        <slot></slot>
+      </main>
+    </div>
+  </div>
+</view>
+
+<style scoped>
+.dash-shell {
+  --sidebar-w: 240px;
+  --sidebar-w-collapsed: 58px;
+  display: grid;
+  grid-template-columns: var(--sidebar-w) 1fr;
+  min-height: 100vh;
+  transition: grid-template-columns .15s ease;
+  background: var(--background);
+  color: var(--foreground);
+}
+
+.dash-shell.collapsed {
+  grid-template-columns: var(--sidebar-w-collapsed) 1fr;
+}
+
+/* Sidebar Styling */
+.dash-sidebar {
+  position: sticky;
+  top: 0;
+  height: 100vh;
+  display: flex;
+  flex-direction: column;
+  background: var(--card);
+  border-inline-end: 1px solid var(--border);
+  overflow: hidden;
+  z-index: 40;
+}
+
+.sidebar-brand-box {
+  padding: 12px 14px;
+  border-bottom: 1px solid var(--border);
+  height: 52px;
+  display: flex;
+  align-items: center;
+}
+
+.sidebar-brand {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  color: var(--foreground);
+  text-decoration: none;
+}
+
+.brand-glyph-sq {
+  width: 22px;
+  height: 22px;
+  border: 1px solid var(--foreground);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--background);
+}
+
+.glyph-core {
+  width: 8px;
+  height: 8px;
+  background: var(--foreground);
+}
+
+.brand-copy {
+  display: grid;
+  line-height: 1.15;
+}
+
+.brand-copy strong {
+  font-size: 14px;
+  letter-spacing: -0.02em;
+}
+
+.brand-copy small {
+  font-size: 11px;
+  font-family: var(--mono);
+  color: var(--muted);
+  text-transform: uppercase;
+}
+
+.sidebar-nav {
+  flex: 1;
+  overflow-y: auto;
+  padding: 12px 10px;
+}
+
+.nav-group {
+  margin-bottom: 16px;
+}
+
+.group-heading {
+  margin: 0 0 4px;
+  padding: 4px 8px;
+  font-size: 11px;
+  font-family: var(--mono);
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--foreground);
+}
+
+.nav-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 2px;
+}
+
+.nav-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  height: 36px;
+  padding: 0 10px;
+  color: var(--foreground);
+  text-decoration: none;
+  font-family: var(--font);
+  font-size: 13.5px;
+  font-weight: 600;
+  transition: all .12s ease;
+  border: 1px solid transparent;
+}
+
+.nav-item:hover {
+  background: var(--accent);
+  border-color: var(--foreground);
+}
+
+.nav-item.active-link {
+  background: var(--primary);
+  color: var(--primary-foreground);
+  border-color: var(--primary);
+  font-weight: 700;
+}
+
+.nav-icon {
+  width: 16px;
+  height: 16px;
+  flex: none;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.8;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+/* User Footer Section */
+.sidebar-footer {
+  position: relative;
+  padding: 10px;
+  border-top: 1px solid var(--border);
+  background: var(--card);
+}
+
+.user-profile-button {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  height: auto;
+  padding: 8px;
+  border: 1px solid transparent;
+  background: transparent;
+  text-align: left;
+  color: var(--foreground);
+  cursor: pointer;
+  transition: all .15s ease;
+}
+
+.user-profile-button:hover {
+  background: var(--accent);
+  border-color: var(--border);
+}
+
+.user-avatar-initial {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  background: var(--primary);
+  color: var(--primary-foreground);
+  font-family: var(--mono);
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.user-info-text {
+  flex: 1;
+  min-width: 0;
+  display: grid;
+  line-height: 1.2;
+}
+
+.user-info-text strong {
+  font-size: 13px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.user-info-text small {
+  font-size: 11px;
+  color: var(--muted);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.user-role-badge {
+  flex: none;
+  font-size: 10px;
+  font-family: var(--mono);
+  font-weight: 700;
+  text-transform: uppercase;
+  padding: 2px 6px;
+  background: var(--accent);
+  border: 1px solid var(--border);
+}
+
+.user-popup-menu {
+  position: absolute;
+  left: 10px;
+  right: 10px;
+  bottom: calc(100% + 4px);
+  background: var(--card);
+  border: 1px solid var(--border);
+  padding: 4px;
+  display: grid;
+  z-index: 60;
+}
+
+.popup-user-info {
+  display: grid;
+  padding: 8px 10px;
+  border-bottom: 1px solid var(--border);
+  margin-bottom: 4px;
+  line-height: 1.3;
+}
+
+.popup-user-info strong {
+  font-size: 13px;
+}
+
+.popup-user-info span {
+  font-size: 11px;
+  color: var(--muted);
+  font-family: var(--mono);
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.popup-item {
+  display: flex;
+  align-items: center;
+  width: 100%;
+  height: 32px;
+  padding: 0 10px;
+  border: 0;
+  background: transparent;
+  color: var(--foreground);
+  text-decoration: none;
+  font-size: 13px;
+  cursor: pointer;
+}
+
+.popup-item:hover {
+  background: var(--accent);
+}
+
+.logout-action {
+  color: var(--destructive);
+  border-top: 1px solid var(--border);
+}
+
+/* Collapsed State */
+.collapsed .brand-copy,
+.collapsed .group-heading,
+.collapsed .nav-label,
+.collapsed .user-info-text,
+.collapsed .user-role-badge {
+  display: none;
+}
+
+.collapsed .sidebar-brand {
+  justify-content: center;
+  width: 100%;
+}
+
+.collapsed .nav-item {
+  justify-content: center;
+  padding: 0;
+}
+
+.collapsed .user-profile-button {
+  justify-content: center;
+  padding: 6px 0;
+}
+
+.collapsed .user-popup-menu {
+  left: 6px;
+  width: 200px;
+  right: auto;
+}
+
+/* Topbar & Viewport */
+.dash-viewport {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  background: var(--background);
+  color: var(--foreground);
+  min-height: 100vh;
+}
+
+.dash-topbar {
+  position: sticky;
+  top: 0;
+  z-index: 30;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  height: 52px;
+  padding: 0 20px;
+  border-bottom: 1px solid var(--border);
+  background: var(--background);
+  backdrop-filter: blur(8px);
+}
+
+.toggle-sidebar-btn {
+  width: 32px;
+  height: 32px;
+  padding: 0;
+}
+
+.topbar-icon {
+  width: 16px;
+  height: 16px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.8;
+}
+
+.topbar-divider {
+  width: 1px;
+  height: 18px;
+  background: var(--border);
+}
+
+.breadcrumbs {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+}
+
+.crumb-root {
+  color: var(--muted);
+  font-family: var(--mono);
+  font-size: 12px;
+}
+
+.crumb-sep {
+  color: var(--border);
+}
+
+.crumb-current {
+  color: var(--foreground);
+  font-weight: 600;
+}
+
+.topbar-spacer {
+  flex: 1;
+}
+
+.theme-switch-btn {
+  height: 30px;
+  padding: 0 10px;
+  font-size: 11px;
+  font-family: var(--mono);
+  background: var(--accent);
+  border: 1px solid var(--border);
+  color: var(--foreground);
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.theme-switch-btn:hover {
+  border-color: var(--foreground);
+}
+
+.dash-content-area {
+  padding: 28px var(--container-pad, 28px) 64px;
+  max-width: calc(var(--container, 1240px) + var(--container-pad, 28px) * 2);
+  width: 100%;
+  background: var(--background);
+  color: var(--foreground);
+  flex: 1;
+}
+
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  border: 0;
+}
+
+.dash-overlay {
+  display: none;
+}
+
+.session-warning-banner {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 10px 24px;
+  background: var(--card);
+  border-bottom: 1px solid var(--destructive);
+  color: var(--destructive);
+  font-size: 13px;
+  font-weight: 500;
+}
+
+/* Responsive Phone Drawer */
+@media (max-width: 768px) {
+  .dash-shell,
+  .dash-shell.collapsed {
+    grid-template-columns: 1fr;
+  }
+
+  .dash-sidebar {
+    position: fixed;
+    inset-inline-start: 0;
+    top: 0;
+    bottom: 0;
+    width: 260px;
+    height: 100%;
+    transform: translateX(-100%);
+    transition: transform .2s ease;
+  }
+
+  [dir="rtl"] .dash-sidebar {
+    transform: translateX(100%);
+  }
+
+  .open .dash-sidebar {
+    transform: none;
+  }
+
+  .collapsed .brand-copy,
+  .collapsed .group-heading,
+  .collapsed .nav-label,
+  .collapsed .user-info-text,
+  .collapsed .user-role-badge {
+    display: revert;
+  }
+
+  .collapsed .sidebar-brand {
+    justify-content: flex-start;
+  }
+
+  .collapsed .nav-item {
+    justify-content: flex-start;
+    padding: 0 10px;
+  }
+
+  .collapsed .user-profile-button {
+    justify-content: flex-start;
+    padding: 8px;
+  }
+
+  .open .dash-overlay {
+    display: block;
+    position: fixed;
+    inset: 0;
+    background: rgba(9, 9, 11, .5);
+    z-index: 35;
+  }
+
+  .dash-topbar {
+    padding: 0 14px;
+  }
+
+  .dash-content-area {
+    padding: 20px 16px 48px;
+  }
+}
+</style>

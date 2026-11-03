@@ -1,4 +1,4 @@
-// som electron:init (and som new --electron): Google Fonts links are removed, nothing else is touched.   Run: npm test
+// kreft electron:init (and kreft new --electron): Google Fonts links are removed, nothing else is touched.   Run: npm test
 const test = require('node:test');
 const assert = require('node:assert');
 const fs = require('node:fs');
@@ -20,7 +20,7 @@ const HTML = `<!doctype html>
 `;
 
 test('electron:init removes the Google Fonts links of index.html and nothing else', () => {
-  const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'som-electron-'));
+  const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'kreft-electron-'));
   const log = console.log;
   try {
     fs.writeFileSync(path.join(tmp, 'package.json'), JSON.stringify({ name: 'demo-app' }));
@@ -53,15 +53,15 @@ test('electron templates: main.js and preload.js support ELECTRON_DEVTOOLS varia
 
   assert.match(mainCode, /ELECTRON_DEVTOOLS/, 'main.js reads ELECTRON_DEVTOOLS variable');
   assert.match(mainCode, /openDevTools\(\{ mode: devTools\.mode \}\)/, 'main.js opens devtools with configured mode (default right sidebar)');
-  assert.match(mainCode, /ipcMain\.handle\('som:devtools:open'/, 'main.js has devtools:open IPC');
-  assert.match(mainCode, /ipcMain\.handle\('som:devtools:close'/, 'main.js has devtools:close IPC');
-  assert.match(preloadCode, /__SOM_ELECTRON__/, 'preload.js exposes __SOM_ELECTRON__');
+  assert.match(mainCode, /ipcMain\.handle\('kreft:devtools:open'/, 'main.js has devtools:open IPC');
+  assert.match(mainCode, /ipcMain\.handle\('kreft:devtools:close'/, 'main.js has devtools:close IPC');
+  assert.match(preloadCode, /__KREFT_ELECTRON__/, 'preload.js exposes __KREFT_ELECTRON__');
   assert.match(preloadCode, /openDevTools:/, 'preload.js exposes openDevTools');
   assert.match(preloadCode, /closeDevTools:/, 'preload.js exposes closeDevTools');
   assert.match(mainCode, /if\s*\(isDev\s*\|\|\s*process\.platform\s*!==\s*'darwin'\)\s*app\.quit\(\)/, 'dev mode quits cleanly on window close');
 });
 
-test('dev-client.js: in Electron, the Som.js devtools button is totally hidden', () => {
+test('dev-client.js: in Electron, the Kreft devtools button is totally hidden', () => {
   const vm = require('node:vm');
   const code = fs.readFileSync(path.join(__dirname, '..', 'tools/dev-client.js'), 'utf8');
 
@@ -85,12 +85,12 @@ test('dev-client.js: in Electron, the Som.js devtools button is totally hidden',
   browserContext.document.body.appendChild = (el) => { browserContext.button = el; };
   vm.runInNewContext(code, browserContext);
   assert.ok(browserContext.button, 'browser gets the devtools button');
-  assert.strictEqual(browserContext.button['data-som-devtools-button'], '');
+  assert.strictEqual(browserContext.button['data-kreft-devtools-button'], '');
 
   // Case 2: Electron environment -> button is totally hidden
   const electronContext = {
-    somDesktop: { isElectron: true },
-    __SOM_ELECTRON__: true,
+    kreftDesktop: { isElectron: true },
+    __KREFT_ELECTRON__: true,
     navigator: { userAgent: 'Mozilla/5.0 (Macintosh) AppleWebKit/537.36 Chrome/130.0.0.0 Electron/34.2.0 Safari/537.36' },
     document: {
       body: {},

@@ -1,5 +1,5 @@
 /*
- * Som.js Localization (i18n & l10n) Engine
+ * Kreft Localization (i18n & l10n) Engine
  *
  * Full Laravel-compatible localization support with the [lang] folder:
  *   lang/en/auth.json         -> __('auth.failed')
@@ -227,7 +227,7 @@ function langScript(langData) {
   const json = JSON.stringify(langData || {})
     .replace(/</g, '\\u003c')
     .replace(/[\u2028\u2029]/g, (c) => '\\u' + c.charCodeAt(0).toString(16));
-  return `window.__SOM_LANG__ = ${json};`;
+  return `window.__KREFT_LANG__ = ${json};`;
 }
 
 module.exports = {

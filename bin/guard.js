@@ -1,12 +1,12 @@
 /*
- * Folder guard: Som.js notices when the folder it works in is deleted, moved or put in the Trash.
+ * Folder guard: Kreft notices when the folder it works in is deleted, moved or put in the Trash.
  *
  * A running process keeps working on a folder that was moved away (the files are still there, under a new
- * name), so `som dev` would carry on serving a project you thought was gone, and a terminal opened in the
+ * name), so `kreft dev` would carry on serving a project you thought was gone, and a terminal opened in the
  * old folder would run commands against the Trash. The operating system cannot be asked to refuse the
- * delete, so Som says it loudly instead:
+ * delete, so Kreft says it loudly instead:
  *   - every command first checks that the folder it runs in is not deleted or in the Trash;
- *   - `som dev`, `som serve` and the queue / schedule workers check every second and stop with a message.
+ *   - `kreft dev`, `kreft serve` and the queue / schedule workers check every second and stop with a message.
  */
 const fs = require('fs');
 const path = require('path');
@@ -37,7 +37,7 @@ function explain(kind, dir) {
     `  ${t.red('✖')} ${t.bold('The project folder ' + what + ':')}`,
     `      ${dir || '(unknown)'}`,
     '',
-    `  Som.js cannot read or write its files any more, so it stops here instead of carrying on`,
+    `  Kreft cannot read or write its files any more, so it stops here instead of carrying on`,
     `  with a copy of the project that you may think is gone.`,
     `  ${t.dim('Restore the folder (or open a terminal in the right one), then start it again.')}`,
     '',

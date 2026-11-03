@@ -1,11 +1,13 @@
-# Som.js for VS Code
+# Kreft for VS Code
 
-Colors, bracket matching, comments (Ctrl+/), folding and snippets for `.som` files.
+Colors, bracket matching, comments (Ctrl+/), folding and snippets for `.kreft` files.
 
-Install from a Som.js project or the Som.js folder:
+Install from a Kreft project or the Kreft folder:
 
 ```bash
-som vscode
+kreft vscode
 ```
 
-Then restart VS Code. Type `som` in an empty `.som` file for a starter component, or `state`, `action`, `for`, `som-wait` …
+Then restart VS Code. Type `kreft` in an empty `.kreft` file for a starter component, or `state`, `action`, `for`, `kreft-wait` …
+
+Files from Som.js projects (`.som`) get the same colors. Both `s-` and `k-` directives, and both `<som-…>` and `<kreft-…>` tags, are highlighted.

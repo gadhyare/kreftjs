@@ -11,18 +11,18 @@ module.exports = {
     port: Number(process.env.REDIS_PORT) || 6379,
     password: process.env.REDIS_PASSWORD || null,
     db: Number(process.env.REDIS_DB) || 0,
-    prefix: process.env.REDIS_PREFIX || 'som_database_',
+    prefix: process.env.REDIS_PREFIX || 'kreft_database_',
   },
 
   cache: {
     driver: process.env.CACHE_STORE || 'redis',
     ttl: Number(process.env.CACHE_DEFAULT_TTL) || 3600,
-    prefix: 'som_cache_',
+    prefix: 'kreft_cache_',
   },
 
   queue: {
     driver: process.env.QUEUE_CONNECTION || 'redis',
-    prefix: 'som_jobs_',
+    prefix: 'kreft_jobs_',
     defaultQueue: 'default',
   },
 };

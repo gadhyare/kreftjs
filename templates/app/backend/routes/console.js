@@ -1,6 +1,6 @@
-// What runs on a schedule. som dev runs it while it is on;
-// on a server: som schedule:work (or `som schedule:run` from cron every minute). See them: som schedule:list
-const { Schedule } = require('somjs/server')
+// What runs on a schedule. kreft dev runs it while it is on;
+// on a server: kreft schedule:work (or `kreft schedule:run` from cron every minute). See them: kreft schedule:list
+const { Schedule } = require('kreft/server')
 
 // Schedule.call(async () => { … }).daily().name('clean-up')
 // Schedule.job(new SendDailyReport()).weekdays().at('08:00')

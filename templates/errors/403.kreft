@@ -1,0 +1,11 @@
+<!-- errors/403.kreft: shown after abort(403), or abort(403, 'Only the owner can see this.'). Change the words as you like. -->
+layout 'errors/minimal.kreft'
+prop status = 403
+prop title = ''
+prop message = ''
+
+<view>
+  <kreft-section name="code">403</kreft-section>
+  <kreft-section name="title">Forbidden</kreft-section>
+  <kreft-section name="message">{message || "You don't have permission to see this page."}</kreft-section>
+</view>

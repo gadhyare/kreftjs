@@ -12,12 +12,12 @@
  *       if (!post) return null                       // answered as 404 (and noindex)
  *       return { title: post.title, description: post.excerpt, og: { image: post.image }, schema: { '@type': 'Article', headline: post.title } }
  *     },
- *     // the addresses of your data pages, for `som sitemap`: '/path' or { path, lastmod }
+ *     // the addresses of your data pages, for `kreft sitemap`: '/path' or { path, lastmod }
  *     urls: async () => (await Post.all()).map((p) => ({ path: '/posts/' + p.slug, lastmod: p.updated_at })),
  *   }
  *
  * Every page request the server answers with index.html gets the tags of the first matching pattern.
- * The tags carry data-som-ssr: the browser keeps them until the first navigation.
+ * The tags carry data-kreft-ssr: the browser keeps them until the first navigation.
  */
 const fs = require('fs');
 const path = require('path');
@@ -79,7 +79,7 @@ async function resolve(backendDir, urlPath, req) {
 // puts tags into <head>, taking the page's own copy of each out
 function inject(html, tags) {
   const keys = new Set([...tags.matchAll(/<meta\s+(?:name|property)="([^"]*)"/g)].map((m) => m[1]));
-  const marked = tags.replace(/<(meta|link|script)\b/g, '<$1 data-som-seo="" data-som-ssr=""');
+  const marked = tags.replace(/<(meta|link|script)\b/g, '<$1 data-kreft-seo="" data-kreft-ssr=""');
   let out = html;
   if (tags.includes('<title>')) out = out.replace(/<title[^>]*>[\s\S]*?<\/title>\s*/i, '');
   out = out.replace(/<meta\s[^>]*>\s*/gi, (m) => {

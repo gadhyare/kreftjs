@@ -1,4 +1,4 @@
--- The demo's Database page keeps its notes here (SQLite). som dev runs this once, by itself.
+-- The demo's Database page keeps its notes here (SQLite). kreft dev runs this once, by itself.
 CREATE TABLE notes (
   id INTEGER PRIMARY KEY,
   title VARCHAR(120) NOT NULL,

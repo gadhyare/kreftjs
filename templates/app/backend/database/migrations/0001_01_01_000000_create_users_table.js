@@ -1,4 +1,4 @@
-// The tables for user authentication. som dev runs it by itself (or: som migrate).
+// The tables for user authentication. kreft dev runs it by itself (or: kreft migrate).
 module.exports = {
   up(schema) {
     schema.create('users', (table) => {

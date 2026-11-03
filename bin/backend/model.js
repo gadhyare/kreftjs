@@ -2,7 +2,7 @@
  * Models and ORM.
  *
  *   // app/Models/Post.js
- *   const { Model } = require('somjs/server')
+ *   const { Model } = require('kreft/server')
  *   class Post extends Model {
  *     static fillable = ['title', 'body', 'user_id']
  *     static hidden = []
@@ -61,7 +61,7 @@ class ModelNotFoundError extends Error {
   }
 }
 
-// where the project's backend is (for factories); set by som dev / som serve / the som commands
+// where the project's backend is (for factories); set by kreft dev / kreft serve / the kreft commands
 let baseDir = null;
 const setBaseDir = (dir) => { baseDir = dir; };
 const getBaseDir = () => baseDir;
@@ -369,11 +369,11 @@ class Model {
         if (!BAD_KEYS.has(pk)) pivot[pk] = v;
         continue;
       }
-      if (k === '__som_parent') continue;
+      if (k === '__kreft_parent') continue;
       m[k] = castOut(this, k, v, cols);
     }
     if (Object.keys(pivot).length) Object.defineProperty(m, 'pivot', { value: pivot, enumerable: false, writable: true, configurable: true });
-    if (row.__som_parent !== undefined) Object.defineProperty(m, '__som_parent', { value: row.__som_parent, enumerable: false, writable: true, configurable: true });
+    if (row.__kreft_parent !== undefined) Object.defineProperty(m, '__kreft_parent', { value: row.__kreft_parent, enumerable: false, writable: true, configurable: true });
     m.__exists = true;
     m.syncOriginal();
     return m;
@@ -454,7 +454,7 @@ class Model {
     if ((await fire(C, 'saving', this)) === false) return false;
     if ((await fire(C, creating ? 'creating' : 'updating', this)) === false) return false;
     if (!(await tableExists(C.table))) {
-      throw new Error(`Table "${C.table}" does not exist in the database. Run "som migrate" to create it.`);
+      throw new Error(`Table "${C.table}" does not exist in the database. Run "kreft migrate" to create it.`);
     }
     const cols = await columnsOf(C.table);
     const has = (c) => cols.some((x) => x.name === c);
@@ -644,9 +644,9 @@ class Model {
         const ids = [...new Set(models.map((m) => m[r.localKey]).filter((v) => v != null))];
         q.join(r.Through.table, `${r.Through.table}.${r.secondLocalKey}`, `${R.table}.${r.secondKey}`).whereIn(`${r.Through.table}.${r.firstKey}`, ids);
         if (q._columns.length === 1 && q._columns[0] === '*') q._columns = [`${R.table}.*`];
-        q.addSelect(`${r.Through.table}.${r.firstKey} as __som_parent`);
+        q.addSelect(`${r.Through.table}.${r.firstKey} as __kreft_parent`);
         found = ids.length ? await q.get() : new Collection();
-        models.forEach((m) => setRelation(m, w.name, found.filter((f) => keyEq(f.__som_parent, m[r.localKey]))));
+        models.forEach((m) => setRelation(m, w.name, found.filter((f) => keyEq(f.__kreft_parent, m[r.localKey]))));
       } else {
         const ids = [...new Set(models.map((m) => m[r.localKey]).filter((v) => v != null))];
         found = ids.length ? await q.whereIn(`${R.table}.${r.foreignKey}`, ids).get() : new Collection();

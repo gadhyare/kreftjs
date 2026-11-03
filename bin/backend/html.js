@@ -1,5 +1,5 @@
 /*
- * Som.js HTML Security & Sanitization Engine: cleanHtml, escapeHtml, stripTags, SafeHtml
+ * Kreft HTML Security & Sanitization Engine: cleanHtml, escapeHtml, stripTags, SafeHtml
  *
  * Provides enterprise-grade, zero-dependency HTML sanitization, tag stripping,
  * entity escaping, and SafeHtml wrapper objects.

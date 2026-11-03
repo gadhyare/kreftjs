@@ -2,7 +2,7 @@
  * Notifications: delivery across multiple channels (mail, database).
  *
  *   // app/Notifications/InvoicePaid.js
- *   const { Notification } = require('somjs/server')
+ *   const { Notification } = require('kreft/server')
  *   class InvoicePaid extends Notification {
  *     static queue = true                                   // optional: send it later, on the queue
  *     constructor(invoice) { super(); this.invoice = invoice }
@@ -16,7 +16,7 @@
  *
  *   await user.notify(new InvoicePaid(invoice))
  *   await Notification.send(users, new InvoicePaid(invoice))
- *   const list = await user.notifications().get()           // the notifications table (som notifications:table)
+ *   const list = await user.notifications().get()           // the notifications table (kreft notifications:table)
  *   await user.unreadNotifications().update({ read_at: new Date() })
  */
 const crypto = require('crypto');

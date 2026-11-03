@@ -1,12 +1,12 @@
 /*
- * som build --prerender — saves every page of the router as ready HTML (static site generation).
+ * kreft build --prerender — saves every page of the router as ready HTML (static site generation).
  *
- *   som build --prerender                    every route without :params
- *   som build --prerender /users/1,/users/2  also these addresses
+ *   kreft build --prerender                    every route without :params
+ *   kreft build --prerender /users/1,/users/2  also these addresses
  *
  * Each page opens in a simulated browser (jsdom), waits until its data has loaded, and the result
  * is written to dist/<path>/index.html. Visitors and search engines get the content at once;
- * then Som.js starts and the page works as usual.
+ * then Kreft starts and the page works as usual.
  * Needs jsdom, once per project:  npm i -D jsdom
  */
 const fs = require('fs');
@@ -18,7 +18,7 @@ const SEO_TAGS = [
   'meta[name="description"]', 'meta[name="keywords"]', 'meta[name="robots"]', 'meta[name="author"]',
   'meta[name^="twitter:"]', 'meta[property^="og:"]',
   'link[rel="canonical"]', 'link[rel="alternate"][hreflang]',
-  'script[type="application/ld+json"][data-som-seo]',
+  'script[type="application/ld+json"][data-kreft-seo]',
 ].join(',');
 
 // what makes two head tags "the same tag": the page's version replaces the original's
@@ -33,7 +33,7 @@ function tagKey(el) {
 // A tag that holds the address of the temporary server (og:url falls back to the page's own address)
 // is left out: the app fills it in with the real address when it starts.
 function seoTags(document, origin) {
-  return [...document.head.querySelectorAll(SEO_TAGS)].filter((el) => el.hasAttribute('data-som-seo')).map((el) => { // only what the page set
+  return [...document.head.querySelectorAll(SEO_TAGS)].filter((el) => el.hasAttribute('data-kreft-seo')).map((el) => { // only what the page set
     if (el.localName !== 'script') return el.outerHTML;
     const copy = el.cloneNode(false);
     copy.textContent = el.textContent.replace(/</g, '\\u003c').replace(/>/g, '\\u003e').replace(/&/g, '\\u0026');
@@ -103,7 +103,7 @@ function createRenderer({ jsdom, origin, basePath, maxWait = 10000, userAgent, e
     const dom = await JSDOM.fromURL(origin + basePath + route.replace(/^\//, ''), {
       runScripts: 'dangerously', pretendToBeVisual: true, virtualConsole: vc, ...loading,
       beforeParse(w) {
-        w.__SOM_DEV__ = true; // lets us find the app and its router
+        w.__KREFT_DEV__ = true; // lets us find the app and its router
         w.scrollTo = () => { };
         w.fetch = (u, o) => {
           pending++;
@@ -124,17 +124,17 @@ function createRenderer({ jsdom, origin, basePath, maxWait = 10000, userAgent, e
       clearTimeout(giveUp);
       while (Date.now() - started < maxWait && (pending > 0 || Date.now() - last < 300)) await new Promise((r) => setTimeout(r, 50));
       await new Promise((r) => setTimeout(r, 50));
-      const Som = w.Som;
-      const rootInst = Som && Som.__devtools.instances().find((i) => !i.parent);
+      const Kreft = w.Kreft;
+      const rootInst = Kreft && Kreft.__devtools.instances().find((i) => !i.parent);
       const container = rootInst && rootInst.hot && rootInst.hot.start().parentNode;
       const router = rootInst && rootInst.appContext.config.globals.$router;
       return {
         problems,
         path: router ? router.route.path : route,
-        errorStatus: router && router.route.error ? Number(router.route.error.status) || 500 : 0, // the app showed errors/404.som (or another)
+        errorStatus: router && router.route.error ? Number(router.route.error.status) || 500 : 0, // the app showed errors/404.kreft (or another)
         title: w.document.title,
         tags: seoTags(w.document, origin),
-        htmlAttrs: ['lang', 'dir', 'data-som-orig-lang', 'data-som-orig-dir'].filter((a) => w.document.documentElement.hasAttribute(a)).map((a) => [a, w.document.documentElement.getAttribute(a)]),
+        htmlAttrs: ['lang', 'dir', 'data-kreft-orig-lang', 'data-kreft-orig-dir'].filter((a) => w.document.documentElement.hasAttribute(a)).map((a) => [a, w.document.documentElement.getAttribute(a)]),
         html: container ? container.innerHTML : null,
         id: container && container.id,
         routes: router ? router.routes.filter((r) => !/[:*]/.test(r.path) && !r.redirect && r.component).map((r) => r.path) : [],
@@ -150,11 +150,11 @@ function compose(JSDOM, original, page, route) {
   const doc = new JSDOM(original).window.document;
   const el = doc.getElementById(page.id);
   const source = doc.createElement('template');
-  source.setAttribute('data-som-ssg-source', '');
+  source.setAttribute('data-kreft-ssg-source', '');
   source.innerHTML = el.innerHTML; // the app's own in-page view, if it has one
   el.innerHTML = page.html;
-  el.setAttribute('data-som-ssg', '');
-  el.removeAttribute('s-cloak');
+  el.setAttribute('data-kreft-ssg', '');
+  el.removeAttribute('k-cloak');
   el.parentNode.insertBefore(source, el.nextSibling);
   if (page.title) doc.title = page.title;
   applyTags(doc, page.tags, route === '/');
@@ -176,7 +176,7 @@ module.exports = async function prerender(dist, root, extra) {
   try {
     jsdom = loadJsdom(root);
   } catch (_) {
-    throw new Error('it needs jsdom. Install it once in your project:\n\n    som add -D jsdom\n');
+    throw new Error('it needs jsdom. Install it once in your project:\n\n    kreft add -D jsdom\n');
   }
   const { JSDOM } = jsdom;
   if (typeof fetch !== 'function') throw new Error('it needs Node.js 18 or newer.');

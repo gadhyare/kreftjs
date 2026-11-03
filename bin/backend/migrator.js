@@ -17,12 +17,14 @@ const { createSchema } = require('./schema.js');
 const { setConnection } = require('./query.js');
 const { forgetTables } = require('./model.js');
 
+// TODO(3.1): the table keeps its Som.js name so deployed databases keep their history. Rename it to kreft_migrations
+// in a migration of its own, and read the old table as a fallback until every database has moved.
 const TABLE = 'som_migrations';
 
 async function ensureTable(db) {
   const text = db.kind === 'postgres' ? 'TEXT' : 'VARCHAR(255)';
   await db.exec(`CREATE TABLE IF NOT EXISTS ${TABLE} (name ${text} PRIMARY KEY, ran_at ${text} NOT NULL, batch INTEGER)`);
-  // made by an older Som.js, without batches
+  // made by an older Kreft, without batches
   const t = (await db.tables()).find((x) => x.name === TABLE);
   if (t && !t.columns.some((c) => c.name === 'batch')) await db.exec(`ALTER TABLE ${TABLE} ADD COLUMN batch INTEGER`);
 }

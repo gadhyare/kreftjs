@@ -1,0 +1,177 @@
+<!-- A real API on the internet (jsonplaceholder.typicode.com): fetch + async/await + try/catch, then the same with api and load -->
+const BASE = 'https://jsonplaceholder.typicode.com'
+// a second api client for this site: api.get('/posts') here means BASE + '/posts'
+const online = api.create({ base: BASE })
+
+// ---- 1. plain fetch, async / await, try / catch
+state users = []
+state usersLoading = false
+state usersError = ''
+
+action loadUsers(path = '/users') {
+  usersLoading = true
+  usersError = ''
+  try {
+    const res = await fetch(BASE + path)
+    if (!res.ok) throw new Error(`The server answered ${res.status} for ${path}`)
+    users = await res.json()
+  } catch (e) {
+    usersError = e.message
+    users = []
+  } finally {
+    usersLoading = false
+  }
+}
+
+on start {
+  await loadUsers()
+}
+
+// ---- 2. load: loads again by itself when userId changes
+state userId = 1
+load posts = online.get('/posts', { query: { userId, _limit: 4 } })
+
+// ---- 3. every HTTP action with api (jsonplaceholder answers like a real server, but keeps nothing)
+state title = 'Hello from Kreft'
+state answer = null
+state answerFrom = ''
+state answerError = ''
+
+action send(method) {
+  answerError = ''
+  answer = null
+  answerFrom = method
+  try {
+    if (method === 'POST') answer = await online.post('/posts', { title, body: 'Sent with api.post', userId })
+    else if (method === 'PUT') answer = await online.put('/posts/1', { id: 1, title, body: 'Replaced with api.put', userId })
+    else if (method === 'PATCH') answer = await online.patch('/posts/1', { title })
+    else if (method === 'DELETE') answer = await online.delete('/posts/1')
+    else answer = await online.get('/posts/12345') // no such post: a 404
+  } catch (e) {
+    answerError = `${e.name}: ${e.message} (status ${e.status})`
+  }
+}
+
+// ---- 4. speed test: how many answers per second this site gives your browser
+state testCount = 50
+state testParallel = 5
+state testing = false
+state result = null
+
+action speedTest() {
+  testing = true
+  result = null
+  const times = []
+  let failed = 0, next = 0
+  const started = performance.now()
+  try {
+    // `testParallel` requests at a time, until `testCount` have answered
+    const worker = async () => {
+      while (next < testCount) {
+        const id = (next++ % 100) + 1
+        const t = performance.now()
+        try { await online.get('/posts/' + id) } catch (e) { failed++ }
+        times.push(performance.now() - t)
+      }
+    }
+    await Promise.all(Array.from({ length: testParallel }, worker))
+  } finally {
+    const seconds = (performance.now() - started) / 1000
+    times.sort((a, b) => a - b)
+    result = {
+      perSecond: (times.length / seconds).toFixed(1),
+      seconds: seconds.toFixed(2),
+      median: Math.round(times[times.length >> 1] || 0),
+      slowest: Math.round(times[times.length - 1] || 0),
+      failed,
+    }
+    testing = false
+  }
+}
+
+<view>
+  <section class="card">
+    <h1>Online API</h1>
+    <p class="lead">This page talks to <a href="https://jsonplaceholder.typicode.com" target="_blank" rel="noopener">jsonplaceholder.typicode.com</a>, a free practice API on the internet.</p>
+
+    <h2>1. <code>fetch</code> with <code>async</code> / <code>await</code> and <code>try</code> / <code>catch</code></h2>
+    <p class="muted">An <code>action</code> that uses <code>await</code> is async by itself.</p>
+    <div class="row">
+      <button class="primary" @click="loadUsers()">Load users</button>
+      <button @click="loadUsers('/nothing-here')">Load a wrong address (a 404 on purpose)</button>
+    </div>
+    <p k-if="usersLoading" class="muted">Loading…</p>
+    <p k-elif="usersError" class="bad">{usersError}</p>
+    <ul k-else class="users">
+      {for u in users key u.id}
+        <li><strong>{u.name}</strong> <span class="muted">{u.email} · {u.address.city}</span></li>
+      {empty}
+        <li class="muted">No users.</li>
+      {/for}
+    </ul>
+  </section>
+
+  <section class="card">
+    <h2>2. <code>load</code>: no <code>try</code> / <code>catch</code> needed</h2>
+    <p class="muted"><code>load posts = online.get('/posts', \{ query: \{ userId } })</code> loads again by itself when <code>userId</code> changes.</p>
+    <label>Posts of user
+      <select k-model.number="userId">
+        {for n in 10}<option value={n}>{n}</option>{/for}
+      </select>
+    </label>
+    <p k-if="posts.loading" class="muted">Loading posts…</p>
+    <p k-elif="posts.error" class="bad">{posts.error.message}</p>
+    <ol k-else class="posts">
+      {for p in posts.data key p.id}<li>{p.title}</li>{/for}
+    </ol>
+  </section>
+
+  <section class="card">
+    <h2>3. Every HTTP action with <code>api</code></h2>
+    <p class="muted">JSON goes out and comes back by itself; a failed answer throws an <code>ApiError</code> with <code>status</code>.</p>
+    <input k-model="title" aria-label="Title" class="wide">
+    <div class="row">
+      <button class="primary" @click="send('POST')">POST</button>
+      <button @click="send('PUT')">PUT</button>
+      <button @click="send('PATCH')">PATCH</button>
+      <button @click="send('DELETE')">DELETE</button>
+      <button @click="send('GET 404')">GET a missing post</button>
+    </div>
+    <p k-if="answerError" class="bad">{answerError}</p>
+    <div k-elif="answer">
+      <p class="muted">{answerFrom} answered:</p>
+      <pre>{answer}</pre>
+    </div>
+  </section>
+
+  <section class="card">
+    <h2>4. Answers per second</h2>
+    <p class="muted">Sends GET <code>/posts/1</code>, <code>/posts/2</code>… from your browser and times every answer. The result depends on your internet connection and on the server.</p>
+    <div class="row">
+      <label>Requests <input type="number" min="1" max="500" k-model.number="testCount" class="num"></label>
+      <label>At a time <input type="number" min="1" max="50" k-model.number="testParallel" class="num"></label>
+      <button class="primary" @click={speedTest} disabled={testing}>{testing ? 'Testing…' : 'Start'}</button>
+    </div>
+    <div k-if="result" class="stats">
+      <div><strong>{result.perSecond}</strong><span>answers / second</span></div>
+      <div><strong>{result.median} ms</strong><span>usual answer (median)</span></div>
+      <div><strong>{result.slowest} ms</strong><span>slowest</span></div>
+      <div><strong>{result.seconds} s</strong><span>total{result.failed ? ' · ' + result.failed + ' failed' : ''}</span></div>
+    </div>
+  </section>
+</view>
+
+<style scoped>
+.row { display: flex; gap: 8px; flex-wrap: wrap; margin: 8px 0; }
+.users, .posts { padding-left: 20px; }
+.users li, .posts li { margin: 4px 0; }
+.bad { color: var(--destructive); background: var(--destructive-bg); padding: 8px 12px;}
+.wide { width: 100%; margin-bottom: 4px; }
+select { font: inherit; padding: 4px 8px; margin-left: 6px; }
+.num { width: 80px; margin-left: 6px; }
+.stats { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; margin-top: 12px; }
+.stats div { background: var(--accent); padding: 10px; display: flex; flex-direction: column; }
+.stats strong { font-size: 22px; font-variant-numeric: tabular-nums; }
+.stats span { color: var(--muted); font-size: 13px; }
+@media (max-width: 560px) { .stats { grid-template-columns: repeat(2, 1fr); } }
+</style>

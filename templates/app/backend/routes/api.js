@@ -1,7 +1,7 @@
 // Your API: every address here starts with /api.
 // All API routes live directly in this file. Add your new routes here!
-// See them all anytime with: som route:list
-const { Route, use, namespace } = require('somjs/server')
+// See them all anytime with: kreft route:list
+const { Route, use, namespace } = require('kreft/server')
 
 // PHP-style namespace imports (e.g. use('App\Http\Controllers\Admin\UserController')):
 const { DashboardController, UserController } = namespace('App\\Http\\Controllers\\Admin')

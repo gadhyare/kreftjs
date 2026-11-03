@@ -10,7 +10,7 @@ installAlias();
 const { namespace, use } = require('../bin/backend/namespace.js');
 
 test('namespace: resolves classes in split project layout (backend/app) from project root', () => {
-  const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'som-split-'));
+  const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'kreft-split-'));
   try {
     const backendDir = path.join(tmp, 'backend');
     const controllerDir = path.join(backendDir, 'app', 'Http', 'Controllers', 'Admin');
@@ -39,13 +39,13 @@ test('namespace: resolves classes in split project layout (backend/app) from pro
 });
 
 test('resolveAction: executes class methods and handles prototype and undefined controller errors', async () => {
-  const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'som-action-'));
+  const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'kreft-action-'));
   try {
     const backendDir = path.join(tmp, 'backend');
     fs.mkdirSync(path.join(backendDir, 'routes'), { recursive: true });
     fs.mkdirSync(path.join(backendDir, 'app', 'Http', 'Controllers'), { recursive: true });
     fs.writeFileSync(path.join(backendDir, 'routes', 'api.js'), `
-      const { Route } = require('somjs/server');
+      const { Route } = require('kreft/server');
       module.exports = (Route) => {};
     `);
 
@@ -71,8 +71,8 @@ test('resolveAction: executes class methods and handles prototype and undefined 
   }
 });
 
-test('remove:model and som:remove: cleans up generated files, routes, and sidebar links', async () => {
-  const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'som-remove-'));
+test('remove:model and kreft:remove: cleans up generated files, routes, and sidebar links', async () => {
+  const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'kreft-remove-'));
   const prevCwd = process.cwd();
   try {
     process.chdir(tmp);
@@ -90,9 +90,9 @@ test('remove:model and som:remove: cleans up generated files, routes, and sideba
 
     fs.writeFileSync(path.join(tmp, 'package.json'), JSON.stringify({ name: 'test-app' }));
     fs.writeFileSync(path.join(tmp, 'frontend', 'index.html'), '<html><body></body></html>');
-    fs.writeFileSync(path.join(tmp, 'backend', 'routes', 'api.js'), "const { Route } = require('somjs/server')\n");
-    fs.writeFileSync(path.join(tmp, 'frontend', 'routes', 'web.som'), "// web routes\n");
-    fs.writeFileSync(path.join(tmp, 'frontend', 'layouts', 'app.som'), `
+    fs.writeFileSync(path.join(tmp, 'backend', 'routes', 'api.js'), "const { Route } = require('kreft/server')\n");
+    fs.writeFileSync(path.join(tmp, 'frontend', 'routes', 'web.kreft'), "// web routes\n");
+    fs.writeFileSync(path.join(tmp, 'frontend', 'layouts', 'app.kreft'), `
       <sidebar>
         { label: 'Management', links: [
           { to: 'dashboard', label: 'Dashboard', icon: 'home' },
@@ -110,7 +110,7 @@ test('remove:model and som:remove: cleans up generated files, routes, and sideba
     const controllerFile = path.join(tmp, 'backend', 'app', 'Http', 'Controllers', 'Admin', 'CategoryController.js');
     const storeReqFile = path.join(tmp, 'backend', 'app', 'Http', 'Requests', 'Admin', 'StoreCategoryRequest.js');
     const updateReqFile = path.join(tmp, 'backend', 'app', 'Http', 'Requests', 'Admin', 'UpdateCategoryRequest.js');
-    const pageFile = path.join(tmp, 'frontend', 'pages', 'Admin', 'Category.som');
+    const pageFile = path.join(tmp, 'frontend', 'pages', 'Admin', 'Category.kreft');
     const factoryFile = path.join(tmp, 'backend', 'database', 'factories', 'CategoryFactory.js');
     const seederFile = path.join(tmp, 'backend', 'database', 'seeders', 'CategorySeeder.js');
 
@@ -125,11 +125,11 @@ test('remove:model and som:remove: cleans up generated files, routes, and sideba
     const apiRoutes = fs.readFileSync(path.join(tmp, 'backend', 'routes', 'api.js'), 'utf8');
     assert.ok(apiRoutes.includes('CategoryController'), 'api route references CategoryController');
 
-    const webRoutes = fs.readFileSync(path.join(tmp, 'frontend', 'routes', 'web.som'), 'utf8');
+    const webRoutes = fs.readFileSync(path.join(tmp, 'frontend', 'routes', 'web.kreft'), 'utf8');
     assert.ok(webRoutes.includes('admin/categories'), 'web route registered');
 
-    const appSom = fs.readFileSync(path.join(tmp, 'frontend', 'layouts', 'app.som'), 'utf8');
-    assert.ok(appSom.includes('admin.categories'), 'sidebar link registered');
+    const appKreft = fs.readFileSync(path.join(tmp, 'frontend', 'layouts', 'app.kreft'), 'utf8');
+    assert.ok(appKreft.includes('admin.categories'), 'sidebar link registered');
 
     // 2. Test dry-run: nothing is deleted
     await commands['remove:model'](['Category', '--all', '--folder=Admin', '--dry-run']);
@@ -146,8 +146,8 @@ test('remove:model and som:remove: cleans up generated files, routes, and sideba
     assert.ok(fs.existsSync(modelFile), 'model file still exists after selective migration removal');
     assert.ok(fs.existsSync(controllerFile), 'controller file still exists');
 
-    // 4. Test som:remove alias with --all
-    await commands['som:remove'](['model', 'Category', '--all', '--folder=Admin', '-f']);
+    // 4. Test kreft:remove alias with --all
+    await commands['kreft:remove'](['model', 'Category', '--all', '--folder=Admin', '-f']);
     assert.ok(!fs.existsSync(modelFile), 'model deleted');
     assert.ok(!fs.existsSync(controllerFile), 'controller deleted');
     assert.ok(!fs.existsSync(storeReqFile), 'store request deleted');
@@ -165,11 +165,11 @@ test('remove:model and som:remove: cleans up generated files, routes, and sideba
     const apiRoutesClean = fs.readFileSync(path.join(tmp, 'backend', 'routes', 'api.js'), 'utf8');
     assert.ok(!apiRoutesClean.includes('CategoryController'), 'controller import and route removed from routes/api.js');
 
-    const webRoutesClean = fs.readFileSync(path.join(tmp, 'frontend', 'routes', 'web.som'), 'utf8');
-    assert.ok(!webRoutesClean.includes('admin/categories'), 'route removed from web.som');
+    const webRoutesClean = fs.readFileSync(path.join(tmp, 'frontend', 'routes', 'web.kreft'), 'utf8');
+    assert.ok(!webRoutesClean.includes('admin/categories'), 'route removed from web.kreft');
 
-    const appSomClean = fs.readFileSync(path.join(tmp, 'frontend', 'layouts', 'app.som'), 'utf8');
-    assert.ok(!appSomClean.includes('admin.categories'), 'sidebar link removed from app.som');
+    const appKreftClean = fs.readFileSync(path.join(tmp, 'frontend', 'layouts', 'app.kreft'), 'utf8');
+    assert.ok(!appKreftClean.includes('admin.categories'), 'sidebar link removed from app.kreft');
 
     // 5. Test positional tokens without leading dashes
     commands['make:model'](['Product', '--all']);
@@ -186,7 +186,7 @@ test('remove:model and som:remove: cleans up generated files, routes, and sideba
 });
 
 test('resolveAction & namespace: resolves Admin controllers (DashboardController) even if root app/ exists and unwraps default exports', async () => {
-  const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'som-admin-stats-'));
+  const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'kreft-admin-stats-'));
   const prevCwd = process.cwd();
   try {
     process.chdir(tmp);
@@ -205,7 +205,7 @@ test('resolveAction & namespace: resolves Admin controllers (DashboardController
     `);
 
     fs.writeFileSync(path.join(tmp, 'backend', 'routes', 'api.js'), `
-      const { Route, namespace } = require('somjs/server');
+      const { Route, namespace } = require('kreft/server');
       const { DashboardController } = namespace('App\\\\Http\\\\Controllers\\\\Admin');
       Route.get('/admin/stats', [DashboardController, 'index']);
       Route.get('/admin/stats-wrapped', [{ default: DashboardController }, 'index']);
@@ -322,7 +322,7 @@ test('factories: callable as function, constructor, static methods, and in seede
   assert.strictEqual(cats5.length, 2, 'Category.factory().count(2).create() created 2');
 
   // 9. Seeder execution where CategoryFactory().count(4).create() is called inside seeder
-  const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'som-seeder-'));
+  const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'kreft-seeder-'));
   try {
     fs.mkdirSync(path.join(tmp, 'database', 'seeders'), { recursive: true });
     fs.mkdirSync(path.join(tmp, 'database', 'factories'), { recursive: true });
@@ -379,7 +379,7 @@ test('factories: callable as function, constructor, static methods, and in seede
 
 test('routes/api.js requiring a deleted controller keeps the other routes (login) working', async () => {
   const { createBackend } = require('../bin/backend/index.js');
-  const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'som-missing-ctrl-'));
+  const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'kreft-missing-ctrl-'));
   try {
     const ctrlDir = path.join(tmp, 'backend', 'app', 'Http', 'Controllers', 'Auth');
     fs.mkdirSync(ctrlDir, { recursive: true });
@@ -389,7 +389,7 @@ test('routes/api.js requiring a deleted controller keeps the other routes (login
       module.exports = SessionController;
     `);
     fs.writeFileSync(path.join(tmp, 'backend', 'routes', 'api.js'), `
-      const { Route } = require('somjs/server');
+      const { Route } = require('kreft/server');
       const SessionController = require('../app/Http/Controllers/Auth/SessionController');
       const PostController = require('../app/Http/Controllers/Admin/PostController');
       Route.get('/login', [SessionController, 'store']);

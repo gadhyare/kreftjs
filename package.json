@@ -1,23 +1,23 @@
 {
-  "name": "@somjs/somjs",
-  "version": "3.0.2",
-  "description": "A tiny reactive framework with its own component language (.som files): router with nested routes, stores, saved data, animations, an API client, hot reload, DevTools and a template engine.",
-  "main": "som.js",
-  "browser": "som.js",
+  "name": "kreft",
+  "version": "3.0.0",
+  "description": "A tiny reactive framework with its own component language (.kreft files): router with nested routes, stores, saved data, animations, an API client, hot reload, DevTools and a template engine.",
+  "main": "kreft.js",
+  "browser": "kreft.js",
   "bin": {
-    "som": "bin/som.js",
-    "somjs": "bin/som.js"
+    "kreft": "bin/kreft.js",
+    "som": "bin/kreft.js"
   },
   "scripts": {
-    "dev": "node bin/som.js dev --api demo/db.json --db sqlite:demo/database/demo.db --migrations demo/database/migrations --server demo/server --backend demo --seed",
-    "start": "node bin/som.js dev --api demo/db.json --db sqlite:demo/database/demo.db --migrations demo/database/migrations --server demo/server --backend demo --seed",
-    "build": "node bin/som.js build demo --out dist/demo --include docs",
-    "preview": "node bin/som.js dev dist --api demo/db.json --db sqlite:demo/database/demo.db --migrations demo/database/migrations --server demo/server --backend demo --seed",
-    "test": "node --test test/security.test.js test/prerender.test.js test/seo.test.js"
+    "dev": "node bin/kreft.js dev --api demo/db.json --db sqlite:demo/database/demo.db --migrations demo/database/migrations --server demo/server --backend demo --seed",
+    "start": "node bin/kreft.js dev --api demo/db.json --db sqlite:demo/database/demo.db --migrations demo/database/migrations --server demo/server --backend demo --seed",
+    "build": "node bin/kreft.js build demo --out dist/demo --include docs",
+    "preview": "node bin/kreft.js dev dist --api demo/db.json --db sqlite:demo/database/demo.db --migrations demo/database/migrations --server demo/server --backend demo --seed",
+    "test": "node --test test/security.test.js test/prerender.test.js test/seo.test.js test/rebrand.test.js"
   },
   "files": [
-    "som.js",
-    "som.d.ts",
+    "kreft.js",
+    "kreft.d.ts",
     "bin/",
     "server.js",
     "server.d.ts",
@@ -32,21 +32,21 @@
     "reactive",
     "components",
     "router",
-    "som"
+    "kreft"
   ],
-  "types": "som.d.ts",
+  "types": "kreft.d.ts",
   "exports": {
     ".": {
-      "types": "./som.d.ts",
-      "default": "./som.js"
+      "types": "./kreft.d.ts",
+      "default": "./kreft.js"
     },
     "./server": {
       "types": "./server.d.ts",
       "default": "./server.js"
     },
     "./vite": {
-      "types": "./tools/vite-plugin-som.d.ts",
-      "default": "./tools/vite-plugin-som.js"
+      "types": "./tools/vite-plugin-kreft.d.ts",
+      "default": "./tools/vite-plugin-kreft.js"
     },
     "./package.json": "./package.json"
   },

@@ -1,8 +1,8 @@
 /*
  * QR codes, with no package to install: for two-factor setup, links on a phone, tickets…
  *
- *   const { QR } = require('somjs/server')
- *   QR.svg('otpauth://totp/…')            // '<svg …>' — put it in a page with s-html
+ *   const { QR } = require('kreft/server')
+ *   QR.svg('otpauth://totp/…')            // '<svg …>' — put it in a page with k-html
  *   QR.matrix('hello')                     // [[true, false, …], …] for your own drawing
  *
  * Byte mode, error correction level M (15% of the code can be damaged), sizes 1–40.

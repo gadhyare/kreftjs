@@ -1,4 +1,4 @@
-const { Model } = require('somjs/server')
+const { Model } = require('kreft/server')
 
 // A signed-in browser (type 'session') or an API token (type 'api'). Only a hash of the token is kept.
 class PersonalAccessToken extends Model {

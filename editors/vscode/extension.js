@@ -3,7 +3,7 @@ try {
   vscode = require('vscode');
 } catch {}
 
-function formatSom(text, options = {}) {
+function formatKreft(text, options = {}) {
   const tabSize = options.tabSize || 2;
   const indentStr = options.insertSpaces !== false ? ' '.repeat(tabSize) : '\t';
 
@@ -163,10 +163,10 @@ function formatSom(text, options = {}) {
 function activate(context) {
   if (!vscode || !vscode.languages) return;
 
-  const provider = vscode.languages.registerDocumentFormattingEditProvider('som', {
+  const provider = vscode.languages.registerDocumentFormattingEditProvider('kreft', {
     provideDocumentFormattingEdits(document, options) {
       const text = document.getText();
-      const formatted = formatSom(text, options);
+      const formatted = formatKreft(text, options);
       if (formatted === text) return [];
       const firstLine = document.lineAt(0);
       const lastLine = document.lineAt(document.lineCount - 1);
@@ -180,4 +180,4 @@ function activate(context) {
 
 function deactivate() {}
 
-module.exports = { activate, deactivate, formatSom };
+module.exports = { activate, deactivate, formatKreft };

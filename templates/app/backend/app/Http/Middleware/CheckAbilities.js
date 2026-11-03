@@ -2,7 +2,7 @@
 //   'abilities:posts:read,posts:write'  the token has all of them
 //   'ability:posts:write,admin'          the token has at least one
 // A browser login can do everything; only API tokens are limited.
-const { abort } = require('somjs/server')
+const { abort } = require('kreft/server')
 
 class CheckAbilities {
   async handle(req, next, ...abilities) {

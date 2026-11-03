@@ -48,13 +48,13 @@ export function markdown(source) {
     }
   };
 
-  const isBlockStart = (l) => /^(#{1,6}\s|```|>|\s*[-*]\s|\s*\d+\.\s|\||---\s*$|<\/?div\b)/.test(l);
+  const isBlockStart = (l) => /^(#{1,6}\s|```|>|\s*[-*]\s|\s*\d+\.\s|\||---\s*$)/.test(l);
   while (i < lines.length) {
     const line = lines[i];
-    if (!line.trim() || /^<\/?div\b[^>]*>\s*$/.test(line.trim())) { i++; continue; }
+    if (!line.trim()) { i++; continue; }
     let m;
     if ((m = line.match(/^(#{1,6})\s+(.*)$/))) {
-      const level = m[1].length, text = m[2].replace(/^‏/, '');
+      const level = m[1].length, text = m[2];
       let id = slug(text);
       // the same heading text twice (two "Example" sections) must not share an id
       const seen = usedIds.get(id) || 0;

@@ -1,14 +1,14 @@
 /*
- * som update [packages...]
+ * kreft update [packages...]
  *
- * Updates npm dependencies and/or Som.js runtime files in the current project:
+ * Updates npm dependencies and/or Kreft runtime files in the current project:
  *
- *   som update                 Update all packages (npm update) and refresh som.js / som.d.ts
- *   som update <package...>    Update specific npm package(s)
- *   som update --latest        Upgrade dependencies to their latest versions
- *   som update --check         Check for outdated packages without installing (npm outdated)
- *   som update --core          Update only Som.js runtime files (som.js, som.d.ts, server.d.ts)
- *   som update --npm           Update only npm packages
+ *   kreft update                 Update all packages (npm update) and refresh kreft.js / kreft.d.ts
+ *   kreft update <package...>    Update specific npm package(s)
+ *   kreft update --latest        Upgrade dependencies to their latest versions
+ *   kreft update --check         Check for outdated packages without installing (npm outdated)
+ *   kreft update --core          Update only Kreft runtime files (kreft.js, kreft.d.ts, server.d.ts)
+ *   kreft update --npm           Update only npm packages
  */
 const fs = require('fs');
 const path = require('path');
@@ -31,7 +31,7 @@ module.exports = function update(args = []) {
     const a = args[i];
     if (a === '--latest' || a === '-L') flags.add('latest');
     else if (a === '--check' || a === '--dry-run') flags.add('check');
-    else if (a === '--core' || a === '--som') flags.add('core');
+    else if (a === '--core' || a === '--kreft' || a === '--som') flags.add('core'); // --som: the Som.js name
     else if (a === '--npm') flags.add('npm');
     else if (a === '--help' || a === '-h') {
       printHelp();
@@ -50,9 +50,9 @@ module.exports = function update(args = []) {
   const onlyCore = flags.has('core');
   const onlyNpm = flags.has('npm');
 
-  console.log(`\n  ${bold('Som.js ' + pkg.version)} ${dim('— updating packages and runtime')}\n`);
+  console.log(`\n  ${bold('Kreft ' + pkg.version)} ${dim('— updating packages and runtime')}\n`);
 
-  // 1. Update Som runtime files (som.js, som.d.ts, server.d.ts) unless --npm was requested
+  // 1. Update Kreft runtime files (kreft.js, kreft.d.ts, server.d.ts) unless --npm was requested
   if (!onlyNpm) {
     updateRuntimeFiles(lay, project);
   }
@@ -67,23 +67,25 @@ module.exports = function update(args = []) {
 
 function updateRuntimeFiles(lay, project) {
   const rootPkgDir = path.join(__dirname, '..');
-  const sourceSomJs = path.join(rootPkgDir, 'som.js');
-  const sourceSomDts = path.join(rootPkgDir, 'som.d.ts');
+  const sourceKreftJs = path.join(rootPkgDir, 'kreft.js');
+  const sourceKreftDts = path.join(rootPkgDir, 'kreft.d.ts');
   const sourceServerDts = path.join(rootPkgDir, 'server.d.ts');
 
   const targets = [];
 
-  // Check frontend / local som.js
-  const frontSomJs = path.join(lay.frontend, 'som.js');
-  const rootSomJs = path.join(project, 'som.js');
-  if (fs.existsSync(frontSomJs) && frontSomJs !== sourceSomJs) targets.push({ src: sourceSomJs, dest: frontSomJs, label: 'frontend/som.js' });
-  else if (fs.existsSync(rootSomJs) && rootSomJs !== sourceSomJs) targets.push({ src: sourceSomJs, dest: rootSomJs, label: 'som.js' });
+  // Check frontend / local kreft.js
+  // a project made with Som.js has som.js / som.d.ts: those files keep their names (index.html loads them) but get the new code
+  const named = (dir, name, legacy) => (!fs.existsSync(path.join(dir, name)) && fs.existsSync(path.join(dir, legacy)) ? legacy : name);
+  const frontKreftJs = path.join(lay.frontend, named(lay.frontend, 'kreft.js', 'som.js'));
+  const rootKreftJs = path.join(project, named(project, 'kreft.js', 'som.js'));
+  if (fs.existsSync(frontKreftJs) && frontKreftJs !== sourceKreftJs) targets.push({ src: sourceKreftJs, dest: frontKreftJs, label: 'frontend/' + path.basename(frontKreftJs) });
+  else if (fs.existsSync(rootKreftJs) && rootKreftJs !== sourceKreftJs) targets.push({ src: sourceKreftJs, dest: rootKreftJs, label: path.basename(rootKreftJs) });
 
-  // Check frontend / local som.d.ts
-  const frontSomDts = path.join(lay.frontend, 'som.d.ts');
-  const rootSomDts = path.join(project, 'som.d.ts');
-  if (fs.existsSync(frontSomDts) && frontSomDts !== sourceSomDts) targets.push({ src: sourceSomDts, dest: frontSomDts, label: 'frontend/som.d.ts' });
-  else if (fs.existsSync(rootSomDts) && rootSomDts !== sourceSomDts) targets.push({ src: sourceSomDts, dest: rootSomDts, label: 'som.d.ts' });
+  // Check frontend / local kreft.d.ts
+  const frontKreftDts = path.join(lay.frontend, named(lay.frontend, 'kreft.d.ts', 'som.d.ts'));
+  const rootKreftDts = path.join(project, named(project, 'kreft.d.ts', 'som.d.ts'));
+  if (fs.existsSync(frontKreftDts) && frontKreftDts !== sourceKreftDts) targets.push({ src: sourceKreftDts, dest: frontKreftDts, label: 'frontend/' + path.basename(frontKreftDts) });
+  else if (fs.existsSync(rootKreftDts) && rootKreftDts !== sourceKreftDts) targets.push({ src: sourceKreftDts, dest: rootKreftDts, label: path.basename(rootKreftDts) });
 
   // Check backend server.d.ts
   const backServerDts = path.join(lay.backend, 'server.d.ts');
@@ -91,17 +93,17 @@ function updateRuntimeFiles(lay, project) {
   if (fs.existsSync(backServerDts) && backServerDts !== sourceServerDts) targets.push({ src: sourceServerDts, dest: backServerDts, label: 'backend/server.d.ts' });
   else if (fs.existsSync(rootServerDts) && rootServerDts !== sourceServerDts) targets.push({ src: sourceServerDts, dest: rootServerDts, label: 'server.d.ts' });
 
-  // Check tools/vite-plugin-som.js
-  const localVitePlugin = path.join(project, 'tools', 'vite-plugin-som.js');
-  const sourceVitePlugin = path.join(rootPkgDir, 'tools', 'vite-plugin-som.js');
+  // Check tools/vite-plugin-kreft.js
+  const localVitePlugin = path.join(project, 'tools', 'vite-plugin-kreft.js');
+  const sourceVitePlugin = path.join(rootPkgDir, 'tools', 'vite-plugin-kreft.js');
   if (fs.existsSync(localVitePlugin) && localVitePlugin !== sourceVitePlugin) {
-    targets.push({ src: sourceVitePlugin, dest: localVitePlugin, label: 'tools/vite-plugin-som.js' });
+    targets.push({ src: sourceVitePlugin, dest: localVitePlugin, label: 'tools/vite-plugin-kreft.js' });
   }
 
-  const localViteDts = path.join(project, 'tools', 'vite-plugin-som.d.ts');
-  const sourceViteDts = path.join(rootPkgDir, 'tools', 'vite-plugin-som.d.ts');
+  const localViteDts = path.join(project, 'tools', 'vite-plugin-kreft.d.ts');
+  const sourceViteDts = path.join(rootPkgDir, 'tools', 'vite-plugin-kreft.d.ts');
   if (fs.existsSync(localViteDts) && localViteDts !== sourceViteDts) {
-    targets.push({ src: sourceViteDts, dest: localViteDts, label: 'tools/vite-plugin-som.d.ts' });
+    targets.push({ src: sourceViteDts, dest: localViteDts, label: 'tools/vite-plugin-kreft.d.ts' });
   }
 
   if (targets.length) {
@@ -132,7 +134,8 @@ function updateRuntimeFiles(lay, project) {
 }
 
 function upgradeAppLayout(lay) {
-  const layoutFile = path.join(lay.frontend, 'layouts', 'app.som');
+  let layoutFile = path.join(lay.frontend, 'layouts', 'app.kreft');
+  if (!fs.existsSync(layoutFile)) layoutFile = path.join(lay.frontend, 'layouts', 'app.som'); // Som.js project
   if (!fs.existsSync(layoutFile)) return;
   let text = fs.readFileSync(layoutFile, 'utf8');
   let changed = false;
@@ -144,8 +147,8 @@ function upgradeAppLayout(lay) {
     [/to:\s*['"]\/welcome['"]/, "to: 'welcome'"],
     [/to:\s*['"]\/docs['"]/, "to: 'docs'"],
     [/to:\s*['"]\/tests['"]/, "to: 'tests.index'"],
-    [/<som-link to=['"]\/['"] class=['"]sidebar-brand['"]>/, '<som-link to="dashboard" class="sidebar-brand">'],
-    [/<som-link to=['"]\/profile['"] role=['"]menuitem['"]/, '<som-link to="profile" role="menuitem"'],
+    [/<kreft-link to=['"]\/['"] class=['"]sidebar-brand['"]>/, '<kreft-link to="dashboard" class="sidebar-brand">'],
+    [/<kreft-link to=['"]\/profile['"] role=['"]menuitem['"]/, '<kreft-link to="profile" role="menuitem"'],
     [/<path d=\{icons\[link\.icon\]\}><\/path>/, '<path d={icons[link.icon] || icons.panel}></path>'],
   ];
 
@@ -159,9 +162,9 @@ function upgradeAppLayout(lay) {
   if (changed) {
     try {
       fs.writeFileSync(layoutFile, text);
-      console.log(`    ${green('DONE')}  frontend/layouts/app.som ${dim('(upgraded sidebar navigation to route names)')}`);
+      console.log(`    ${green('DONE')}  frontend/layouts/app.kreft ${dim('(upgraded sidebar navigation to route names)')}`);
     } catch (err) {
-      console.error(`    ${red('FAIL')}  frontend/layouts/app.som: ${err.message}`);
+      console.error(`    ${red('FAIL')}  frontend/layouts/app.kreft: ${err.message}`);
     }
   }
 }
@@ -223,12 +226,12 @@ function updateNpmPackages(project, pkgs, flags) {
 function printHelp() {
   console.log(`
   Usage:
-    som update [package...]     Update project packages and Som runtime files
-    som update                  Update all packages in package.json and refresh som.js
-    som update <name>           Update a specific package (e.g. som update esbuild)
-    som update --latest         Upgrade packages to their latest versions
-    som update --check          Check for outdated packages (npm outdated)
-    som update --core           Update only Som.js runtime files (som.js, som.d.ts, server.d.ts)
-    som update --npm            Update only npm dependencies
+    kreft update [package...]     Update project packages and Kreft runtime files
+    kreft update                  Update all packages in package.json and refresh kreft.js
+    kreft update <name>           Update a specific package (e.g. kreft update esbuild)
+    kreft update --latest         Upgrade packages to their latest versions
+    kreft update --check          Check for outdated packages (npm outdated)
+    kreft update --core           Update only Kreft runtime files (kreft.js, kreft.d.ts, server.d.ts)
+    kreft update --npm            Update only npm dependencies
 `);
 }

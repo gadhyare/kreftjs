@@ -1,32 +1,34 @@
 /*
- * som build — turns a Som.js app into production files.
+ * kreft build — turns a Kreft app into production files.
  *
- *   som build                  build this folder into ./dist
- *   som build ./site           build another folder
- *   som build --out public     choose the output folder
- *   som build --base /         change <base href> in index.html
- *   som build --prerender      also save every page as ready HTML (needs: npm i -D jsdom)
- *   som build --prerender --urls urls.js   ... and the addresses in that file (pages that come from your data)
- *   som build --include docs   also copy another folder into the output
+ *   kreft build                  build this folder into ./dist
+ *   kreft build ./site           build another folder
+ *   kreft build --out public     choose the output folder
+ *   kreft build --base /         change <base href> in index.html
+ *   kreft build --prerender      also save every page as ready HTML (needs: npm i -D jsdom)
+ *   kreft build --prerender --urls urls.js   ... and the addresses in that file (pages that come from your data)
+ *   kreft build --include docs   also copy another folder into the output
  *
  * What it does:
- *   1. Compiles every .som file ahead of time into app.js (no .som files are downloaded in production).
+ *   1. Compiles every .kreft file ahead of time into app.js (no .kreft files are downloaded in production).
  *   2. Turns every expression in the views into a real function, so the app runs without
  *      eval / new Function — it works under a strict Content-Security-Policy.
  *   3. Collects all <style> blocks (scoped ones already scoped) into app.css.
  *   4. Moves inline <script> code from index.html into main.js.
- *   5. Copies som.js and every other file (images, fonts, .js) next to them.
+ *   5. Copies kreft.js and every other file (images, fonts, .js) next to them.
  *
  * No dependencies — only Node.js.
  */
 const fs = require('fs');
 const path = require('path');
-const Som = require('../som.js');
+const Kreft = require('../kreft.js');
 
-const { expandBlocks, splitSom, splitInterp, exactBrace, stripBrace, interpToExpr, quoteBraceAttrs, expandSelfClosing,
-  scopeCss, hashString, propType, simplePathRE, fnExpRE, forAliasRE, stripTypeScript } = Som.__internal;
+const { expandBlocks, prepareTemplate, splitKreft, splitInterp, exactBrace, stripBrace, interpToExpr, quoteBraceAttrs, expandSelfClosing,
+  scopeCss, hashString, propType, simplePathRE, fnExpRE, forAliasRE, stripTypeScript } = Kreft.__internal;
 
 const deps = require('./deps.js');
+// component files: .kreft, or .som in a project made with Som.js
+const isComp = (f) => /\.(?:kreft|som)$/i.test(f);
 const SERVER_DIRS = new Set();
 const SKIP = new Set(['node_modules', '.git', '.vscode', '.idea', 'package.json', 'package-lock.json', '.DS_Store']);
 
@@ -51,40 +53,40 @@ module.exports = function build(args) {
   if (dist === root) fail('The output folder must be different from the app folder.');
   const project = deps.projectDir(root);
   const env = require('./env.js');
-  env.loadEnv(project); // PUBLIC_ values from .env go into app.js, as Som.env
+  env.loadEnv(project); // PUBLIC_ values from .env go into app.js, as Kreft.env
   // server code never goes into the built site: server/, backend app/ and routes/
   if (!lay.split) for (const dir of [root, project]) ['server', 'app', 'routes'].forEach((d) => SERVER_DIRS.add(path.join(dir, d)));
   SERVER_DIRS.add(lay.backend === lay.project ? path.join(project, 'server') : lay.backend);
-  const bare = new Set(), cssLinks = [];    // npm packages used by the .som files, and imported CSS files
+  const bare = new Set(), cssLinks = [];    // npm packages used by the .kreft files, and imported CSS files
 
-  // ---- 1. find and compile every .som file
-  const somFiles = walk(root, dist).filter((f) => f.endsWith('.som'));
+  // ---- 1. find and compile every .kreft file
+  const kreftFiles = walk(root, dist).filter((f) => isComp(f));
   const fns = new Map();             // precompiled expression functions: key → source
   const components = [];
   let css = '';
   const errors = [];
 
-  addRouterTemplates(fns);           // the router's own <som-link> and <som-view> templates
+  addRouterTemplates(fns);           // the router's own <kreft-link> and <kreft-view> templates
 
-  // .som files in --include folders too: they land in the output as <folder>/…, so that is their path there
-  const jobs = somFiles.map((file) => [file, toUrlPath(path.relative(root, file)), root]);
+  // .kreft files in --include folders too: they land in the output as <folder>/…, so that is their path there
+  const jobs = kreftFiles.map((file) => [file, toUrlPath(path.relative(root, file)), root]);
   for (const dir of include) {
     const from = path.resolve(dir);
     if (!fs.existsSync(from)) fail(`--include: ${dir} does not exist.`);
-    for (const file of walk(from, null).filter((f) => f.endsWith('.som'))) {
+    for (const file of walk(from, null).filter((f) => isComp(f))) {
       jobs.push([file, toUrlPath(path.join(path.basename(from), path.relative(from, file))), path.dirname(from)]);
     }
   }
   const { createProgressBar, renderBox, bold, cyan, green, dim } = require('./terminal.js');
-  console.log(`\n  ${bold('Som.js Build')} ${dim('— ' + (path.relative(process.cwd(), root) || '.') + ' → ' + (path.relative(process.cwd(), dist) || 'dist'))}\n`);
+  console.log(`\n  ${bold('Kreft Build')} ${dim('— ' + (path.relative(process.cwd(), root) || '.') + ' → ' + (path.relative(process.cwd(), dist) || 'dist'))}\n`);
   const templateBar = createProgressBar(jobs.length, { label: 'Compiling templates' });
   for (const [file, rel, base] of jobs) {
     templateBar.tick(rel);
-    // routes/web.som and other route files: plain JavaScript with Route in scope, kept as a function
+    // routes/web.kreft and other route files: plain JavaScript with Route in scope, kept as a function
     if (/^routes\//.test(rel)) {
       const src = stripTypeScript(fs.readFileSync(file, 'utf8'));
       try { new Function('Route', src); } catch (e) { errors.push(`  ${rel}: ${e.message}`); continue; }
-      components.push(`// ${rel}\nSom.__routes(${JSON.stringify(rel)}, function (Route) {\n${src}\n});`);
+      components.push(`// ${rel}\nKreft.__routes(${JSON.stringify(rel)}, function (Route) {\n${src}\n});`);
       continue;
     }
     try {
@@ -108,30 +110,30 @@ module.exports = function build(args) {
   const langHelper = require('./lang.js');
   const langDirs = langHelper.findLangDirs(root);
   const langData = langHelper.scanLangDir(langDirs);
-  const langInject = Object.keys(langData).length ? `Som.translations(${JSON.stringify(langData)});\n` : '';
+  const langInject = Object.keys(langData).length ? `Kreft.translations(${JSON.stringify(langData)});\n` : '';
 
   const precompiled = [...fns].map(([key, src]) => `F[${JSON.stringify(key)}] = ${src};`).join('\n');
-  const appJs = `/* Built by som build — do not edit. Rebuild from your .som files instead. */
+  const appJs = `/* Built by kreft build — do not edit. Rebuild from your .kreft files instead. */
 ${env.envScript(env.publicEnv())}
-(function (Som) {
-  if (!Som) throw new Error('Load som.js before app.js');
-  var F = Som.__precompiled;
+(function (Kreft) {
+  if (!Kreft) throw new Error('Load kreft.js before app.js');
+  var F = Kreft.__precompiled;
 ${langInject ? indent(langInject) : ''}
 ${indent(precompiled)}
 
 ${indent(components.join('\n\n'))}
-})(window.Som);
+})(window.Kreft);
 `;
   // app.js uses `with`, so it must stay a classic (non-module, non-strict) script — check it parses
   try { new Function(appJs); } catch (e) { fail('Internal error: app.js does not parse: ' + e.message); }
   write(dist, 'app.js', appJs);
-  // the ready-made s-animate styles (fade, slide, scale, pop), first so your own CSS wins
-  write(dist, 'app.css', '/* Som.js s-animate presets */\n' + Som.__presetCss + '\n\n' + css.trim() + '\n');
+  // the ready-made k-animate styles (fade, slide, scale, pop), first so your own CSS wins
+  write(dist, 'app.css', '/* Kreft k-animate presets */\n' + Kreft.__presetCss + '\n\n' + css.trim() + '\n');
 
   // copy everything else (images, fonts, plain .js files…)
   for (const file of walk(root, dist)) {
     const rel = path.relative(root, file);
-    if (file.endsWith('.som') || file.endsWith('.d.ts') || rel === 'index.html') continue;
+    if (isComp(file) || file.endsWith('.d.ts') || rel === 'index.html') continue;
     fs.mkdirSync(path.dirname(path.join(dist, rel)), { recursive: true });
     if (/\.ts$/i.test(file)) { // a TypeScript module: its JavaScript, as name.js
       write(path.dirname(path.join(dist, rel)), path.basename(rel).replace(/\.ts$/i, '.js'), tsToJs(file, project));
@@ -142,7 +144,7 @@ ${indent(components.join('\n\n'))}
   if (lay.public && lay.public !== root && lay.public !== dist && fs.existsSync(lay.public)) {
     for (const file of walk(lay.public, dist)) {
       const rel = path.relative(lay.public, file);
-      if (file.endsWith('.som') || file.endsWith('.d.ts') || rel === 'index.html') continue;
+      if (isComp(file) || file.endsWith('.d.ts') || rel === 'index.html') continue;
       const to = path.join(dist, rel);
       if (!fs.existsSync(to)) {
         fs.mkdirSync(path.dirname(to), { recursive: true });
@@ -150,32 +152,32 @@ ${indent(components.join('\n\n'))}
       }
     }
   }
-  fs.copyFileSync(path.join(__dirname, '..', 'som.js'), path.join(dist, 'som.js'));
+  fs.copyFileSync(path.join(__dirname, '..', 'kreft.js'), path.join(dist, 'kreft.js'));
   for (const dir of include) {
     const from = path.resolve(dir);
     if (!fs.existsSync(from)) fail(`--include: ${dir} does not exist.`);
     for (const file of walk(from, null)) {
-      if (file.endsWith('.som')) continue; // compiled into app.js above
+      if (isComp(file)) continue; // compiled into app.js above
       const to = path.join(dist, path.basename(from), path.relative(from, file));
       fs.mkdirSync(path.dirname(to), { recursive: true });
       fs.copyFileSync(file, to);
     }
   }
 
-  // ---- 3. index.html: som.js + app.js + app.css, inline scripts moved to main.js
+  // ---- 3. index.html: kreft.js + app.js + app.css, inline scripts moved to main.js
   let html = fs.readFileSync(path.join(root, 'index.html'), 'utf8');
-  // an included folder that sits next to the app ('../docs/Docs.som') is inside the output: 'docs/Docs.som'
+  // an included folder that sits next to the app ('../docs/Docs.kreft') is inside the output: 'docs/Docs.kreft'
   for (const dir of include) {
     const up = toUrlPath(path.relative(root, path.resolve(dir)));
     if (up.startsWith('../')) html = html.split(`'${up}/`).join(`'${path.basename(up)}/`).split(`"${up}/`).join(`"${path.basename(up)}/`);
   }
   let mainJs = '';
-  let sawSom = false, placedMain = false;
+  let sawKreft = false, placedMain = false;
   html = html.replace(/<script\b([^>]*)>([\s\S]*?)<\/script>/gi, (tag, attrs, body) => {
     const src = (attrs.match(/\bsrc\s*=\s*["']([^"']+)["']/i) || [])[1];
-    if (src && /(^|\/)som(\.min)?\.js$/i.test(src)) {
-      sawSom = true;
-      return '<script src="som.js"></script>\n  <script src="app.js"></script>';
+    if (src && /(^|\/)(?:kreft|som)(\.min)?\.js$/i.test(src)) {
+      sawKreft = true;
+      return '<script src="kreft.js"></script>\n  <script src="app.js"></script>';
     }
     if (!src && body.trim() && !/type\s*=\s*["'](?!text\/javascript|module)/i.test(attrs)) {
       if (/type\s*=\s*["']module["']/i.test(attrs)) return tag; // leave modules as they are
@@ -187,7 +189,7 @@ ${indent(components.join('\n\n'))}
     return tag;
   });
   html = html.replace(/(<script\b[^>]*\bsrc=["'][^"']+?)\.ts(["'])/gi, '$1.js$2');
-  if (!sawSom) fail('index.html has no <script src="…som.js">. Add one so the build knows where to load Som.js.');
+  if (!sawKreft) fail('index.html has no <script src="…kreft.js">. Add one so the build knows where to load Kreft.');
   if (mainJs) write(dist, 'main.js', mainJs);
   // ---- 4. npm packages: each one bundled into deps/, found through an import map; imported CSS as <link>s
   const map = {};
@@ -202,7 +204,7 @@ ${indent(components.join('\n\n'))}
   const links = cssLinks.map(({ spec, local }) => {
     if (local) return spec;
     const file = deps.packageFile(project, spec);
-    if (!file) fail(`The CSS file "${spec}" was not found in node_modules. Run:  som add ${(spec.match(deps.NAME) || [spec])[0]}`);
+    if (!file) fail(`The CSS file "${spec}" was not found in node_modules. Run:  kreft add ${(spec.match(deps.NAME) || [spec])[0]}`);
     const info = deps.packageJson(project, spec);
     copyCss(file, info.dir, path.join(dist, 'vendor', info.name));
     return toUrlPath(path.join('vendor', info.name, path.relative(info.dir, file)));
@@ -216,7 +218,7 @@ ${indent(components.join('\n\n'))}
     } else html = html.replace(/<head[^>]*>/i, (m) => `${m}\n  <script type="importmap">${JSON.stringify({ imports: map })}</script>`);
   }
   const escAttr = (s) => String(s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
-  html = html.replace(/<\/head>/i, () => links.map((l) => `  <link rel="stylesheet" href="${escAttr(l)}">\n`).join('') + '  <link rel="stylesheet" href="app.css" data-som-presets>\n</head>');
+  html = html.replace(/<\/head>/i, () => links.map((l) => `  <link rel="stylesheet" href="${escAttr(l)}">\n`).join('') + '  <link rel="stylesheet" href="app.css" data-kreft-presets>\n</head>');
   if (base != null) {
     const rawBase = base.endsWith('/') ? base : base + '/';
     const b = String(rawBase).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
@@ -235,7 +237,7 @@ ${indent(components.join('\n\n'))}
       ...files.sort().map(([f, n]) => `  ${cyan(kb(n))}  ${toUrlPath(f)}`),
       '---',
       `  ${bold('Output:')}  ${dist}`,
-      `  ${bold('Preview:')} som dev ${path.relative(process.cwd(), dist) || '.'}`,
+      `  ${bold('Preview:')} kreft dev ${path.relative(process.cwd(), dist) || '.'}`,
     ];
     console.log('\n' + renderBox(lines, { width: 66, borderColor: green }) + '\n');
   };
@@ -254,12 +256,12 @@ function tsToJs(file, project) {
   return code.replace(/((?:from|import)\s*\(?\s*['"])(\.{1,2}\/[^'"]+?)\.ts(['"])/g, '$1$2.js$3');
 }
 
-/* ------------------------------------------------------------------ one .som file → JS */
+/* ------------------------------------------------------------------ one .kreft file → JS */
 function compileFile(file, rel, root) {
-  const sp = splitSom(fs.readFileSync(file, 'utf8'), rel);
+  const sp = splitKreft(fs.readFileSync(file, 'utf8'), rel);
   const name = sp.name;
 
-  // the script must parse; report the .som line if it doesn't
+  // the script must parse; report the .kreft line if it doesn't
   const run = `function ($scope, $h) { with ($scope) {\n${sp.code}\n} }`;
   try { new Function('return ' + run); } catch (e) { throw new Error(`script error: ${e.message}`); }
 
@@ -273,16 +275,16 @@ function compileFile(file, rel, root) {
     return `${JSON.stringify(p)}: { ${type ? `type: ${type.name}, ` : ''}default: function () { return (${expr}); } }`;
   });
 
-  // imports: other .som files become component references; .js modules load with import()
+  // imports: other .kreft files become component references; .js modules load with import()
   const comps = [], values = [], bare = [], cssImports = [];
   for (const stmt of sp.imports) {
     const m = stmt.match(/^import\s+(?:([\s\S]+?)\s+from\s+)?(['"])(.+?)\2/);
     if (!m) throw new Error(`can't read import: ${stmt}`);
     const [, what, , spec] = m;
-    if (/^som(\.js)?$/.test(spec)) continue;
+    if (/^(?:kreft|som)(\.js)?$/.test(spec)) continue;
     let target = /^\.{1,2}\//.test(spec) ? toUrlPath(path.relative(root, path.resolve(path.dirname(file), spec))) : spec;
     if (/^\.{1,2}\//.test(spec) && /\.ts$/i.test(spec)) target = target.replace(/\.ts$/i, '.js'); // TypeScript files are built into .js
-    if (/\.som$/i.test(spec)) {
+    if (isComp(spec)) {
       if (what && /^[A-Za-z_$][\w$]*$/.test(what.trim())) comps.push(`${JSON.stringify(what.trim())}: ${JSON.stringify(target)}`);
       continue;
     }
@@ -316,7 +318,7 @@ function compileFile(file, rel, root) {
   ].filter(Boolean);
 
   return {
-    code: `// ${rel}\nSom.__define(${JSON.stringify(rel)}, {\n  ${parts.join(',\n  ').replace(/\n/g, '\n  ')}\n});`,
+    code: `// ${rel}\nKreft.__define(${JSON.stringify(rel)}, {\n  ${parts.join(',\n  ').replace(/\n/g, '\n  ')}\n});`,
     css,
     template: sp.template,
     bare,
@@ -327,7 +329,7 @@ function compileFile(file, rel, root) {
 // `import { a, b as c } from './x.js'` → loaded with import() when the component is first used
 function loadValuesSource(values) {
   const lines = values.map(({ what, target, local }, i) => {
-    // files in the app resolve from <base href>, like .som paths; URLs and package names stay as written
+    // files in the app resolve from <base href>, like .kreft paths; URLs and package names stay as written
     const url = local ? `new URL(${JSON.stringify(target)}, document.baseURI).href` : JSON.stringify(target);
     const picks = [];
     if (what) what.split(/,(?![^{]*\})/).map((s) => s.trim()).forEach((part) => {
@@ -338,7 +340,7 @@ function loadValuesSource(values) {
       });
       else picks.push(`v[${JSON.stringify(part)}] = m${i}.default;`);
     });
-    return `return Som.__import(${url}).then(function (m${i}) { ${picks.join(' ')} })`;
+    return `return Kreft.__import(${url}).then(function (m${i}) { ${picks.join(' ')} })`;
   });
   return `function () { var v = {}; return Promise.resolve()${lines.map((l) => `.then(function () { ${l}; })`).join('')}.then(function () { return v; }); }`;
 }
@@ -378,12 +380,12 @@ function addRouterTemplates(fns) {
 const STRUCTURAL = new Set(['if', 'elif', 'else', 'each', 'key', 'ref', 'skip', 'cloak', 'slot', 'empty', 'once', 'animate', 'waiting', 'failed']);
 
 function collectExpressions(template, fns) {
-  const html = quoteBraceAttrs(expandBlocks(expandSelfClosing(template)));
+  const html = prepareTemplate(template);
   scanHtml(html, {
     attr(name, value) {
-      if (name[0] === ':' || name === 's-bind' || name.startsWith('s-bind:')) return addEval(fns, value);
-      if (name[0] === '@' || name.startsWith('s-on:')) return addHandler(fns, stripBrace(value));
-      if (name.startsWith('s-')) {
+      if (name[0] === ':' || name === 'k-bind' || name.startsWith('k-bind:')) return addEval(fns, value);
+      if (name[0] === '@' || name.startsWith('k-on:')) return addHandler(fns, stripBrace(value));
+      if (name.startsWith('k-')) {
         const v = stripBrace(value);
         const dir = name.slice(2).split('.')[0].split(':')[0];
         if (dir === 'if' || dir === 'elif' || dir === 'key') return addEval(fns, v);
@@ -393,7 +395,7 @@ function collectExpressions(template, fns) {
           return;
         }
         if (dir === 'model') { addEval(fns, v); addFn(fns, ASSIGN(v)); return; }
-        if (!STRUCTURAL.has(dir) && v) addEval(fns, v); // s-show, s-text, s-html, your own directives
+        if (!STRUCTURAL.has(dir) && v) addEval(fns, v); // k-show, k-text, k-html, your own directives
         return;
       }
       if (value.includes('{')) {
@@ -478,7 +480,7 @@ function scanHtml(html, on) {
         j = Math.max(k, j + 1);
       }
       i = j + 1;
-      if (tag === 'script' || tag === 'style') { // raw text: not compiled by Som
+      if (tag === 'script' || tag === 'style') { // raw text: not compiled by Kreft
         const e = html.toLowerCase().indexOf(`</${tag}`, i);
         i = e < 0 ? html.length : e;
       } else if (tag === 'pre' || tag === 'textarea' || tag === 'listing') {
@@ -516,7 +518,7 @@ function walk(dir, exclude) {
     if (SKIP.has(entry.name)) continue;
     if (entry.name === 'storage' && (entry.isSymbolicLink() || entry.isDirectory())) continue;
     // the database, its settings and its migrations stay on the server, never in the built site
-    if (/\.(db|sqlite3?)(-wal|-shm)?$/i.test(entry.name) || entry.name === 'som.config.json' || (entry.isDirectory() && entry.name === 'database')) continue;
+    if (/\.(db|sqlite3?)(-wal|-shm)?$/i.test(entry.name) || entry.name === 'kreft.config.json' || entry.name === 'som.config.json' || (entry.isDirectory() && entry.name === 'database')) continue;
     const full = path.join(dir, entry.name);
     if (exclude && full === exclude) continue;
     if (SERVER_DIRS.has(full)) continue; // server/ code runs on the server only

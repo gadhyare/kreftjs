@@ -1,7 +1,7 @@
 /*
- * Som.js Auto Garbage Collector & Memory Watchdog
+ * Kreft Auto Garbage Collector & Memory Watchdog
  *
- * Keeps Som.js server instances blazing fast and lightweight, preventing V8 heap
+ * Keeps Kreft server instances blazing fast and lightweight, preventing V8 heap
  * bloating during continuous development and production traffic.
  */
 let gcTimer = null;
@@ -34,7 +34,7 @@ function startAutoGarbageCollector(options = {}) {
           if (log) {
             const after = process.memoryUsage();
             const reclaimedMB = (heapUsedMB - after.heapUsed / (1024 * 1024)).toFixed(1);
-            console.log(`  [Som GC] Auto-collected ${reclaimedMB} MB heap memory.`);
+            console.log(`  [Kreft GC] Auto-collected ${reclaimedMB} MB heap memory.`);
           }
         }
       }

@@ -1,5 +1,5 @@
 /*
- * A REST API made from the tables of a database (used by `som dev --db` and `som serve --db`).
+ * A REST API made from the tables of a database (used by `kreft dev --db` and `kreft serve --db`).
  *
  *   GET    /api                    the tables you can use
  *   GET    /api/posts              rows   ?userId=3  ?title_like=som  ?likes_gte=5  ?q=text
@@ -13,11 +13,11 @@
  * Standard errors: 404 { message }, 422 { message, errors: { column: [...] } }.
  * Required columns (NOT NULL without a default) are checked before anything reaches the database.
  *
- * Which tables, and what each allows, comes from `tables` (som.config.json):
+ * Which tables, and what each allows, comes from `tables` (kreft.config.json):
  *   { "posts": true, "users": { "write": false, "hidden": ["password"] }, "logs": false }
- * `som dev` shows every table unless you list them; `som serve` shows only the tables you list.
+ * `kreft dev` shows every table unless you list them; `kreft serve` shows only the tables you list.
  */
-const { validate } = require('../som.js'); // the same rules as Som.validate in the browser
+const { validate } = require('../kreft.js'); // the same rules as Kreft.validate in the browser
 const MAX_BODY = 1024 * 1024;
 const MAX_ROWS = 1000;
 
@@ -48,7 +48,7 @@ function createDbApi(db, { tables: allow = null, production = false, prefix = '/
     }
     return out;
   };
-  // `som serve` reads the tables once; `som dev` looks again every 2 s, so a new table shows up by itself
+  // `kreft serve` reads the tables once; `kreft dev` looks again every 2 s, so a new table shows up by itself
   let loadedAt = 0;
   const tables = async () => {
     if (schema && (production || Date.now() - loadedAt < 2000)) return schema;
@@ -98,7 +98,7 @@ function createDbApi(db, { tables: allow = null, production = false, prefix = '/
       const missing = v === undefined || v === null || (typeof v === 'string' && v.trim() === '');
       if (mode === 'patch' ? c.name in data && missing : missing) errors[c.name] = [`The ${label(c.name)} field is required.`];
     }
-    // your own rules from som.config.json (PATCH checks only the columns it sends)
+    // your own rules from kreft.config.json (PATCH checks only the columns it sends)
     if (t.rules) {
       const found = validate({ ...body }, t.rules, { only: mode === 'patch' ? Object.keys(body) : null });
       for (const k of Object.keys(found)) if (!errors[k]) errors[k] = found[k];

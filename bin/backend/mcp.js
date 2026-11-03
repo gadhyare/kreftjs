@@ -1,9 +1,9 @@
 /*
- * Som.js Native MCP (Model Context Protocol) Engine
+ * Kreft Native MCP (Model Context Protocol) Engine
  *
  * Implements the open standard Model Context Protocol (v2024-11-05) natively.
  * Gives AI assistants (Claude Desktop, Cursor, Zed, Antigravity, VS Code, OpenAI)
- * instant, rich contextual access to Som.js routes, models, database schemas,
+ * instant, rich contextual access to Kreft routes, models, database schemas,
  * live logs, artisan actions, and server health.
  *
  * Far superior to Next.js by providing full-stack introspection out-of-the-box!
@@ -12,7 +12,7 @@ const { DB } = require('./query.js');
 const http = require('./http.js');
 
 const PROTOCOL_VERSION = '2024-11-05';
-const SERVER_NAME = 'somjs-mcp-server';
+const SERVER_NAME = 'kreft-mcp-server';
 const SERVER_VERSION = require('../../package.json').version;
 
 class McpServer {
@@ -144,7 +144,7 @@ class McpServer {
 
     // 3. Tool: server_health & memory stats
     this.registerTool('server_health', {
-      description: 'Get live Som.js server memory usage, garbage collector state, and uptime.',
+      description: 'Get live Kreft server memory usage, garbage collector state, and uptime.',
       inputSchema: { type: 'object', properties: {} },
     }, async () => {
       const gc = require('./gc.js');
@@ -159,15 +159,17 @@ class McpServer {
       };
     });
 
-    // 4. Resource: som://routes
-    this.registerResource('som://routes', 'Active Som.js Routes', 'application/json', async () => {
+    // 4. Resource: kreft://routes   (som://routes is the Som.js address, still answered)
+    const routesResource = async () => {
       const { Route } = require('./index.js');
       const routes = Route.list();
       return JSON.stringify(routes, null, 2);
-    });
+    };
+    this.registerResource('kreft://routes', 'Active Kreft Routes', 'application/json', routesResource);
+    this.registerResource('som://routes', 'Active Kreft Routes (Som.js address)', 'application/json', routesResource);
 
-    // 5. Resource: som://schema
-    this.registerResource('som://schema', 'Database Schema', 'application/json', async () => {
+    // 5. Resource: kreft://schema   (som://schema likewise)
+    const schemaResource = async () => {
       try {
         const migrator = require('./migrator.js');
         const tables = await migrator.listTables();
@@ -175,7 +177,9 @@ class McpServer {
       } catch (err) {
         return JSON.stringify({ error: err.message }, null, 2);
       }
-    });
+    };
+    this.registerResource('kreft://schema', 'Database Schema', 'application/json', schemaResource);
+    this.registerResource('som://schema', 'Database Schema (Som.js address)', 'application/json', schemaResource);
   }
 
   async handleMessage(reqObj) {
@@ -320,7 +324,7 @@ class McpServer {
     const hostName = String(req.headers.host || '').replace(/:\d+$/, '').replace(/^\[|\]$/g, '').toLowerCase();
     const isLocalHost = hostName === 'localhost' || hostName === '127.0.0.1' || hostName === '::1';
     const isProd = process.env.NODE_ENV === 'production' || process.env.APP_ENV === 'production';
-    const requiredToken = process.env.MCP_TOKEN || process.env.SOM_MCP_TOKEN || null;
+    const requiredToken = process.env.MCP_TOKEN || (process.env.KREFT_MCP_TOKEN || process.env.SOM_MCP_TOKEN) || null;
     const deny = (status, message) => {
       res.writeHead(status, { 'Content-Type': 'application/json' });
       return res.end(JSON.stringify({ jsonrpc: '2.0', id: null, error: { code: -32000, message } }));
@@ -390,7 +394,7 @@ class McpServer {
     res.end(JSON.stringify({ error: 'Method Not Allowed' }));
   }
 
-  // Stdio Transport: runs Som.js as a stdio MCP server for Claude Desktop / AI IDEs
+  // Stdio Transport: runs Kreft as a stdio MCP server for Claude Desktop / AI IDEs
   listenStdio() {
     process.stdin.setEncoding('utf8');
     let buffer = '';

@@ -2,16 +2,16 @@
  * Whole pages for crawlers and link previews: the server answers them with the page already drawn.
  *
  * A search engine or a chat app that does not run JavaScript would see an empty <div id="app">. For those
- * visitors the server opens the page in a simulated browser (the same one `som build --prerender` uses),
+ * visitors the server opens the page in a simulated browser (the same one `kreft build --prerender` uses),
  * waits until its data has loaded, and answers with the result. Everyone else gets the normal page.
  *
- *   SOM_SSR=bots   (default) crawlers and link-preview bots only
- *   SOM_SSR=all    every visitor (the browser then starts Som.js on top of the drawn page)
- *   SOM_SSR=off    never
- *   SOM_SSR_TTL    seconds a drawn page is kept (default 300)
+ *   KREFT_SSR=bots   (default) crawlers and link-preview bots only
+ *   KREFT_SSR=all    every visitor (the browser then starts Kreft on top of the drawn page)
+ *   KREFT_SSR=off    never
+ *   KREFT_SSR_TTL    seconds a drawn page is kept (default 300)
  *
  * Needs jsdom (npm i -D jsdom). Without it, or when a page fails or is too slow, the normal page is sent.
- * If the app answers with its 404 page (errors/404.som), the response status is 404 too.
+ * If the app answers with its 404 page (errors/404.kreft), the response status is 404 too.
  *
  * The simulated browser asks this same server, so its requests carry a secret User-Agent (new on every start):
  * the server never draws them again, and lets them through the HTTPS redirect.
@@ -32,9 +32,9 @@ const decode = (p) => { try { return decodeURIComponent(p); } catch (_) { return
 const trimSlash = (p) => (p.length > 1 ? p.replace(/\/+$/, '') : p);
 
 function create({ root, origin, log = () => { }, cached = true }) {
-  const mode = String(process.env.SOM_SSR || 'bots').toLowerCase();
-  const ttl = cached ? (Number(process.env.SOM_SSR_TTL) || 300) * 1000 : 0; // som dev: always the latest files
-  const userAgent = 'som-ssr/' + crypto.randomBytes(16).toString('hex');
+  const mode = String((process.env.KREFT_SSR || process.env.SOM_SSR) || 'bots').toLowerCase();
+  const ttl = cached ? (Number((process.env.KREFT_SSR_TTL || process.env.SOM_SSR_TTL)) || 300) * 1000 : 0; // kreft dev: always the latest files
+  const userAgent = 'kreft-ssr/' + crypto.randomBytes(16).toString('hex');
   const cache = new Map();    // address → { at, html, status }
   const failed = new Map();   // address → when it failed
   const inflight = new Map(); // address → the promise of the page being drawn (a second request waits for it)
@@ -45,7 +45,7 @@ function create({ root, origin, log = () => { }, cached = true }) {
     if (jsdom || unavailable) return jsdom;
     try { jsdom = require('./prerender.js').loadJsdom(root); } catch (_) {
       unavailable = true;
-      if (mode !== 'off') log('  SSR for crawlers needs jsdom: som add -D jsdom (crawlers get the normal page until then)');
+      if (mode !== 'off') log('  SSR for crawlers needs jsdom: kreft add -D jsdom (crawlers get the normal page until then)');
     }
     return jsdom;
   }

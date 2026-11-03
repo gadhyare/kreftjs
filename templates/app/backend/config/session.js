@@ -27,7 +27,7 @@ module.exports = {
   redirect_url: '/login?reason=inactive',
 
   // Cookie settings
-  cookie: process.env.SESSION_COOKIE || 'som_session',
+  cookie: process.env.SESSION_COOKIE || 'kreft_session',
   path: '/',
   domain: process.env.SESSION_DOMAIN || null,
   secure: process.env.SESSION_SECURE_COOKIE ? process.env.SESSION_SECURE_COOKIE === 'true' : process.env.APP_ENV === 'production',

@@ -1,0 +1,63 @@
+<!-- saved: values kept in localStorage, so they survive a reload -->
+saved note = ''
+saved visits = 0
+saved theme = 'light' as 'demo.theme'
+state keys = []
+
+action refresh() { keys = storage.keys().sort() }
+
+action clearAll() {
+  storage.clear()
+  location.reload()
+}
+
+on start { visits++ }
+on ready {
+  await tick()
+  refresh()
+}
+
+<view>
+  <section class="card {theme}">
+    <h1>Saved data</h1>
+    <p class="lead">Write <code>saved</code> instead of <code>state</code>. Change something here, then reload the page (F5): it is still here.</p>
+
+    <p>You opened this page <strong>{visits}</strong> {visits === 1 ? 'time' : 'times'}.</p>
+
+    <label>A note
+      <textarea k-model="note" rows="3" placeholder="Type something, then reload the page"></textarea>
+    </label>
+
+    <div class="row">
+      <span>Theme:</span>
+      <button @click="theme = 'light'" disabled={theme === 'light'}>Light</button>
+      <button @click="theme = 'dark'" disabled={theme === 'dark'}>Dark</button>
+      <span class="muted">saved as <code>demo.theme</code> with <code>as</code></span>
+    </div>
+  </section>
+
+  <section class="card">
+    <h2>What is saved in this browser</h2>
+    <p class="muted">Every key starts with <code>som:</code>. Other pages (Home, Forms, Shop, Components) save here too.</p>
+    <ul>
+      {for key in keys}
+        <li><code>som:{key}</code></li>
+      {empty}
+        <li class="muted">Nothing saved yet.</li>
+      {/for}
+    </ul>
+    <div class="row">
+      <button @click={refresh}>Refresh the list</button>
+      <button @click={clearAll}>Clear all saved data</button>
+    </div>
+  </section>
+</view>
+
+<style scoped>
+label { display: flex; flex-direction: column; gap: 6px; font-weight: 600; margin: 12px 0; }
+textarea { font: inherit; padding: 8px 10px; border: 1px solid var(--input); }
+.row { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+.dark { background: #1f1c2c; color: #f4f3f8; }
+.dark .lead, .dark .muted { color: var(--ring); }
+.dark code { background: #2f2b40; }
+</style>

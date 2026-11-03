@@ -61,7 +61,7 @@ test('seo.js inject: the page\'s own title, description and canonical are replac
   assert.match(out, /content="About it"/);
   assert.match(out, /name="viewport"/, 'tags it does not set stay');
   assert.strictEqual((out.match(/rel="canonical"/g) || []).length, 1);
-  assert.match(out, /<meta data-som-seo="" data-som-ssr="" name="description"/);
+  assert.match(out, /<meta data-kreft-seo="" data-kreft-ssr="" name="description"/);
 });
 
 async function freePort() {
@@ -86,8 +86,8 @@ const get = (port, url) => new Promise((ok, fail) => http.get({ port, host: '127
   let body = ''; res.on('data', (d) => (body += d)); res.on('end', () => ok({ status: res.statusCode, body }));
 }).on('error', fail));
 
-for (const command of ['dev', 'serve']) test(`server (som ${command}): pages from seo.js get their own tags and status in the first response`, { skip: !canLoopback && 'loopback network connection is restricted' }, async () => {
-  const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'som-seo-'));
+for (const command of ['dev', 'serve']) test(`server (kreft ${command}): pages from seo.js get their own tags and status in the first response`, { skip: !canLoopback && 'loopback network connection is restricted' }, async () => {
+  const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'kreft-seo-'));
   fs.mkdirSync(path.join(tmp, 'frontend'));
   fs.mkdirSync(path.join(tmp, 'backend', 'routes'), { recursive: true });
   fs.writeFileSync(path.join(tmp, 'frontend', 'index.html'), '<!doctype html><html lang="en"><head><meta charset="utf-8"><title>Shop</title><meta name="description" content="Default"></head><body><div id="app"></div></body></html>');
@@ -96,7 +96,7 @@ for (const command of ['dev', 'serve']) test(`server (som ${command}): pages fro
     '/posts/:slug': async ({ slug }) => slug === 'missing' ? null : { title: 'Post ' + slug, description: 'About "' + slug + '"', schema: { name: '</script>' } },
   }\n`);
   const port = await freePort();
-  const child = spawn(process.execPath, [path.join(__dirname, '..', 'bin/som.js'), command, path.join(tmp, 'frontend'), '--backend', path.join(tmp, 'backend'), '--port', String(port), ...(command === 'dev' ? ['--no-hot'] : [])], { cwd: tmp, stdio: 'ignore', env: { ...process.env, ...(command === 'serve' ? { APP_ENV: 'production', APP_KEY: 'base64:' + Buffer.alloc(32, 7).toString('base64') } : {}) } });
+  const child = spawn(process.execPath, [path.join(__dirname, '..', 'bin/kreft.js'), command, path.join(tmp, 'frontend'), '--backend', path.join(tmp, 'backend'), '--port', String(port), ...(command === 'dev' ? ['--no-hot'] : [])], { cwd: tmp, stdio: 'ignore', env: { ...process.env, ...(command === 'serve' ? { APP_ENV: 'production', APP_KEY: 'base64:' + Buffer.alloc(32, 7).toString('base64') } : {}) } });
   try {
     let up = false;
     for (let i = 0; i < 60 && !up; i++) { try { await get(port, '/'); up = true; } catch (_) { await new Promise((ok) => setTimeout(ok, 100)); } }
@@ -123,12 +123,12 @@ for (const command of ['dev', 'serve']) test(`server (som ${command}): pages fro
   }
 });
 
-test('server (som serve): FORCE_HTTPS redirects plain requests, but believes a proxy that ends TLS', { skip: !canLoopback && 'loopback network connection is restricted' }, async () => {
-  const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'som-https-'));
+test('server (kreft serve): FORCE_HTTPS redirects plain requests, but believes a proxy that ends TLS', { skip: !canLoopback && 'loopback network connection is restricted' }, async () => {
+  const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'kreft-https-'));
   fs.mkdirSync(path.join(tmp, 'frontend'));
   fs.writeFileSync(path.join(tmp, 'frontend', 'index.html'), '<!doctype html><html><head><title>Shop</title></head><body></body></html>');
   const port = await freePort();
-  const child = spawn(process.execPath, [path.join(__dirname, '..', 'bin/som.js'), 'serve', path.join(tmp, 'frontend'), '--port', String(port)], {
+  const child = spawn(process.execPath, [path.join(__dirname, '..', 'bin/kreft.js'), 'serve', path.join(tmp, 'frontend'), '--port', String(port)], {
     cwd: tmp, stdio: 'ignore',
     env: { ...process.env, APP_ENV: 'production', FORCE_HTTPS: 'true', APP_URL: 'https://example.com', APP_KEY: 'base64:' + Buffer.alloc(32, 7).toString('base64') },
   });

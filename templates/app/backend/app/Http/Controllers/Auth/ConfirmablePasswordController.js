@@ -1,7 +1,7 @@
-const { Hash, ValidationError } = require('somjs/server')
+const { Hash, ValidationError } = require('kreft/server')
 
 class ConfirmablePasswordController {
-  // POST /api/confirm-password   (pages/auth/ConfirmPassword.som): opens 'password.confirm' routes for 3 hours
+  // POST /api/confirm-password   (pages/auth/ConfirmPassword.kreft): opens 'password.confirm' routes for 3 hours
   async store(req) {
     const { password } = await req.validate({ password: 'required' })
     if (!Hash.check(password, req.user.password)) throw new ValidationError({ password: ['The password is incorrect.'] })

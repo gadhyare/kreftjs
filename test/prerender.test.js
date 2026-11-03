@@ -1,4 +1,4 @@
-// Regression test: `som build --prerender` keeps the per-page SEO tags.   Run: npm test
+// Regression test: `kreft build --prerender` keeps the per-page SEO tags.   Run: npm test
 // Needs jsdom (npm i -D jsdom); the test is skipped when it is not installed.
 const test = require('node:test');
 const assert = require('node:assert');
@@ -25,19 +25,19 @@ const INDEX = `<!doctype html>
 </head>
 <body>
   <div id="app"></div>
-  <script src="som.js"></script>
+  <script src="kreft.js"></script>
   <script>
-    const router = Som.router({
+    const router = Kreft.router({
       errors: 'errors',
       routes: [
-        { path: '/', component: 'pages/Home.som', meta: { title: 'Home', seo: { description: 'Home page', canonical: 'https://example.com/', lang: 'ar', dir: 'rtl',
+        { path: '/', component: 'pages/Home.kreft', meta: { title: 'Home', seo: { description: 'Home page', canonical: 'https://example.com/', lang: 'ar', dir: 'rtl',
           alternates: { en: 'https://example.com/en', ar: 'https://example.com/' },
           og: { image: 'https://example.com/a.png' }, schema: { '@type': 'WebSite', name: 'x<\\/script><b>' } } } },
-        { path: '/about', component: 'pages/About.som', meta: { title: 'About', description: 'About us' } },
-        { path: '/plain', component: 'pages/Plain.som' },
+        { path: '/about', component: 'pages/About.kreft', meta: { title: 'About', description: 'About us' } },
+        { path: '/plain', component: 'pages/Plain.kreft' },
       ],
     })
-    Som.app('App.som').use(router).mount('#app')
+    Kreft.app('App.kreft').use(router).mount('#app')
   </script>
 </body>
 </html>
@@ -49,20 +49,20 @@ function writeSite(tmp) {
   fs.symlinkSync(jsdomModules, path.join(tmp, 'node_modules'), 'dir'); // so the build can find jsdom
   const site = path.join(tmp, 'site');
   fs.mkdirSync(path.join(site, 'pages'), { recursive: true });
-  fs.copyFileSync(path.join(ROOT, 'som.js'), path.join(site, 'som.js'));
+  fs.copyFileSync(path.join(ROOT, 'kreft.js'), path.join(site, 'kreft.js'));
   fs.writeFileSync(path.join(site, 'index.html'), INDEX);
-  fs.writeFileSync(path.join(site, 'App.som'), '<view><som-view></som-view></view>\n');
+  fs.writeFileSync(path.join(site, 'App.kreft'), '<view><kreft-view></kreft-view></view>\n');
   fs.mkdirSync(path.join(site, 'errors'));
-  fs.writeFileSync(path.join(site, 'errors', '404.som'), '<view><h1>Not found</h1></view>\n');
-  for (const name of ['Home', 'About', 'Plain']) fs.writeFileSync(path.join(site, 'pages', name + '.som'), `<view><h1>${name}</h1></view>\n`);
+  fs.writeFileSync(path.join(site, 'errors', '404.kreft'), '<view><h1>Not found</h1></view>\n');
+  for (const name of ['Home', 'About', 'Plain']) fs.writeFileSync(path.join(site, 'pages', name + '.kreft'), `<view><h1>${name}</h1></view>\n`);
   return site;
 }
 
 // builds the fixture site with --prerender into a temporary folder; returns { tmp, dist }
 function buildSite() {
-  const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'som-prerender-'));
+  const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'kreft-prerender-'));
   const site = writeSite(tmp);
-  const run = spawnSync(process.execPath, [path.join(ROOT, 'bin/som.js'), 'build', site, '--out', path.join(tmp, 'dist'), '--prerender'], { cwd: tmp, encoding: 'utf8' });
+  const run = spawnSync(process.execPath, [path.join(ROOT, 'bin/kreft.js'), 'build', site, '--out', path.join(tmp, 'dist'), '--prerender'], { cwd: tmp, encoding: 'utf8' });
   assert.strictEqual(run.status, 0, run.stdout + run.stderr);
   return { tmp, dist: path.join(tmp, 'dist') };
 }
@@ -80,7 +80,7 @@ test('prerender: every page keeps its own description, canonical, Open Graph and
     assert.match(home, /<link rel="canonical" href="https:\/\/example\.com\/"[^>]*>/);
     assert.match(home, /<meta property="og:image"[^>]*content="https:\/\/example\.com\/a\.png"/);
     assert.match(home, /<meta name="twitter:card"[^>]*content="summary_large_image"/);
-    const ld = home.match(/<script type="application\/ld\+json" data-som-seo[^>]*>([\s\S]*?)<\/script>/);
+    const ld = home.match(/<script type="application\/ld\+json" data-kreft-seo[^>]*>([\s\S]*?)<\/script>/);
     assert.ok(ld, 'JSON-LD is in the page');
     assert.strictEqual(JSON.parse(ld[1]).name, 'x</script><b>', 'the data survives, but cannot close the <script>');
 
@@ -114,12 +114,12 @@ test('router: a page without SEO of its own does not keep the last page\'s tags;
   try {
     dom = await JSDOM.fromURL(`http://127.0.0.1:${server.address().port}/`, {
       runScripts: 'dangerously', resources: 'usable', pretendToBeVisual: true, virtualConsole: new VirtualConsole(),
-      beforeParse(w) { w.__SOM_DEV__ = true; w.scrollTo = () => { }; },
+      beforeParse(w) { w.__KREFT_DEV__ = true; w.scrollTo = () => { }; },
     });
     const w = dom.window;
     await new Promise((ok) => w.addEventListener('load', ok));
     await new Promise((ok) => setTimeout(ok, 500));
-    const router = w.Som.__devtools.instances().find((i) => !i.parent).appContext.config.globals.$router;
+    const router = w.Kreft.__devtools.instances().find((i) => !i.parent).appContext.config.globals.$router;
     const get = (sel) => { const el = w.document.head.querySelector(sel); return el && (el.getAttribute('content') || el.getAttribute('href')); };
 
     assert.strictEqual(get('meta[name="description"]'), 'Home page');
@@ -138,7 +138,7 @@ test('router: a page without SEO of its own does not keep the last page\'s tags;
     assert.strictEqual(get('meta[property="og:image"]'), null, 'a tag only the last page set is gone');
     assert.strictEqual(w.document.head.querySelector('script[type="application/ld+json"]'), null, 'so is its JSON-LD');
 
-    w.Som.seo({ description: 'From a component' }); // adds to the route's tags
+    w.Kreft.seo({ description: 'From a component' }); // adds to the route's tags
     assert.strictEqual(get('meta[name="description"]'), 'From a component');
 
     await router.go('/about');
@@ -162,10 +162,10 @@ test('router: a page without SEO of its own does not keep the last page\'s tags;
 test('server: crawlers get the page already drawn, and a 404 for an address the app does not have', { skip: !jsdomModules && 'jsdom is not installed' }, async () => {
   const net = require('node:net');
   const { spawn } = require('node:child_process');
-  const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'som-ssr-'));
+  const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'kreft-ssr-'));
   const site = writeSite(tmp);
   const port = await new Promise((ok) => { const s = net.createServer().listen(0, '127.0.0.1', () => { const p = s.address().port; s.close(() => ok(p)); }); });
-  const child = spawn(process.execPath, [path.join(ROOT, 'bin/som.js'), 'dev', site, '--port', String(port), '--no-hot'], { cwd: tmp, stdio: 'ignore' });
+  const child = spawn(process.execPath, [path.join(ROOT, 'bin/kreft.js'), 'dev', site, '--port', String(port), '--no-hot'], { cwd: tmp, stdio: 'ignore' });
   const get = (url, ua) => new Promise((ok, fail) => http.get({ port, host: '127.0.0.1', path: url, headers: { Accept: 'text/html', 'User-Agent': ua } }, (res) => {
     let body = ''; res.on('data', (d) => (body += d)); res.on('end', () => ok({ status: res.statusCode, body, headers: res.headers }));
   }).on('error', fail));
@@ -197,17 +197,17 @@ test('server: crawlers get the page already drawn, and a 404 for an address the 
   }
 });
 
-// ----- the page-drawing server in production (som serve, HTTPS enforced), many crawlers at once
-test('server (som serve, behind an HTTPS proxy): crawlers get the drawn page, together with the security headers; many at once all do', { skip: !jsdomModules && 'jsdom is not installed' }, async () => {
+// ----- the page-drawing server in production (kreft serve, HTTPS enforced), many crawlers at once
+test('server (kreft serve, behind an HTTPS proxy): crawlers get the drawn page, together with the security headers; many at once all do', { skip: !jsdomModules && 'jsdom is not installed' }, async () => {
   const net = require('node:net');
   const { spawn } = require('node:child_process');
   const { encodePath } = require(path.join(ROOT, 'bin/ssr.js'));
   assert.strictEqual(encodePath('/a b/café%'), '/a%20b/caf%C3%A9%25', 'an address the server already decoded is encoded again for the simulated browser');
 
-  const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'som-ssr-prod-'));
+  const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'kreft-ssr-prod-'));
   const site = writeSite(tmp);
   const port = await new Promise((ok) => { const s = net.createServer().listen(0, '127.0.0.1', () => { const p = s.address().port; s.close(() => ok(p)); }); });
-  const child = spawn(process.execPath, [path.join(ROOT, 'bin/som.js'), 'serve', site, '--port', String(port)], {
+  const child = spawn(process.execPath, [path.join(ROOT, 'bin/kreft.js'), 'serve', site, '--port', String(port)], {
     cwd: tmp, stdio: 'ignore',
     env: { ...process.env, APP_ENV: 'production', APP_KEY: 'base64:' + Buffer.alloc(32, 7).toString('base64') },
   });

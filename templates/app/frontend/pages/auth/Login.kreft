@@ -1,0 +1,89 @@
+<!-- /login: sign in with email and password (POST /api/login), then the two-factor code when it is on
+     (POST /api/two-factor-challenge). app/Http/Controllers/Auth/AuthenticatedSessionController.js -->
+state f = form({ email: '', password: '', remember: false }, { email: 'required|email', password: 'required' })
+state two = form({ code: '', recovery_code: '' }, {})
+state step = 'password'        // 'password', then 'code' when two-factor is on
+state useRecovery = false
+state problem = ''
+
+action done(res) {
+  $store.auth.signIn(res)
+  const to = String($route.query.redirect || '')
+  $router.replace(to.startsWith('/') && !to.startsWith('//') ? to : '/')
+}
+action submit() {
+  problem = ''
+  try {
+    const res = await f.$submit((values) => api.post('/api/login', values))
+    if (!res) return
+    if (res.two_factor) { step = 'code'; return }
+    done(res)
+  } catch (e) {
+    problem = e.message
+  }
+}
+action toggleRecovery() { useRecovery = !useRecovery; problem = '' }
+action back() { step = 'password'; problem = '' }
+action submitCode() {
+  problem = ''
+  try {
+    const res = await two.$submit((values) => api.post('/api/two-factor-challenge', useRecovery ? { recovery_code: values.recovery_code } : { code: values.code }))
+    if (res) done(res)
+  } catch (e) {
+    problem = e.message
+    if (e.status === 419) { step = 'password'; f.password = '' } // took too long: start again
+  }
+}
+
+<view>
+  <div k-if="step === 'password'">
+    <h1>Log in</h1>
+    <p class="lead">Welcome back. Log in to your account.</p>
+    <p k-if="$route.query.status" class="alert success" role="status">{$route.query.status}</p>
+    <p k-if="problem" class="alert danger" role="alert">{problem}</p>
+
+    <form @submit.prevent={submit} novalidate>
+      <field label="Email" error={f.$error('email')}>
+        <input type="email" k-model="f.email" autocomplete="username" autofocus>
+      </field>
+      <field label="Password" error={f.$error('password')}>
+        <input type="password" k-model="f.password" autocomplete="current-password">
+      </field>
+      <label class="check"><input type="checkbox" k-model="f.remember"> Remember me</label>
+      <button class="primary wide" disabled={f.$busy}>{f.$busy ? 'Logging in…' : 'Log in'}</button>
+    </form>
+
+    <p class="links">
+      <kreft-link to="/forgot-password">Forgot your password?</kreft-link>
+      <span>No account? <kreft-link to="/register">Register</kreft-link></span>
+    </p>
+  </div>
+
+  <div k-else>
+    <h1>Two-factor authentication</h1>
+    <p class="lead" k-if="!useRecovery">Type the 6-digit code from your authenticator app.</p>
+    <p class="lead" k-else>Type one of your recovery codes. Each one works once.</p>
+    <p k-if="problem" class="alert danger" role="alert">{problem}</p>
+    <form @submit.prevent={submitCode} novalidate>
+      <field k-if="!useRecovery" label="Code" error={two.$error('code')}>
+        <input k-model="two.code" inputmode="numeric" autocomplete="one-time-code" maxlength="6" autofocus>
+      </field>
+      <field k-else label="Recovery code" error={two.$error('recovery_code')}>
+        <input k-model="two.recovery_code" autocomplete="off" autofocus>
+      </field>
+      <button class="primary wide" disabled={two.$busy}>{two.$busy ? 'Checking…' : 'Log in'}</button>
+    </form>
+    <p class="links">
+      <button class="link" @click={toggleRecovery}>{useRecovery ? 'Use a code from the app' : 'Use a recovery code'}</button>
+      <button class="link" @click={back}>Back</button>
+    </p>
+  </div>
+</view>
+
+<style scoped>
+h1 { font-size: 24px; }
+.wide { width: 100%; margin-top: 4px; }
+.check { display: flex; align-items: center; gap: 8px; margin: -4px 0 16px; font-size: 14px; }
+.links { display: flex; justify-content: space-between; gap: 12px; flex-wrap: wrap; margin: 20px 0 0; font-size: 13px; color: var(--muted); }
+.link { height: auto; padding: 0; border: 0; background: none; color: var(--foreground); text-decoration: underline; text-underline-offset: 4px; font-size: 13px; font-weight: 400; }
+</style>

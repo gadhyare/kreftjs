@@ -1,0 +1,82 @@
+<!-- k-model on every kind of input. The form is saved, so it survives a reload. -->
+saved form = {
+  name: '',
+  age: 18,
+  newsletter: false,
+  plan: 'free',
+  city: 'Mogadishu',
+  skills: [],
+  bio: '',
+}
+
+state cities = ['Mogadishu', 'Hargeisa', 'Kismayo', 'Garowe', 'Baidoa']
+state skillList = ['Node.js', 'Tailwind', 'Kreft', 'Alpine']
+
+action reset() {
+  form = { name: '', age: 18, newsletter: false, plan: 'free', city: 'Mogadishu', skills: [], bio: '' }
+}
+
+<view>
+  <section class="card">
+    <h1>Forms</h1>
+    <p class="lead"><code>k-model</code> keeps an input and a value in step, both ways. This form uses <code>saved</code>, so reload the page and your answers are still here.</p>
+
+    <div class="grid">
+      <label>Name <small>k-model.trim</small>
+        <input k-model.trim="form.name" placeholder="Your name">
+      </label>
+
+      <label>Age <small>k-model.number</small>
+        <input type="number" k-model.number="form.age" min="0">
+      </label>
+
+      <label class="check">
+        <input type="checkbox" k-model="form.newsletter"> Send me the newsletter
+      </label>
+
+      <fieldset>
+        <legend>Plan <small>radio</small></legend>
+        <label class="check"><input type="radio" value="free" k-model="form.plan"> Free</label>
+        <label class="check"><input type="radio" value="pro" k-model="form.plan"> Pro</label>
+      </fieldset>
+
+      <label>City <small>select</small>
+        <select k-model="form.city">
+          {for city in cities}
+            <option value={city}>{city}</option>
+          {/for}
+        </select>
+      </label>
+
+      <fieldset>
+        <legend>Skills <small>checkboxes → array</small></legend>
+        {for skill in skillList}
+          <label class="check"><input type="checkbox" value={skill} k-model="form.skills"> {skill}</label>
+        {/for}
+      </fieldset>
+
+      <label class="wide">Bio <small>k-model.lazy (updates when you leave the box)</small>
+        <textarea k-model.lazy="form.bio" rows="3"></textarea>
+      </label>
+    </div>
+
+    <button @click={reset}>Reset the form</button>
+  </section>
+
+  <section class="card">
+    <h2>The value</h2>
+    <p k-if="form.name">Hello {form.name}, {form.age} years old, from {form.city}, on the {form.plan} plan.</p>
+    <pre>{JSON.stringify(form, null, 2)}</pre>
+  </section>
+</view>
+
+<style scoped>
+.grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 14px; margin-bottom: 14px; }
+label { display: flex; flex-direction: column; gap: 4px; font-weight: 600; }
+label small, legend small { font-weight: 400; color: var(--muted); }
+label.check { flex-direction: row; align-items: center; gap: 8px; font-weight: 400; }
+.wide { grid-column: 1 / -1; }
+fieldset { border: 1px solid var(--border); padding: 8px 12px; }
+legend { font-weight: 600; }
+select, textarea { font: inherit; padding: 6px 10px; border: 1px solid var(--input); }
+</style>

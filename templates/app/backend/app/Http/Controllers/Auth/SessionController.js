@@ -1,7 +1,7 @@
-const { noContent, abort } = require('somjs/server')
+const { noContent, abort } = require('kreft/server')
 const PersonalAccessToken = require('../../../Models/PersonalAccessToken')
 
-// The devices signed in to this account (pages/Profile.som → Browser sessions)
+// The devices signed in to this account (pages/Profile.kreft → Browser sessions)
 class SessionController {
   ensureSession(req) {
     if (req.accessToken && req.accessToken.type !== 'session' && !req.accessToken.can('*')) {

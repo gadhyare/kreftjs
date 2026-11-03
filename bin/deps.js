@@ -1,14 +1,14 @@
 /*
  * npm packages in the browser.
  *
- *   import dayjs from 'dayjs'                        (in a .som file)
+ *   import dayjs from 'dayjs'                        (in a .kreft file)
  *   import { debounce } from 'lodash'
  *   import 'bootstrap/dist/css/bootstrap.min.css'
  *
- * som dev answers /__som/deps/<package> with the package as one browser-ready ES module, made by
+ * kreft dev answers /__kreft/deps/<package> with the package as one browser-ready ES module, made by
  * esbuild (npm i -D esbuild), and adds an import map so the browser knows where 'dayjs' is.
- * som build writes the same files into dist/deps/. Without esbuild, packages that already ship
- * ES modules still work in som dev; older CommonJS ones (like lodash) need esbuild.
+ * kreft build writes the same files into dist/deps/. Without esbuild, packages that already ship
+ * ES modules still work in kreft dev; older CommonJS ones (like lodash) need esbuild.
  */
 const fs = require('fs');
 const path = require('path');
@@ -57,14 +57,14 @@ function isEsm(root, spec) {
 
 const cache = new Map();
 // one package (or a file inside it) as a single ES module for the browser.
-// bundle() is async (som dev); bundleSync() is the same for som build.
+// bundle() is async (kreft dev); bundleSync() is the same for kreft build.
 function prepare(root, spec, minify) {
   const esbuild = loadEsbuild(root);
-  if (!esbuild) throw Object.assign(new Error(`To use "${spec}" in the browser, install esbuild once:  som add -D esbuild`), { code: 'NO_ESBUILD' });
+  if (!esbuild) throw Object.assign(new Error(`To use "${spec}" in the browser, install esbuild once:  kreft add -D esbuild`), { code: 'NO_ESBUILD' });
   // only packages by name: never a path that would bundle (and show) one of your own server files
   if (!isBare(spec) || spec.split('/').some((p) => p === '..' || p === '.')) throw Object.assign(new Error(`"${spec}" is not a package name.`), { code: 'MISSING' });
   const file = resolveFrom(root, spec);
-  if (!file) throw Object.assign(new Error(`The package "${spec}" is not installed. Run:  som add ${(spec.match(NAME) || [spec])[0]}`), { code: 'MISSING' });
+  if (!file) throw Object.assign(new Error(`The package "${spec}" is not installed. Run:  kreft add ${(spec.match(NAME) || [spec])[0]}`), { code: 'MISSING' });
   const key = spec + '|' + fs.statSync(file).mtimeMs + '|' + minify + '|' + root;
   const s = JSON.stringify(spec);
   let tries;
@@ -104,7 +104,7 @@ function bundleSync(root, spec, { minify = true } = {}) {
 }
 
 // a file inside an installed package, like 'bootstrap/dist/css/bootstrap.min.css' → its path on disk
-// (only inside that package's folder, so /__som/npm/ can't be used to read anything else)
+// (only inside that package's folder, so /__kreft/npm/ can't be used to read anything else)
 function packageFile(root, spec) {
   const info = packageJson(root, spec);
   if (!info) return null;
@@ -124,8 +124,8 @@ function projectDir(start) {
   }
 }
 
-// the import map: 'dayjs' → /__som/deps/dayjs, 'dayjs/' → /__som/deps/dayjs/ (for 'dayjs/plugin/utc')
-function importMap(root, base = '/__som/deps/') {
+// the import map: 'dayjs' → /__kreft/deps/dayjs, 'dayjs/' → /__kreft/deps/dayjs/ (for 'dayjs/plugin/utc')
+function importMap(root, base = '/__kreft/deps/') {
   let pkg;
   try { pkg = JSON.parse(fs.readFileSync(path.join(root, 'package.json'), 'utf8')); } catch (_) { return null; }
   const names = Object.keys(pkg.dependencies || {});

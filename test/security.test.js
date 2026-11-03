@@ -5,7 +5,7 @@ const { EventEmitter } = require('node:events');
 const path = require('node:path');
 
 const ROOT = path.join(__dirname, '..');
-const ENV_KEYS = ['NODE_ENV', 'APP_ENV', 'MCP_TOKEN', 'SOM_MCP_TOKEN', 'APP_KEY', 'MCP_ALLOWED_ORIGIN'];
+const ENV_KEYS = ['NODE_ENV', 'APP_ENV', 'MCP_TOKEN', 'KREFT_MCP_TOKEN', 'SOM_MCP_TOKEN', 'APP_KEY', 'MCP_ALLOWED_ORIGIN'];
 
 function request({ remote = '127.0.0.1', headers = {} } = {}) {
   const req = new EventEmitter();
@@ -66,7 +66,7 @@ test('MCP: MCP_TOKEN must be sent as a Bearer token', async () => {
 
 // no document here, so this is the text-based cleaner; the DOM-based one runs in the browser
 test('cleanHtml: event handlers are removed, including ones glued to a closing quote', () => {
-  const { cleanHtml } = require(path.join(ROOT, 'som.js'));
+  const { cleanHtml } = require(path.join(ROOT, 'kreft.js'));
   const attack = [
     '<img src="x"onerror=alert(1)>', "<img src='x'onerror=alert(1)>", '<a href="x"onclick=alert(1)>c</a>',
     '<img src=x/onerror=alert(1)>', '<img src=x onerror=alert(1)>', '<img src=x ONERROR = alert(1)>',
@@ -75,7 +75,7 @@ test('cleanHtml: event handlers are removed, including ones glued to a closing q
 });
 
 test('cleanHtml: dangerous elements and addresses are removed', () => {
-  const { cleanHtml } = require(path.join(ROOT, 'som.js'));
+  const { cleanHtml } = require(path.join(ROOT, 'kreft.js'));
   assert.strictEqual(cleanHtml('<svg><script>alert(1)</script></svg>'), '');
   assert.strictEqual(cleanHtml('<iframe srcdoc="<b>x</b>"></iframe>'), '');
   assert.match(cleanHtml('<a href="jav&#x61;script:alert(1)">x</a>'), /href="#"/);
@@ -83,7 +83,7 @@ test('cleanHtml: dangerous elements and addresses are removed', () => {
 });
 
 test('cleanHtml: ordinary markup is kept', () => {
-  const { cleanHtml } = require(path.join(ROOT, 'som.js'));
+  const { cleanHtml } = require(path.join(ROOT, 'kreft.js'));
   const ok = '<p>Hello <b>world</b> <a href="https://example.com/">link</a></p>';
   assert.strictEqual(cleanHtml(ok), ok);
 });
@@ -173,7 +173,7 @@ async function templateAuth() {
   const Module = require('node:module');
   const origResolve = Module._resolveFilename;
   Module._resolveFilename = function (request, ...rest) {
-    if (request === 'somjs/server') return path.join(ROOT, 'server.js');
+    if (request === 'kreft/server') return path.join(ROOT, 'server.js');
     return origResolve.call(this, request, ...rest);
   };
   const { connect } = require(path.join(ROOT, 'bin/db.js'));
@@ -309,22 +309,22 @@ test('folder guard: a deleted folder or one in the Trash is recognised', () => {
   assert.ok(inTrash('/home/ada/.local/share/Trash/files/my-app'));
   assert.ok(inTrash('C:\\$Recycle.Bin\\S-1\\my-app'));
   assert.ok(!inTrash('/Users/ada/Projects/trash-talk/app'));
-  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'som-guard-'));
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'kreft-guard-'));
   assert.strictEqual(problem(dir), null);
   fs.rmSync(dir, { recursive: true });
   assert.strictEqual(problem(dir), 'deleted');
   assert.strictEqual(problem(null), 'deleted');
 });
 
-test('som.js loads when the page ships its own translations (window.__SOM_LANG__)', () => {
-  // found by `som new`: a project with a lang/ folder gets __SOM_LANG__ before som.js loads, and registering it
-  // touched `Som` while it was still being created: "Som is not defined" on the first page
+test('kreft.js loads when the page ships its own translations (window.__KREFT_LANG__)', () => {
+  // found by `kreft new`: a project with a lang/ folder gets __KREFT_LANG__ before kreft.js loads, and registering it
+  // touched `Kreft` while it was still being created: "Kreft is not defined" on the first page
   const vm = require('node:vm');
   const fs = require('node:fs');
-  const win = { __SOM_LANG__: { en: { greeting: 'Hello :name' }, ar: { greeting: 'مرحبا :name' } } };
+  const win = { __KREFT_LANG__: { en: { greeting: 'Hello :name' }, ar: { greeting: 'مرحبا :name' } } };
   const ctx = vm.createContext({ window: win, console, setTimeout, clearTimeout, Intl, URL });
-  vm.runInContext(fs.readFileSync(path.join(ROOT, 'som.js'), 'utf8'), ctx);
-  const Som = ctx.Som || win.Som;
-  assert.strictEqual(typeof Som, 'object');
-  assert.deepStrictEqual([...Som.locales()].sort(), ['ar', 'en']);
+  vm.runInContext(fs.readFileSync(path.join(ROOT, 'kreft.js'), 'utf8'), ctx);
+  const Kreft = ctx.Kreft || win.Kreft;
+  assert.strictEqual(typeof Kreft, 'object');
+  assert.deepStrictEqual([...Kreft.locales()].sort(), ['ar', 'en']);
 });

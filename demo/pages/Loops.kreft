@@ -1,0 +1,91 @@
+<!-- {for} loops: index, key, objects, numbers, nesting, {empty} -->
+state fruits = ['Banana', 'Mango', 'Papaya']
+state newFruit = ''
+state people = [
+  { id: 1, name: 'Maxamuud Xussen', city: 'Mogadishu' },
+  { id: 2, name: 'Cali', city: 'Hargeisa' },
+  { id: 3, name: 'Sahra', city: 'Kismayo' },
+]
+state profile = { name: 'Maxamuud', role: 'Developer', city: 'Mogadishu' }
+state size = 4
+
+action addFruit() {
+  if (!newFruit.trim()) return
+  fruits.push(newFruit.trim())
+  newFruit = ''
+}
+action removeFruit(i) { fruits.splice(i, 1) }
+action reverse() { people = [...people].reverse() }
+
+<view>
+  <section class="card">
+    <h1>Loops</h1>
+    <p class="lead"><code>\{for item in list} … \{empty} … \{/for}</code> repeats part of the view, like <code>list.map()</code> in React.</p>
+
+    <h2>A list with its index and an empty state</h2>
+    <form @submit.prevent={addFruit} class="row">
+      <input k-model="newFruit" placeholder="Add a fruit">
+      <button class="primary">Add</button>
+    </form>
+    <ul>
+      {for (fruit, i) in fruits}
+        <li>{i + 1}. {fruit} <button @click="removeFruit(i)" aria-label="Remove {fruit}">✕</button></li>
+      {empty}
+        <li class="muted">No fruit left. Add one above.</li>
+      {/for}
+    </ul>
+  </section>
+
+  <section class="card">
+    <h2>Keys keep each row</h2>
+    <p class="muted">Type in a box, then reverse: each text stays with its person because of <code>key person.id</code>.</p>
+    <button @click={reverse}>Reverse</button>
+    <ul>
+      {for person in people key person.id}
+        <li>{person.name} <span class="muted">{person.city}</span> <input placeholder="Note for {person.name}"></li>
+      {/for}
+    </ul>
+  </section>
+
+  <section class="card">
+    <h2>An object</h2>
+    <dl>
+      {for (value, field) in profile}
+        <dt>{field}</dt>
+        <dd>{value}</dd>
+      {/for}
+    </dl>
+  </section>
+
+  <section class="card">
+    <h2>Counting, nested, in a table</h2>
+    <label>Size <input type="number" k-model.number="size" min="1" max="9"></label>
+    <table>
+      <tbody>
+        {for row in size}
+          <tr>
+            {for col in size}
+              <td class={row === col ? 'same' : ''}>{row * col}</td>
+            {/for}
+          </tr>
+        {/for}
+      </tbody>
+    </table>
+  </section>
+</view>
+
+<style scoped>
+.row { display: flex; gap: 8px; margin-bottom: 8px; }
+.row input { flex: 1; }
+ul { padding-left: 18px; }
+li { padding: 4px 0; }
+li button { border: none; background: none; }
+li input { margin-left: 8px; }
+dl { display: grid; grid-template-columns: max-content 1fr; gap: 4px 16px; margin: 0; }
+dt { font-weight: 600; }
+dd { margin: 0; }
+table { border-collapse: collapse; margin-top: 12px; }
+td { width: 40px; height: 32px; text-align: center; border: 1px solid var(--border); }
+td.same { background: var(--ember); color: #fff; }
+input[type=number] { width: 70px; }
+</style>

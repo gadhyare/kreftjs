@@ -1,18 +1,18 @@
 /*
- * Som.js Configuration Repository & Loader: config(key, defaultValue)
+ * Kreft Configuration Repository & Loader: config(key, defaultValue)
  *
  * Automatically loads all configuration files from the project's config/ directory:
  *   config/app.js         -> config('app.name')
  *   config/database.js    -> config('database.default')
  *   config/redis.js       -> config('redis.host')
  *   config/auth.js        -> config('auth.guards')
- *   som.config.json       -> config('tables.notes.rules')
+ *   kreft.config.json       -> config('tables.notes.rules')
  *
  * Supports dot notation, default fallbacks, runtime setters, and hot reloading.
  *
  * Usage:
- *   const { config } = require('somjs/server')
- *   const appName = config('app.name', 'Som.js App')
+ *   const { config } = require('kreft/server')
+ *   const appName = config('app.name', 'Kreft App')
  *   const dbHost = config('database.connections.mysql.host', '127.0.0.1')
  *   config.set('app.env', 'production')
  */
@@ -101,7 +101,7 @@ class ConfigRepository {
     return this.items;
   }
 
-  // Discover and load all files in config/ and som.config.json
+  // Discover and load all files in config/ and kreft.config.json
   load(projectRoot = process.cwd()) {
     const root = path.resolve(projectRoot);
     const candidateDirs = [
@@ -138,20 +138,20 @@ class ConfigRepository {
             const mod = require(fullPath);
             loadedConfigs[configKey] = mod && mod.__esModule && mod.default ? mod.default : mod;
           } catch (err) {
-            console.error(`[Som.js Config] Error reading config file "${file}":`, err.message);
+            console.error(`[Kreft Config] Error reading config file "${file}":`, err.message);
           }
         }
       } catch (_) {}
     }
 
-    // 2. Load and merge som.config.json if present
-    const somConfigPath = path.join(root, 'som.config.json');
-    if (fs.existsSync(somConfigPath)) {
+    // 2. Load and merge kreft.config.json if present
+    const kreftConfigPath = path.join(root, 'kreft.config.json');
+    if (fs.existsSync(kreftConfigPath)) {
       try {
-        delete require.cache[require.resolve(somConfigPath)];
-        const somJson = require(somConfigPath);
-        if (somJson && typeof somJson === 'object') {
-          for (const [k, v] of Object.entries(somJson)) {
+        delete require.cache[require.resolve(kreftConfigPath)];
+        const kreftJson = require(kreftConfigPath);
+        if (kreftJson && typeof kreftJson === 'object') {
+          for (const [k, v] of Object.entries(kreftJson)) {
             if (!(k in loadedConfigs)) {
               loadedConfigs[k] = v;
             } else if (typeof loadedConfigs[k] === 'object' && typeof v === 'object') {

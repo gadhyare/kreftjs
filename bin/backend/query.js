@@ -216,10 +216,10 @@ class Builder {
     const { sql, params } = this.toSql();
     const rows = await this.db.query(sql, params);
     const maxWarn = Number(process.env.MAX_QUERY_ROWS) || 10000;
-    const isCliOrMigrate = process.env.SOM_CLI === '1' || process.argv.some((a) => /artisan|migrate|seed/i.test(a));
+    const isCliOrMigrate = (process.env.KREFT_CLI || process.env.SOM_CLI) === '1' || process.argv.some((a) => /artisan|migrate|seed/i.test(a));
     const hardLimit = this._unlimited || isCliOrMigrate ? 0 : (Number(process.env.HARD_QUERY_LIMIT) || (process.env.NODE_ENV === 'production' ? 50000 : 0));
     if (rows && rows.length >= maxWarn && this._limit == null && !this._unlimited) {
-      console.warn(`[Som Query Warning] Query on "${this._table}" returned ${rows.length} rows without an explicit limit(). Consider using paginate(), chunk(), or limit() to prevent high memory usage.`);
+      console.warn(`[Kreft Query Warning] Query on "${this._table}" returned ${rows.length} rows without an explicit limit(). Consider using paginate(), chunk(), or limit() to prevent high memory usage.`);
       if (hardLimit > 0 && rows.length > hardLimit) {
         throw Object.assign(new Error(`Query on table "${this._table}" exceeded HARD_QUERY_LIMIT (${hardLimit} rows). Use chunk(), explicit pagination, or .withoutLimit().`), { status: 500 });
       }
@@ -242,7 +242,7 @@ class Builder {
   async _aggregate(fn, column = '*') {
     const f = this._from(), w = this._whereSql();
     const base = this._groups.length || this._distinct
-      ? (() => { const inner = this.clone(); inner._orders = []; inner._limit = null; inner._offset = null; const s = inner.toSql(); return { sql: `SELECT ${fn}(${column === '*' ? '*' : this.db.q(String(column).split('.').pop())}) AS ${this.db.q('aggregate')} FROM (${s.sql}) som_sub`, params: s.params }; })()
+      ? (() => { const inner = this.clone(); inner._orders = []; inner._limit = null; inner._offset = null; const s = inner.toSql(); return { sql: `SELECT ${fn}(${column === '*' ? '*' : this.db.q(String(column).split('.').pop())}) AS ${this.db.q('aggregate')} FROM (${s.sql}) kreft_sub`, params: s.params }; })()
       : { sql: `SELECT ${fn}(${column === '*' ? '*' : this.q(column)}) AS ${this.db.q('aggregate')} FROM ${f.sql}${w.sql ? ' WHERE ' + w.sql : ''}`, params: [...f.params, ...w.params] };
     const rows = await this.db.query(base.sql, base.params);
     const v = rows[0] ? rows[0].aggregate : null;

@@ -1,16 +1,16 @@
 /*
  * TypeScript support across backend and frontend:
  *   - Backend: routes/api.ts, config/*.ts, server/*.ts, and every .ts file in app/ and database/ load like .js files.
- *   - Frontend: .ts modules (e.g. frontend/logic/*.ts) and .som components with TypeScript syntax work natively in
- *     both `som dev` and `som build`.
+ *   - Frontend: .ts modules (e.g. frontend/logic/*.ts) and .kreft components with TypeScript syntax work natively in
+ *     both `kreft dev` and `kreft build`.
  *
- * Uses `esbuild` when installed in the project, or falls back to Som.js's built-in zero-dependency TypeScript
- * compiler (`Som.stripTypeScript` + ESM-to-CJS transform) so TypeScript projects work out of the box with zero setup.
+ * Uses `esbuild` when installed in the project, or falls back to Kreft's built-in zero-dependency TypeScript
+ * compiler (`Kreft.stripTypeScript` + ESM-to-CJS transform) so TypeScript projects work out of the box with zero setup.
  */
 const fs = require('fs');
 const path = require('path');
 const Module = require('module');
-const Som = require('../../som.js');
+const Kreft = require('../../kreft.js');
 
 let installed = false;
 let esbuild = null;
@@ -33,7 +33,7 @@ function esmToCjs(code) {
 
   // 2. import Def, { a, b as c } from 'spec'
   code = code.replace(/^[ \t]*import\s+([A-Za-z_$][\w$]*)\s*,\s*\{([^}]*)\}\s*from\s+(['"][^'"]+['"])[ \t]*;?/gm, (_, def, specs, mod) => {
-    const tmp = `__som_imp_${++uid}`;
+    const tmp = `__kreft_imp_${++uid}`;
     const mapped = specs.replace(/\b([A-Za-z_$][\w$]*)\s+as\s+([A-Za-z_$][\w$]*)/g, '$1: $2');
     return `const ${tmp} = require(${mod}); const ${def} = ${tmp} && ${tmp}.__esModule && ${tmp}.default !== undefined ? ${tmp}.default : ${tmp}; const {${mapped}} = ${tmp};`;
   });
@@ -46,7 +46,7 @@ function esmToCjs(code) {
 
   // 4. import Def from 'spec'
   code = code.replace(/^[ \t]*import\s+([A-Za-z_$][\w$]*)\s+from\s+(['"][^'"]+['"])[ \t]*;?/gm, (_, def, mod) => {
-    const tmp = `__som_imp_${++uid}`;
+    const tmp = `__kreft_imp_${++uid}`;
     return `const ${tmp} = require(${mod}); const ${def} = ${tmp} && ${tmp}.__esModule && ${tmp}.default !== undefined ? ${tmp}.default : ${tmp};`;
   });
 
@@ -55,7 +55,7 @@ function esmToCjs(code) {
 
   // 6. export { a, b as c } from 'spec'
   code = code.replace(/^[ \t]*export\s*\{([^}]*)\}\s*from\s+(['"][^'"]+['"])[ \t]*;?/gm, (_, specs, mod) => {
-    const tmp = `__som_exp_${++uid}`;
+    const tmp = `__kreft_exp_${++uid}`;
     const assigns = specs.split(',').map((s) => s.trim()).filter(Boolean).map((p) => {
       const [from, to] = p.split(/\s+as\s+/);
       return `exports[${JSON.stringify((to || from).trim())}] = ${tmp}[${JSON.stringify(from.trim())}];`;
@@ -132,9 +132,9 @@ function transpileTs(source, { filename = 'module.ts', format = 'cjs', projectDi
       jsCode = null;
     }
   }
-  // Fallback 2: Som.js built-in zero-dependency TypeScript stripper
+  // Fallback 2: Kreft built-in zero-dependency TypeScript stripper
   if (jsCode == null) {
-    jsCode = Som.stripTypeScript(source);
+    jsCode = Kreft.stripTypeScript(source);
   }
 
   return format === 'cjs' ? esmToCjs(jsCode) : jsCode;

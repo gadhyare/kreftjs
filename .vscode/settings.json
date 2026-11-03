@@ -1,9 +1,9 @@
 {
   "files.associations": {
-    "*.som": "som"
+    "*.kreft": "kreft"
   },
-  "[som]": {
-    "editor.defaultFormatter": "somjs.som",
+  "[kreft]": {
+    "editor.defaultFormatter": "kreft.kreft",
     "editor.formatOnSave": true
   }
 }

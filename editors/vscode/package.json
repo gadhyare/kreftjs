@@ -1,33 +1,56 @@
 {
-  "name": "som",
-  "displayName": "Som.js (.som files)",
-  "description": "Colors, brackets, formatting and snippets for Som.js .som component files.",
+  "name": "kreft",
+  "displayName": "Kreft (.kreft files)",
+  "description": "Colors, brackets, formatting and snippets for Kreft .kreft component files (and .som files from Som.js).",
   "version": "2.3.0",
-  "publisher": "somjs",
+  "publisher": "kreft",
   "license": "MIT",
-  "engines": { "vscode": "^1.60.0" },
-  "categories": ["Programming Languages", "Formatters", "Snippets"],
+  "engines": {
+    "vscode": "^1.60.0"
+  },
+  "categories": [
+    "Programming Languages",
+    "Formatters",
+    "Snippets"
+  ],
   "main": "./extension.js",
-  "activationEvents": ["onLanguage:som"],
+  "activationEvents": [
+    "onLanguage:kreft"
+  ],
   "contributes": {
-    "languages": [{
-      "id": "som",
-      "aliases": ["Som", "som"],
-      "extensions": [".som"],
-      "configuration": "./language-configuration.json"
-    }],
-    "grammars": [{
-      "language": "som",
-      "scopeName": "source.som",
-      "path": "./syntaxes/som.tmLanguage.json",
-      "embeddedLanguages": {
-        "meta.embedded.block.html": "html",
-        "source.css": "css",
-        "meta.embedded.expression.som": "javascript",
-        "meta.embedded.block.javascript": "javascript",
-        "source.js": "javascript"
+    "languages": [
+      {
+        "id": "kreft",
+        "aliases": [
+          "Kreft",
+          "kreft"
+        ],
+        "extensions": [
+          ".kreft",
+          ".som"
+        ],
+        "configuration": "./language-configuration.json"
       }
-    }],
-    "snippets": [{ "language": "som", "path": "./snippets/som.json" }]
+    ],
+    "grammars": [
+      {
+        "language": "kreft",
+        "scopeName": "source.kreft",
+        "path": "./syntaxes/kreft.tmLanguage.json",
+        "embeddedLanguages": {
+          "meta.embedded.block.html": "html",
+          "source.css": "css",
+          "meta.embedded.expression.kreft": "javascript",
+          "meta.embedded.block.javascript": "javascript",
+          "source.js": "javascript"
+        }
+      }
+    ],
+    "snippets": [
+      {
+        "language": "kreft",
+        "path": "./snippets/kreft.json"
+      }
+    ]
   }
 }

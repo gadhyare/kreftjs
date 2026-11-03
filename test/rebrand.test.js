@@ -1,0 +1,57 @@
+// Som.js → Kreft: the new names work and the old ones still do
+const test = require('node:test');
+const assert = require('node:assert');
+const path = require('node:path');
+const Module = require('node:module');
+
+const ROOT = path.join(__dirname, '..');
+const Kreft = require(path.join(ROOT, 'kreft.js'));
+const { legacyMarkup, prepareTemplate } = Kreft.__internal;
+
+test('Kreft: the runtime is 3.0.0, Som is the same object and compileSom is Kreft.compile', () => {
+  assert.strictEqual(Kreft.version, '3.0.0');
+  assert.strictEqual(globalThis.Kreft, Kreft);
+  assert.strictEqual(globalThis.Som, Kreft);
+  assert.strictEqual(typeof Kreft.compile, 'function');
+  assert.strictEqual(Kreft.compileSom, Kreft.compile);
+});
+
+test('templates: s- directives and <som-…> tags are read as k- and <kreft-…>', () => {
+  const html = '<som-view s-if="a > b" s-on:click="go()" @click="x" title="s-if stays"></som-view><p>use s-if here</p><template s-each="u in us"><som-link to="/">s-key</som-link></template>';
+  assert.strictEqual(legacyMarkup(html),
+    '<kreft-view k-if="a > b" k-on:click="go()" @click="x" title="s-if stays"></kreft-view><p>use s-if here</p><template k-each="u in us"><kreft-link to="/">s-key</kreft-link></template>');
+  // already new: untouched, and the {for} blocks come out with the new names
+  assert.strictEqual(legacyMarkup('<kreft-view k-if="a"></kreft-view>'), '<kreft-view k-if="a"></kreft-view>');
+  assert.match(prepareTemplate('{for u in us key u.id}<b>{u}</b>{/for}'), /<template k-each="u in us" k-key="u\.id">/);
+  // an unknown <som-…> element is not one of ours
+  assert.strictEqual(legacyMarkup('<som-other s-x="1"></som-other>'), '<som-other k-x="1"></som-other>');
+});
+
+test('require(): kreft/server and the Som.js names all reach server.js', () => {
+  const { installAlias } = require(path.join(ROOT, 'bin/backend/index.js'));
+  installAlias();
+  for (const name of ['kreft/server', '@kreft/server', 'somjs/server', 'som/server', '@somjs/server']) {
+    assert.strictEqual(Module._resolveFilename(name, module), path.join(ROOT, 'server.js'), name);
+  }
+});
+
+test('package: kreft 3.0.0 with a `kreft` and a `som` command', () => {
+  const pkg = require(path.join(ROOT, 'package.json'));
+  assert.strictEqual(pkg.name, 'kreft');
+  assert.strictEqual(pkg.version, '3.0.0');
+  assert.strictEqual(pkg.main, 'kreft.js');
+  assert.deepStrictEqual(pkg.bin, { kreft: 'bin/kreft.js', som: 'bin/kreft.js' });
+  for (const f of pkg.files) assert.ok(require('node:fs').existsSync(path.join(ROOT, f)), `${f} is listed in "files" and exists`);
+});
+
+test('settings: kreft.config.json is read, and so is som.config.json when it is the only one', () => {
+  const fs = require('node:fs'), os = require('node:os');
+  const { readConfig } = require(path.join(ROOT, 'bin/kreft-config.js'));
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'kreft-config-'));
+  fs.writeFileSync(path.join(dir, 'package.json'), '{}');
+  fs.writeFileSync(path.join(dir, 'som.config.json'), '{"db":"sqlite:old.db"}');
+  assert.strictEqual(readConfig(dir).db, 'sqlite:old.db');
+  fs.writeFileSync(path.join(dir, 'kreft.config.json'), '{"db":"sqlite:new.db"}');
+  assert.strictEqual(readConfig(dir).db, 'sqlite:new.db');
+  fs.rmSync(dir, { recursive: true, force: true });
+});

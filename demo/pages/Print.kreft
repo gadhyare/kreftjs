@@ -1,0 +1,13 @@
+<!-- A page with no layout: the route says { layout: false } -->
+<view>
+  <article class="sheet">
+    <p class="muted">Kreft demo</p>
+    <h1>A page with no layout</h1>
+    <p>No bar and no menu: the route for this page has <code>layout: false</code>. Good for printing, a login page or an embed.</p>
+    <kreft-link to="/layouts" class="btn">Back to Layouts</kreft-link>
+  </article>
+</view>
+
+<style scoped>
+.sheet { max-width: 620px; margin: 64px auto; padding: 0 24px; }
+</style>

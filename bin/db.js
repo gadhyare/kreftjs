@@ -1,5 +1,5 @@
 /*
- * Som.js database layer — one small interface over SQLite, MySQL / MariaDB and PostgreSQL.
+ * Kreft database layer — one small interface over SQLite, MySQL / MariaDB and PostgreSQL.
  *
  *   sqlite:database/app.db         (or just a file name ending in .db / .sqlite / .sqlite3)
  *   mysql://user:password@localhost:3306/shop
@@ -33,7 +33,7 @@ function parseUrl(url) {
 function driver(name, root) {
   const paths = [root || process.cwd(), process.cwd(), __dirname];
   try { return require(require.resolve(name, { paths })); }
-  catch (_) { throw new Error(`To use this database, install its driver in your project:\n\n    som add ${name}\n`); }
+  catch (_) { throw new Error(`To use this database, install its driver in your project:\n\n    kreft add ${name}\n`); }
 }
 
 const TEXT = /char|text|clob|string|uuid|enum|json/i;
@@ -51,7 +51,7 @@ async function connect(url, { root } = {}) {
 /* ---------------------------------------------------------------- SQLite (node:sqlite) */
 function sqlite(cfg, root) {
   let DatabaseSync;
-  // node:sqlite prints an "experimental" warning once; Som users don't need to see it
+  // node:sqlite prints an "experimental" warning once; Kreft users don't need to see it
   const emit = process.emitWarning;
   process.emitWarning = (w, ...a) => (String(w).includes('SQLite') ? undefined : emit.call(process, w, ...a));
   try { ({ DatabaseSync } = require('node:sqlite')); }
@@ -74,7 +74,7 @@ function sqlite(cfg, root) {
     // one connection: nested transactions become savepoints
     async transaction(fn) {
       const depth = (db.__depth = (db.__depth || 0) + 1);
-      const sp = 'som_sp_' + depth;
+      const sp = 'kreft_sp_' + depth;
       conn.exec(depth === 1 ? 'BEGIN' : `SAVEPOINT ${sp}`);
       try {
         const r = await fn(db);
@@ -124,7 +124,7 @@ async function mysql(cfg, root) {
         async run(sql, params) { const [r] = await c.query(sql, conv(params)); return { changes: r.affectedRows, insertId: r.insertId || null }; },
         async exec(sql) { for (const stmt of splitSql(sql)) await c.query(stmt); },
         async transaction(inner) { // nested: a savepoint
-          const sp = 'som_sp_' + Math.random().toString(36).slice(2, 8);
+          const sp = 'kreft_sp_' + Math.random().toString(36).slice(2, 8);
           await c.query(`SAVEPOINT ${sp}`);
           try { const r = await inner(trx); await c.query(`RELEASE SAVEPOINT ${sp}`); return r; } catch (e) { await c.query(`ROLLBACK TO SAVEPOINT ${sp}`); throw e; }
         },
@@ -182,7 +182,7 @@ async function postgres(cfg, root) {
         async run(sql, params) { const r = await c.query(numbered(sql), conv(params)); return { changes: r.rowCount, insertId: null, rows: r.rows }; },
         async exec(sql) { await c.query(sql); },
         async transaction(inner) {
-          const sp = 'som_sp_' + Math.random().toString(36).slice(2, 8);
+          const sp = 'kreft_sp_' + Math.random().toString(36).slice(2, 8);
           await c.query(`SAVEPOINT ${sp}`);
           try { const r = await inner(trx); await c.query(`RELEASE SAVEPOINT ${sp}`); return r; } catch (e) { await c.query(`ROLLBACK TO SAVEPOINT ${sp}`); throw e; }
         },
@@ -250,7 +250,8 @@ function splitSql(sql) {
 
 /* ---------------------------------------------------------------- migrations
  * database/migrations/001_create_posts.sql, 002_add_likes.sql …  run once each, in name order,
- * remembered in the table som_migrations. database/seed.sql fills in starting data.
+ * remembered in the table som_migrations (TODO 3.1: rename to kreft_migrations, reading the old name as a fallback).
+ * database/seed.sql fills in starting data.
  */
 async function migrate(db, dir, log = () => {}) {
   if (!fs.existsSync(dir)) return [];

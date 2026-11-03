@@ -1,13 +1,13 @@
 /*
  * Task scheduling: backend/routes/console.js says what runs when.
  *
- *   const { Schedule } = require('somjs/server')
+ *   const { Schedule } = require('kreft/server')
  *   Schedule.call(async () => { await Post.onlyTrashed().forceDelete() }).daily().name('clean-trash')
  *   Schedule.job(new SendDailyReport()).weekdays().at('08:00')
  *   Schedule.command('cache:clear').hourly()
  *   Schedule.call(fn).cron('* /15 * * * *')     (no space: every 15 minutes)
  *
- * som dev runs them while it is on; for a real server: som schedule:work (or `som schedule:run` from cron each minute).
+ * kreft dev runs them while it is on; for a real server: kreft schedule:work (or `kreft schedule:run` from cron each minute).
  */
 const tasks = [];
 
@@ -79,7 +79,7 @@ class Task {
 const Schedule = {
   call(fn) { const t = new Task(fn, 'Closure'); tasks.push(t); return t; },
   job(job) { const t = new Task(() => require('./queue.js').dispatch(job), job.constructor.name); tasks.push(t); return t; },
-  command(line) { const t = new Task(() => require('../artisan.js').runCommand(line), 'som ' + line); tasks.push(t); return t; },
+  command(line) { const t = new Task(() => require('../artisan.js').runCommand(line), 'kreft ' + line); tasks.push(t); return t; },
   tasks: () => tasks,
   reset() { tasks.length = 0; },
   // runs the tasks due this minute
@@ -96,7 +96,7 @@ function loadSchedule(baseDir) {
   require(file);
   return file;
 }
-// som dev / som schedule:work: check every minute, on the minute
+// kreft dev / kreft schedule:work: check every minute, on the minute
 function startScheduler(baseDir, log = console.log) {
   let timer = null;
   const tick = async () => {

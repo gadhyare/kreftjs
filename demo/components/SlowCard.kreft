@@ -1,0 +1,19 @@
+<!-- loads slowly on purpose, so the <kreft-wait> around it can show its loading view -->
+prop ms = 1200
+prop fail = false
+
+load person = new Promise((ok, no) => setTimeout(() => {
+  if (fail) no(new Error('The server did not answer.'))
+  else ok({ name: 'Maxamuud Xussen', city: 'Mogadishu', since: 2021 })
+}, ms))
+
+<view>
+  <div class="person">
+    <strong>{person.data.name}</strong>
+    <span class="muted">{person.data.city} · member since {person.data.since} · loaded in {ms} ms</span>
+  </div>
+</view>
+
+<style scoped>
+.person { display: flex; flex-direction: column; gap: 2px; padding: 12px; background: var(--accent); }
+</style>

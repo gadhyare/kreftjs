@@ -1,6 +1,6 @@
 // Runs once when the backend starts (and again after a change).
 // A place for gates, event listeners and settings that belong to the whole app.
-const { Gate } = require('somjs/server')
+const { Gate } = require('kreft/server')
 
 class AppServiceProvider {
   boot() {

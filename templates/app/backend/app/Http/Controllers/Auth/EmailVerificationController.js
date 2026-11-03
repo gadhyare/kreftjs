@@ -1,8 +1,8 @@
-const { Hash, Url, abort, same } = require('somjs/server')
+const { Hash, Url, abort, same } = require('kreft/server')
 const User = require('../../../Models/User')
 
 class EmailVerificationController {
-  // POST /api/email/verification-notification: send the link again (pages/auth/VerifyEmail.som)
+  // POST /api/email/verification-notification: send the link again (pages/auth/VerifyEmail.kreft)
   async send(req) {
     if (req.user.hasVerifiedEmail()) return { message: 'Your email address is already verified.' }
     await req.user.sendEmailVerificationNotification()

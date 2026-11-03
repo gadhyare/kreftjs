@@ -1,5 +1,5 @@
 /*
- * A list of page addresses from a file, for `som build --prerender --urls urls.js` and `som sitemap --urls urls.js`.
+ * A list of page addresses from a file, for `kreft build --prerender --urls urls.js` and `kreft sitemap --urls urls.js`.
  *
  *   urls.json   ["/posts/1", "/posts/2"]  or  [{ "path": "/posts/1", "lastmod": "2026-01-02" }]
  *   urls.txt    one address per line (# starts a comment)

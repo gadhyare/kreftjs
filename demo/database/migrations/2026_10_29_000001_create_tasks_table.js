@@ -1,4 +1,4 @@
-// som dev runs it once by itself; som migrate:rollback runs down()
+// kreft dev runs it once by itself; kreft migrate:rollback runs down()
 module.exports = {
   up(schema) {
     schema.create('tasks', (table) => {

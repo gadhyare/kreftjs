@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 /*
- * @somjs/somjs (safe-add / som)
+ * kreft (safe-add / kreft)
  *
  * Enterprise-Grade Security Gatekeeper & Safe Package Installer for Node.js.
  * Zero-dependency, portable CLI that works anywhere on any computer or CI/CD environment.
@@ -367,19 +367,19 @@ function runSecurityAudit(npmCmd, project, auditData) {
 
 function printHelp() {
   console.log(`
-  ${bold('som add <packages...>') }  (alias: ${dim('som install')}, ${dim('som i')})
+  ${bold('kreft add <packages...>') }  (alias: ${dim('kreft install')}, ${dim('kreft i')})
 
-  Enterprise-Grade Security Gatekeeper & Package Installer for Som.js.
+  Enterprise-Grade Security Gatekeeper & Package Installer for Kreft.
   Runs anywhere on any machine with zero external dependencies.
 
   Usage:
-    som add <packages...>           Install package(s) with full security gatekeeper verification
-    som add express lodash          Install multiple packages safely
-    som add -D vitest               Install as devDependency
-    som add --check <pkg>           Inspect package security report without installing (alias: --dry-run)
-    som add -y <pkg>                Auto-confirm unverified packages in CI/CD (alias: --yes)
-    som add --allow-scripts <pkg>   Allow lifecycle scripts (postinstall/build)
-    som add --force <pkg>           Bypass security warnings & redundancy checks
+    kreft add <packages...>           Install package(s) with full security gatekeeper verification
+    kreft add express lodash          Install multiple packages safely
+    kreft add -D vitest               Install as devDependency
+    kreft add --check <pkg>           Inspect package security report without installing (alias: --dry-run)
+    kreft add -y <pkg>                Auto-confirm unverified packages in CI/CD (alias: --yes)
+    kreft add --allow-scripts <pkg>   Allow lifecycle scripts (postinstall/build)
+    kreft add --force <pkg>           Bypass security warnings & redundancy checks
 
   Security Verification Rules:
     1. Homoglyph & Shell Injection Shield:
@@ -414,7 +414,7 @@ async function runSafeAdd(args = []) {
     return;
   }
 
-  // Handle subcommands: 'som add <pkgs>', 'som install <pkgs>', 'som i <pkgs>'
+  // Handle subcommands: 'kreft add <pkgs>', 'kreft install <pkgs>', 'kreft i <pkgs>'
   let inputArgs = [...args];
   if (inputArgs[0] === 'add' || inputArgs[0] === 'install' || inputArgs[0] === 'i') {
     inputArgs = inputArgs.slice(1);
@@ -454,7 +454,7 @@ async function runSafeAdd(args = []) {
 
   const project = findProjectDir(targetDir);
 
-  console.log(`\n  ${bold('Som.js Security Gatekeeper & Package Installer')} ${dim('v1.0.1')}`);
+  console.log(`\n  ${bold('Kreft Security Gatekeeper & Package Installer')} ${dim('v1.0.1')}`);
   console.log(`  ${dim('Enforcing strict supply-chain security rules...')}\n`);
 
   // =========================================================================

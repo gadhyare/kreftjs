@@ -1,7 +1,7 @@
 /*
  * Small helpers for server code: Hash, Str, Mail and signed URLs.
  *
- *   const { Hash, Str, Mail, Url } = require('somjs/server')
+ *   const { Hash, Str, Mail, Url } = require('kreft/server')
  *
  *   const hashed = Hash.make('secret')        // store this, never the password
  *   Hash.check('secret', hashed)              // true
@@ -41,7 +41,7 @@ const Hash = {
   },
   // Constant-time dummy check when a user record does not exist, preventing timing-based email enumeration
   dummyCheck(value) {
-    if (!dummyHashCache) dummyHashCache = Hash.make('som-dummy-timing-guard-password');
+    if (!dummyHashCache) dummyHashCache = Hash.make('kreft-dummy-timing-guard-password');
     return Hash.check(String(value || '').slice(0, 256), dummyHashCache);
   },
   // a quick, unsalted hash for random tokens (they are long and random already)
@@ -98,11 +98,11 @@ function appKey() {
   if (k) {
     const buf = k.startsWith('base64:') ? Buffer.from(k.slice(7), 'base64') : Buffer.from(k);
     if (buf.length >= 16) return buf;
-    if (production) throw new Error('APP_KEY is shorter than 16 bytes. Run `som key:generate` and put the new key in .env.');
-    console.warn('  APP_KEY in .env is shorter than 16 bytes; run `som key:generate` for a 256-bit key.');
+    if (production) throw new Error('APP_KEY is shorter than 16 bytes. Run `kreft key:generate` and put the new key in .env.');
+    console.warn('  APP_KEY in .env is shorter than 16 bytes; run `kreft key:generate` for a 256-bit key.');
     return buf;
   }
-  if (production) throw new Error('APP_KEY is not set. Run `som key:generate` and put the key in .env (production needs one that every process shares).');
+  if (production) throw new Error('APP_KEY is not set. Run `kreft key:generate` and put the key in .env (production needs one that every process shares).');
   if (!fallbackKey) {
     fallbackKey = crypto.randomBytes(32);
     console.warn('  No APP_KEY in .env: signed links stop working when the server restarts.');
@@ -170,7 +170,7 @@ const Mail = {
       if (!transport) {
         let nodemailer;
         try { nodemailer = require(require.resolve('nodemailer', { paths: [process.cwd()] })); } catch (_) {
-          throw new Error('MAIL_URL is set: install the mailer with  som add nodemailer');
+          throw new Error('MAIL_URL is set: install the mailer with  kreft add nodemailer');
         }
         transport = nodemailer.createTransport(process.env.MAIL_URL);
       }
@@ -211,7 +211,7 @@ const Crypt = {
 };
 
 /* ------------------------------------------------------------------ Log */
-// Log.info('Order placed', { id }) → the terminal and storage/logs/som.log (LOG_LEVEL in .env: debug, info, warning, error)
+// Log.info('Order placed', { id }) → the terminal and storage/logs/kreft.log (LOG_LEVEL in .env: debug, info, warning, error)
 const LEVELS = { debug: 0, info: 1, notice: 2, warning: 3, error: 4, critical: 5 };
 let logDir = null;
 function getLogDir() {
@@ -226,7 +226,7 @@ function getLogDir() {
 const Log = {
   setDirectory(dir) { logDir = dir; },
   getDirectory() { return getLogDir(); },
-  path() { return require('path').join(getLogDir(), 'som.log'); },
+  path() { return require('path').join(getLogDir(), 'kreft.log'); },
   write(level, message, context) {
     if (LEVELS[level] < (LEVELS[(process.env.LOG_LEVEL || 'debug').toLowerCase()] ?? 0)) return;
     const time = new Date().toISOString().slice(0, 19).replace('T', ' ');
@@ -239,12 +239,12 @@ const Log = {
       const dir = getLogDir();
       try {
         require('fs').mkdirSync(dir, { recursive: true });
-        require('fs').appendFileSync(require('path').join(dir, 'som.log'), line + '\n');
+        require('fs').appendFileSync(require('path').join(dir, 'kreft.log'), line + '\n');
       } catch (_) { /* no place to write */ }
     }
   },
   clear() {
-    const f = require('path').join(getLogDir(), 'som.log');
+    const f = require('path').join(getLogDir(), 'kreft.log');
     try { if (require('fs').existsSync(f)) require('fs').writeFileSync(f, ''); return true; } catch (_) { return false; }
   },
 };

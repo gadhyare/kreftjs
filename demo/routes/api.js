@@ -1,6 +1,6 @@
 // The demo's API: every address here starts with /api.
-// som dev --backend demo loads it (see package.json). List them: node bin/som.js route:list --backend demo
-const { Route, DB, Cache, config, getMemoryStats } = require('somjs/server')
+// kreft dev --backend demo loads it (see package.json). List them: node bin/kreft.js route:list --backend demo
+const { Route, DB, Cache, config, getMemoryStats } = require('kreft/server')
 const TaskController = require('../app/Http/Controllers/TaskController')
 
 // GET, POST /api/tasks · GET, PUT, PATCH /api/tasks/{task}  (TaskController)

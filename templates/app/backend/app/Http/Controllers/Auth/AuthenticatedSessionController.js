@@ -1,4 +1,4 @@
-const { Hash, ValidationError, noContent, abort } = require('somjs/server')
+const { Hash, ValidationError, noContent, abort } = require('kreft/server')
 const User = require('../../../Models/User')
 const Throttle = require('../../../Auth/Throttle')
 
@@ -8,7 +8,7 @@ const LoginRequest = require('../../Requests/Auth/LoginRequest')
 const { signIn, signOut, pendingTwoFactor } = require('../../../Auth/Session')
 
 class AuthenticatedSessionController {
-  // POST /api/login  { email, password, remember }   (pages/auth/Login.som)
+  // POST /api/login  { email, password, remember }   (pages/auth/Login.kreft)
   // with two-factor on, the answer is { two_factor: true } and the code goes to /api/two-factor-challenge
   async store(req) {
     const data = await LoginRequest.validate(req)

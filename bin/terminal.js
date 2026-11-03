@@ -1,5 +1,5 @@
 /*
- * Terminal UI & Styling for Som.js
+ * Terminal UI & Styling for Kreft
  * Crisp typography, box frames, status badges, and progress bars.
  * Strictly 0 border-radius (sharp box-drawing characters).
  */
@@ -147,7 +147,7 @@ function renderDevBanner({
   const netUrl = host !== '127.0.0.1' && host !== 'localhost' ? `http://${host}:${port}/${start}` : null;
 
   const lines = [
-    `  ${c.bold(c.white('SOM.JS'))} ${c.dim('v' + version)}  ${badge('DEV SERVER', c.bgCyan, c.black)}  ${c.dim('⚡ Ready in 45ms')}`,
+    `  ${c.bold(c.white('KREFT'))} ${c.dim('v' + version)}  ${badge('DEV SERVER', c.bgCyan, c.black)}  ${c.dim('⚡ Ready in 45ms')}`,
     '---',
     `  ${c.cyan('➜')}  ${c.bold('Local:')}    ${c.underline(c.cyan(localUrl))}`,
   ];
@@ -167,7 +167,7 @@ function renderDevBanner({
     lines.push(`  ${c.dim('•')} ${c.bold('Database:')} ${c.green(database)}`);
   }
   if (routesCount > 0) {
-    lines.push(`  ${c.dim('•')} ${c.bold('API:')}      ${c.cyan(routesCount + ' routes')} ${c.dim('(som route:list)')}`);
+    lines.push(`  ${c.dim('•')} ${c.bold('API:')}      ${c.cyan(routesCount + ' routes')} ${c.dim('(kreft route:list)')}`);
   }
   if (serverRoutesCount > 0) {
     lines.push(`  ${c.dim('•')} ${c.bold('Server:')}   ${c.cyan(serverRoutesCount + ' custom endpoints')}`);

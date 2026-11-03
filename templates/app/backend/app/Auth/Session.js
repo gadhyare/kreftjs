@@ -1,15 +1,15 @@
 // Signing a browser in and out via secure SPA session cookies.
 //
-// A browser gets its login in an HttpOnly cookie (som_session): page scripts can't read it, so a
+// A browser gets its login in an HttpOnly cookie (kreft_session): page scripts can't read it, so a
 // script injected into a page can't steal it. Changes (POST, PUT, DELETE…) also need the X-XSRF-TOKEN
-// header to match the XSRF-TOKEN cookie, which only your own pages can read (Som.api sends it by itself).
+// header to match the XSRF-TOKEN cookie, which only your own pages can read (Kreft.api sends it by itself).
 //
 // An app or script that sends `device_name` when it logs in gets an API token in the answer instead:
 // Authorization: Bearer 5|k3J9…
-const { response, Str, Crypt, cookieSecure } = require('somjs/server')
+const { response, Str, Crypt, cookieSecure } = require('kreft/server')
 const PersonalAccessToken = require('../Models/PersonalAccessToken')
 
-const SESSION = 'som_session'
+const SESSION = 'kreft_session'
 const XSRF = 'XSRF-TOKEN'
 const days = () => Number(process.env.AUTH_TOKEN_DAYS || 30)
 
@@ -127,10 +127,10 @@ function pendingTwoFactor(req, user, remember) {
   const exp = Date.now() + 5 * 60000
   const ticket = Crypt.encrypt({ id: user.id, remember: Boolean(remember), nonce, exp })
   if (req.input('device_name')) return response({ two_factor: true, challenge: ticket })
-  return response({ two_factor: true }).cookie('som_2fa', ticket, { maxAge: 300 })
+  return response({ two_factor: true }).cookie('kreft_2fa', ticket, { maxAge: 300 })
 }
 function readPendingTwoFactor(req) {
-  const ticket = req.input('challenge') || req.cookie('som_2fa')
+  const ticket = req.input('challenge') || req.cookie('kreft_2fa')
   if (!ticket) return null
   try {
     const t = Crypt.decrypt(ticket)

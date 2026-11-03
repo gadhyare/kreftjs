@@ -1,0 +1,189 @@
+<view>
+  <div class="demo-wrapper">
+    <header class="demo-topbar">
+      <button class="sidebar-toggle-btn" @click="toggleSidebar" aria-label="Toggle Sidebar">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"/></svg>
+        <span>Menu</span>
+      </button>
+      <h1>Basic Demo</h1>
+    </header>
+    <div class="demo-layout">
+      <div k-if="!sidebarCollapsed" class="demo-sidebar-backdrop" @click="toggleSidebar" aria-hidden="true"></div>
+      <aside class="demo-sidebar" k-if="!sidebarCollapsed">
+        <div class="demo-sidebar-mobile-header">
+          <span>Navigation</span>
+          <button class="demo-sidebar-close" @click="toggleSidebar" aria-label="Close sidebar">×</button>
+        </div>
+        <nav>
+          <ul>
+            <li><a href="/demo/docs.kreft">Docs Demo</a></li>
+            <li><a href="#section1">Section 1</a></li>
+            <li><a href="#section2">Section 2</a></li>
+          </ul>
+        </nav>
+      </aside>
+      <main class="demo-main">
+        <section id="section1"><h2>Section 1</h2><p>This is a basic content area. It demonstrates the two‑column layout with a sidebar on the left.</p></section>
+        <section id="section2"><h2>Section 2</h2><p>Another example paragraph with some placeholder text.</p></section>
+      </main>
+    </div>
+  </div>
+
+  <script>
+    state sidebarCollapsed = false;
+    action toggleSidebar() { sidebarCollapsed = !sidebarCollapsed; }
+  </script>
+
+  <style scoped>
+    .demo-wrapper {
+      font-family: var(--font, system-ui, -apple-system, sans-serif);
+      color: var(--foreground);
+      width: 100%;
+      max-width: 1140px; /* Bootstrap .container max-width */
+      margin: 0 auto;
+      padding: 0 16px;
+      box-sizing: border-box;
+    }
+    .demo-topbar {
+      display: flex;
+      align-items: center;
+      gap: 16px;
+      padding: 16px 0;
+      border-bottom: 1px solid var(--border);
+    }
+    .demo-topbar h1 {
+      font-size: 20px;
+      font-weight: 700;
+      margin: 0;
+    }
+    .sidebar-toggle-btn {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      background: var(--card);
+      color: var(--foreground);
+      border: 1px solid var(--border);
+      padding: 6px 12px;
+      border-radius: 6px;
+      cursor: pointer;
+      font-size: 13px;
+    }
+    .demo-layout {
+      display: grid;
+      grid-template-columns: 240px minmax(0, 1fr);
+      gap: 32px;
+      margin-top: 24px;
+      padding-bottom: 48px;
+    }
+    .demo-sidebar {
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 16px;
+      height: fit-content;
+    }
+    .demo-sidebar ul {
+      list-style: none;
+      padding: 0;
+      margin: 0;
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+    }
+    .demo-sidebar a {
+      color: var(--muted);
+      text-decoration: none;
+      font-size: 14px;
+      font-weight: 500;
+      padding: 8px 12px;
+      border-radius: 6px;
+      display: block;
+      transition: all 0.15s ease;
+    }
+    .demo-sidebar a:hover {
+      color: var(--foreground);
+      background: var(--accent);
+    }
+    .demo-main {
+      padding: 0;
+    }
+    .demo-main section {
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 24px;
+      margin-bottom: 20px;
+    }
+    .demo-main h2 {
+      margin: 0 0 10px;
+      font-size: 18px;
+      font-weight: 700;
+    }
+    .demo-main p {
+      margin: 0;
+      color: var(--muted);
+      line-height: 1.6;
+    }
+    .demo-sidebar-backdrop {
+      display: none;
+    }
+    .demo-sidebar-mobile-header {
+      display: none;
+    }
+    @media (max-width: 768px) {
+      .demo-wrapper {
+        max-width: 100%;
+        padding: 0 16px;
+      }
+      .demo-layout {
+        grid-template-columns: 1fr;
+        gap: 20px;
+      }
+      .demo-sidebar-backdrop {
+        display: block;
+        position: fixed;
+        inset: 0;
+        background: rgba(0, 0, 0, 0.45);
+        backdrop-filter: blur(2px);
+        -webkit-backdrop-filter: blur(2px);
+        z-index: 55;
+      }
+      .demo-sidebar {
+        position: fixed;
+        top: 0;
+        left: 0;
+        bottom: 0;
+        width: 270px;
+        max-width: 82vw;
+        height: 100%;
+        border-radius: 0;
+        z-index: 60;
+        box-shadow: 4px 0 24px rgba(0, 0, 0, 0.15);
+        animation: demoSlideIn 0.22s ease-out;
+        box-sizing: border-box;
+      }
+      @keyframes demoSlideIn {
+        from { transform: translateX(-100%); }
+        to { transform: translateX(0); }
+      }
+      .demo-sidebar-mobile-header {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        margin-bottom: 12px;
+        padding-bottom: 8px;
+        border-bottom: 1px solid var(--border);
+        font-weight: 600;
+        font-size: 14px;
+      }
+      .demo-sidebar-close {
+        background: transparent;
+        border: none;
+        font-size: 20px;
+        line-height: 1;
+        cursor: pointer;
+        color: var(--muted);
+      }
+    }
+  </style>
+</view>

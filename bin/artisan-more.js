@@ -1,23 +1,23 @@
 /*
  * Full-stack CLI commands:
  *
- *   som list                         every command (yours too)
- *   som about                        versions, settings, folders
- *   som tinker                       a console with your models, DB, Cache… (await works)
- *   som key:generate                 a new APP_KEY in .env
- *   som down [--secret=x] / som up   maintenance mode
- *   som db:wipe                      drop every table
- *   som migrate:refresh [--seed]     undo every migration, then run them again
- *   som migrate:reset                undo every migration
- *   som queue:work [--queue=a,b] [--once] [--stop-when-empty]
- *   som queue:failed / queue:retry <id|all> / queue:flush / queue:table
- *   som schedule:work / schedule:run / schedule:list
- *   som cache:clear / cache:table
- *   som notifications:table
- *   som event:list
- *   som make:job, make:event, make:listener, make:mail, make:notification, make:policy, make:request,
+ *   kreft list                         every command (yours too)
+ *   kreft about                        versions, settings, folders
+ *   kreft tinker                       a console with your models, DB, Cache… (await works)
+ *   kreft key:generate                 a new APP_KEY in .env
+ *   kreft down [--secret=x] / kreft up   maintenance mode
+ *   kreft db:wipe                      drop every table
+ *   kreft migrate:refresh [--seed]     undo every migration, then run them again
+ *   kreft migrate:reset                undo every migration
+ *   kreft queue:work [--queue=a,b] [--once] [--stop-when-empty]
+ *   kreft queue:failed / queue:retry <id|all> / queue:flush / queue:table
+ *   kreft schedule:work / schedule:run / schedule:list
+ *   kreft cache:clear / cache:table
+ *   kreft notifications:table
+ *   kreft event:list
+ *   kreft make:job, make:event, make:listener, make:mail, make:notification, make:policy, make:request,
  *       make:resource, make:factory, make:rule, make:command, make:observer
- *   Your own commands: app/Console/Commands/*.js (som make:command SendReport)
+ *   Your own commands: app/Console/Commands/*.js (kreft make:command SendReport)
  */
 const fs = require('fs');
 const path = require('path');
@@ -42,7 +42,7 @@ async function withApp(o, ctx, fn) {
 
 /* ------------------------------------------------------------------ built-in migration tables */
 const tableStubs = {
-  jobs: `// The queue's tables: jobs waiting (som queue:work, or som dev, runs them) and jobs that failed
+  jobs: `// The queue's tables: jobs waiting (kreft queue:work, or kreft dev, runs them) and jobs that failed
 module.exports = {
   up(schema) {
     schema.create('jobs', (table) => {
@@ -110,7 +110,7 @@ function tableCommand(kind, fileName) {
     const exists = fs.existsSync(dir) && fs.readdirSync(dir).some((f) => f.includes(fileName));
     if (exists) return console.log(`  There is already a ${fileName} migration.`);
     write(path.join(dir, `${nextStamp(dir)}_${fileName}.js`), tableStubs[kind]);
-    console.log(dim('  Then: som migrate'));
+    console.log(dim('  Then: kreft migrate'));
   };
 }
 commands['queue:table'] = tableCommand('jobs', 'create_jobs_table');
@@ -124,7 +124,7 @@ commands['queue:work'] = async function (args) {
   const queues = (raw.split('=')[1] || 'default').split(',');
   await withApp(o, ctx, async () => {
     const q = require('./backend/queue.js');
-    if (!(await q.tablesReady())) return console.error('  No jobs table. Make it with:  som queue:table, then som migrate');
+    if (!(await q.tablesReady())) return console.error('  No jobs table. Make it with:  kreft queue:table, then kreft migrate');
     console.log(`  Working on the ${queues.join(', ')} queue${queues.length > 1 ? 's' : ''}. Stop with Ctrl+C.\n`);
     await q.work({ queues, once: o.flags.has('once'), stopWhenEmpty: o.flags.has('stop-when-empty'), log: console.log });
   });
@@ -135,13 +135,13 @@ commands['queue:failed'] = async function (args) {
     const rows = await db.query('SELECT id, queue, payload, exception, failed_at FROM failed_jobs ORDER BY id DESC LIMIT 50');
     if (!rows.length) return console.log('  No failed jobs.');
     for (const r of rows) console.log(`  ${String(r.id).padEnd(5)} ${String(r.failed_at).slice(0, 19)}  ${JSON.parse(r.payload).class}  ${dim(String(r.exception).split('\n')[0].slice(0, 90))}`);
-    console.log(dim('\n  Try one again: som queue:retry <id>  (or all)'));
+    console.log(dim('\n  Try one again: kreft queue:retry <id>  (or all)'));
   });
 };
 commands['queue:retry'] = async function (args) {
   const o = options(args), ctx = context(o);
   const which = o._[0];
-  if (!which) return console.error('  som queue:retry <id>   or   som queue:retry all');
+  if (!which) return console.error('  kreft queue:retry <id>   or   kreft queue:retry all');
   await withDb(o, ctx, async (db) => {
     const { Builder } = require('./backend/query.js');
     const rows = which === 'all' ? await new Builder('failed_jobs').get() : await new Builder('failed_jobs').where('id', which).get();
@@ -169,10 +169,10 @@ commands['queue:stop'] = async function (args) {
   q.stop(target);
   if (target === 'all' || target === '*') {
     console.log(`  ${red('STOPPED')} All running queues have been stopped.`);
-    console.log(dim('  Resume anytime with: som queue:resume --all'));
+    console.log(dim('  Resume anytime with: kreft queue:resume --all'));
   } else {
     console.log(`  ${yellow('STOPPED')} Queue "${target}" has been stopped.`);
-    console.log(dim(`  Resume with: som queue:resume ${target}`));
+    console.log(dim(`  Resume with: kreft queue:resume ${target}`));
   }
 };
 commands['queue:pause'] = commands['queue:stop'];
@@ -210,7 +210,7 @@ commands['queue:status'] = async function (args) {
     console.log(`  Worker State:    ${green('RUNNING')}`);
   }
 
-  const { readConfig } = require('./som-config.js');
+  const { readConfig } = require('./kreft-config.js');
   const config = readConfig(ctx.base);
   const url = o.db || process.env.DATABASE_URL || config.db;
   if (url) {
@@ -363,17 +363,17 @@ commands['sitemap'] = async function (args) {
   const routes = ['/'];
   // a route with a :param or * is a family of pages, not one address: it cannot be listed as it is
   const add = (p) => { if (p && p.startsWith('/') && !/[:*]/.test(p) && !routes.includes(p)) routes.push(p); };
-  const webSom = [
-    path.join(ctx.frontend, 'routes', 'web.som'),
-    path.join(ctx.project, 'routes', 'web.som'),
+  const webKreft = [
+    path.join(ctx.frontend, 'routes', 'web.kreft'),
+    path.join(ctx.project, 'routes', 'web.kreft'),
   ].find((f) => fs.existsSync(f));
 
-  if (webSom) {
-    const src = fs.readFileSync(webSom, 'utf8');
+  if (webKreft) {
+    const src = fs.readFileSync(webKreft, 'utf8');
     for (const m of src.matchAll(/Route\.(?:view|get)\(\s*['"]([^'"]+)['"]/g)) add(m[1]);
   }
 
-  // routes written in Som.router({ routes: [{ path: '/about', component: ... }] }) in index.html
+  // routes written in Kreft.router({ routes: [{ path: '/about', component: ... }] }) in index.html
   const indexHtml = [path.join(ctx.frontend, 'index.html'), path.join(ctx.project, 'index.html')].find((f) => fs.existsSync(f));
   if (indexHtml) {
     for (const line of fs.readFileSync(indexHtml, 'utf8').split('\n')) {
@@ -387,7 +387,7 @@ commands['sitemap'] = async function (args) {
   try {
     if (o.urls) extra.push(...await require('./urls-file.js')(o.urls));
     if (fs.existsSync(path.join(ctx.base, 'routes')) && require('./backend/typescript.js').findFile(path.join(ctx.base, 'routes', 'seo'))) {
-      const { readConfig } = require('./som-config.js');
+      const { readConfig } = require('./kreft-config.js');
       const dbUrl = o.db || process.env.DATABASE_URL || readConfig(ctx.base).db;
       const seoPages = require('./backend/seo-pages.js');
       const backend = require('./backend/index.js');
@@ -417,7 +417,7 @@ commands['sitemap'] = async function (args) {
   }
   bar.complete(`${routes.length} URLs indexed`);
 
-  if (/^https?:\/\/(localhost|127\.0\.0\.1|\[::1\])(:|\/|$)/.test(baseUrl)) console.log(`  WARN  The sitemap uses ${baseUrl}. Search engines need your real address: som sitemap --url https://example.com (or set APP_URL)`);
+  if (/^https?:\/\/(localhost|127\.0\.0\.1|\[::1\])(:|\/|$)/.test(baseUrl)) console.log(`  WARN  The sitemap uses ${baseUrl}. Search engines need your real address: kreft sitemap --url https://example.com (or set APP_URL)`);
   const { SEO } = require('./backend/support.js');
   const xml = SEO.sitemap(routes, { baseUrl });
   const robots = SEO.robots({ allow: '/', sitemapUrl: `${baseUrl.replace(/\/+$/, '')}/sitemap.xml` });
@@ -441,7 +441,7 @@ commands['log'] = async function (args) {
   if (o.flags.has('clear')) return commands['log:clear'](args);
 
   const logDir = path.join(ctx.base, 'storage', 'logs');
-  const logFile = path.join(logDir, 'som.log');
+  const logFile = path.join(logDir, 'kreft.log');
 
   if (!fs.existsSync(logFile)) {
     console.log(`  No log file at ${path.relative(ctx.project, logFile)}.`);
@@ -478,7 +478,7 @@ commands['log'] = async function (args) {
 commands['log:clear'] = async function (args) {
   const o = options(args), ctx = context(o);
   const logDir = path.join(ctx.base, 'storage', 'logs');
-  const logFile = path.join(logDir, 'som.log');
+  const logFile = path.join(logDir, 'kreft.log');
   fs.mkdirSync(logDir, { recursive: true });
   fs.writeFileSync(logFile, '');
   console.log(`  ${green('DONE')}  The log file (${path.relative(ctx.project, logFile)}) has been cleared.`);
@@ -557,7 +557,7 @@ commands['key:generate'] = async function (args) {
   // Revoke all active sessions in the database so all users are forced to log in again
   let revokedSessions = 0;
   try {
-    const { readConfig } = require('./som-config.js');
+    const { readConfig } = require('./kreft-config.js');
     const config = readConfig(ctx.base);
     const url = o.db || process.env.DATABASE_URL || config.db;
     if (url) {
@@ -602,7 +602,7 @@ commands.down = function (args) {
   const data = { time: Math.floor(Date.now() / 1000), retry: Number(get('retry')) || null, message: get('message') || 'We are making the site better. Please come back soon.', secret };
   fs.mkdirSync(path.dirname(downFile(ctx)), { recursive: true });
   fs.writeFileSync(downFile(ctx), JSON.stringify(data, null, 2), { mode: 0o600 });
-  console.log(`  ${yellow('DOWN')}  The app is in maintenance mode: visitors see a 503 page.${secret ? `\n  You can still use it at: /${secret}  (once; a cookie remembers you)` : ''}\n  Back with: som up`);
+  console.log(`  ${yellow('DOWN')}  The app is in maintenance mode: visitors see a 503 page.${secret ? `\n  You can still use it at: /${secret}  (once; a cookie remembers you)` : ''}\n  Back with: kreft up`);
 };
 commands.up = function (args) {
   const o = options(args), ctx = context(o);
@@ -617,11 +617,11 @@ commands.about = function (args) {
   const ok = (b) => (b ? green('yes') : dim('no'));
   const has = (p) => fs.existsSync(p);
   console.log('\n  Environment');
-  row('Som.js', pkg.version);
+  row('Kreft', pkg.version);
   row('Node.js', process.version);
   row('App name', process.env.APP_NAME || '-');
   row('App URL', process.env.APP_URL || '-');
-  row('APP_KEY', process.env.APP_KEY ? green('set') : red('missing (som key:generate)'));
+  row('APP_KEY', process.env.APP_KEY ? green('set') : red('missing (kreft key:generate)'));
   row('TypeScript', ok(has(path.join(ctx.project, 'tsconfig.json'))));
   row('Maintenance mode', has(downFile(ctx)) ? yellow('down') : 'live');
   console.log('\n  Drivers');
@@ -642,7 +642,7 @@ commands.tinker = async function (args) {
     const app = require('./backend/app.js');
     const models = {};
     for (const file of app.filesOf('model')) { try { const M = app.unwrap(require(file)); if (M && M.name) models[M.name] = M; } catch (e) { console.error(`  ${path.basename(file)}: ${e.message}`); } }
-    console.log(`  Som.js ${pkg.version} tinker. Your models: ${Object.keys(models).join(', ') || '(none)'}.  await works.  .exit to leave.\n`);
+    console.log(`  Kreft ${pkg.version} tinker. Your models: ${Object.keys(models).join(', ') || '(none)'}.  await works.  .exit to leave.\n`);
     const r = repl.start({ prompt: '> ', useGlobal: false, preview: true });
     Object.assign(r.context, b, models, { db });
     await new Promise((res) => r.on('exit', res));
@@ -651,9 +651,9 @@ commands.tinker = async function (args) {
 
 /* ------------------------------------------------------------------ make:… */
 const stub = {
-  job: (n) => `const { Job } = require('somjs/server')
+  job: (n) => `const { Job } = require('kreft/server')
 
-// dispatch(new ${n}(…)) puts it on the queue; som queue:work (or som dev) runs handle()
+// dispatch(new ${n}(…)) puts it on the queue; kreft queue:work (or kreft dev) runs handle()
 class ${n} extends Job {
   static tries = 3        // try again after an error, up to 3 times
   static backoff = 10     // seconds between tries
@@ -695,7 +695,7 @@ class ${n} {
 
 module.exports = ${n}
 `,
-  mail: (n) => `const { Mailable } = require('somjs/server')
+  mail: (n) => `const { Mailable } = require('kreft/server')
 
 // await Mail.to(user.email).send(new ${n}(user))   or   .queue(new ${n}(user))
 class ${n} extends Mailable {
@@ -716,7 +716,7 @@ class ${n} extends Mailable {
 
 module.exports = ${n}
 `,
-  notification: (n) => `const { Notification, Url } = require('somjs/server')
+  notification: (n) => `const { Notification, Url } = require('kreft/server')
 
 // await user.notify(new ${n}(…))
 class ${n} extends Notification {
@@ -728,7 +728,7 @@ class ${n} extends Notification {
   }
 
   via(notifiable) {
-    return ['mail', 'database'] // 'database' needs the notifications table: som notifications:table
+    return ['mail', 'database'] // 'database' needs the notifications table: kreft notifications:table
   }
 
   toMail(notifiable) {
@@ -760,7 +760,7 @@ class ${n} {
 
 module.exports = ${n}
 `,
-  request: (n) => `const { FormRequest } = require('somjs/server')
+  request: (n) => `const { FormRequest } = require('kreft/server')
 
 // in a controller:  const data = await ${n}.validate(req)
 class ${n} extends FormRequest {
@@ -783,7 +783,7 @@ class ${n} extends FormRequest {
 
 module.exports = ${n}
 `,
-  resource: (n) => `const { JsonResource } = require('somjs/server')
+  resource: (n) => `const { JsonResource } = require('kreft/server')
 
 // return new ${n}(model)   or   ${n}.collection(list)   ({ data: … })
 class ${n} extends JsonResource {
@@ -836,7 +836,7 @@ module.exports = ${n}
   is_active: true,`;
     }
 
-    return `const { Factory } = require('somjs/server')
+    return `const { Factory } = require('kreft/server')
 const ${model} = require('${modelReq}')
 
 // await ${model}.factory().count(10).create()
@@ -858,9 +858,9 @@ class ${n} {
 
 module.exports = ${n}
 `,
-  command: (n, sig) => `const { Command } = require('somjs/server')
+  command: (n, sig) => `const { Command } = require('kreft/server')
 
-// som ${sig} — your own command
+// kreft ${sig} — your own command
 class ${n} extends Command {
   static signature = '${sig} {name?} {--force}'
   static description = 'What ${sig} does'
@@ -894,21 +894,21 @@ function makeIn(folder, suffix, build, usage) {
     return build(o, ctx, dirs, name, path.join(ctx.base, ...folder.split('/'), ...dirs, name + '.js'));
   };
 }
-make.job = makeIn('app/Jobs', '', (o, c, d, n, f) => write(f, stub.job(n)), 'som make:job SendWelcomeEmail');
-make.event = makeIn('app/Events', '', (o, c, d, n, f) => write(f, stub.event(n)), 'som make:event OrderShipped');
-make.listener = makeIn('app/Listeners', '', (o, c, d, n, f) => write(f, stub.listener(n, o.event)), 'som make:listener SendShipmentNotice --event OrderShipped');
-make.mail = makeIn('app/Mail', 'Mail', (o, c, d, n, f) => write(f, stub.mail(n)), 'som make:mail WelcomeMail');
-make.notification = makeIn('app/Notifications', '', (o, c, d, n, f) => write(f, stub.notification(n)), 'som make:notification InvoicePaid');
-make.policy = makeIn('app/Policies', 'Policy', (o, c, d, n, f) => write(f, stub.policy(n, o.model || n.replace(/Policy$/, ''))), 'som make:policy PostPolicy [--model Post]');
-make.request = make.request || makeIn('app/Http/Requests', 'Request', (o, c, d, n, f) => write(f, stub.request(n)), 'som make:request StorePostRequest');
-make.resource = make.resource || makeIn('app/Http/Resources', 'Resource', (o, c, d, n, f) => write(f, stub.resource(n)), 'som make:resource PostResource');
-make.rule = make.rule || makeIn('app/Rules', '', (o, c, d, n, f) => write(f, stub.rule(n)), 'som make:rule Uppercase');
-make.observer = makeIn('app/Observers', 'Observer', (o, c, d, n, f) => write(f, stub.observer(n, o.model || n.replace(/Observer$/, ''))), 'som make:observer PostObserver [--model Post]');
-make.command = makeIn('app/Console/Commands', '', (o, c, d, n, f) => write(f, stub.command(n, o.command || n.replace(/Command$/, '').replace(/([a-z])([A-Z])/g, '$1-$2').toLowerCase().replace(/-/, ':'))), 'som make:command SendReport [--command report:send]');
+make.job = makeIn('app/Jobs', '', (o, c, d, n, f) => write(f, stub.job(n)), 'kreft make:job SendWelcomeEmail');
+make.event = makeIn('app/Events', '', (o, c, d, n, f) => write(f, stub.event(n)), 'kreft make:event OrderShipped');
+make.listener = makeIn('app/Listeners', '', (o, c, d, n, f) => write(f, stub.listener(n, o.event)), 'kreft make:listener SendShipmentNotice --event OrderShipped');
+make.mail = makeIn('app/Mail', 'Mail', (o, c, d, n, f) => write(f, stub.mail(n)), 'kreft make:mail WelcomeMail');
+make.notification = makeIn('app/Notifications', '', (o, c, d, n, f) => write(f, stub.notification(n)), 'kreft make:notification InvoicePaid');
+make.policy = makeIn('app/Policies', 'Policy', (o, c, d, n, f) => write(f, stub.policy(n, o.model || n.replace(/Policy$/, ''))), 'kreft make:policy PostPolicy [--model Post]');
+make.request = make.request || makeIn('app/Http/Requests', 'Request', (o, c, d, n, f) => write(f, stub.request(n)), 'kreft make:request StorePostRequest');
+make.resource = make.resource || makeIn('app/Http/Resources', 'Resource', (o, c, d, n, f) => write(f, stub.resource(n)), 'kreft make:resource PostResource');
+make.rule = make.rule || makeIn('app/Rules', '', (o, c, d, n, f) => write(f, stub.rule(n)), 'kreft make:rule Uppercase');
+make.observer = makeIn('app/Observers', 'Observer', (o, c, d, n, f) => write(f, stub.observer(n, o.model || n.replace(/Observer$/, ''))), 'kreft make:observer PostObserver [--model Post]');
+make.command = makeIn('app/Console/Commands', '', (o, c, d, n, f) => write(f, stub.command(n, o.command || n.replace(/Command$/, '').replace(/([a-z])([A-Z])/g, '$1-$2').toLowerCase().replace(/-/, ':'))), 'kreft make:command SendReport [--command report:send]');
 make.factory = function (args) {
   const o = options(args), ctx = context(o);
   let { name } = nested(o._[0]);
-  if (!name) return console.error('  som make:factory PostFactory [--model Post]');
+  if (!name) return console.error('  kreft make:factory PostFactory [--model Post]');
   if (!name.endsWith('Factory')) name += 'Factory';
   const model = o.model ? nested(o.model) : { dirs: [], name: name.replace(/Factory$/, '') };
   write(path.join(ctx.base, 'database', 'factories', name + '.js'), stub.factory(name, model.name, '../../app/Models/' + [...model.dirs, model.name].join('/')));
@@ -954,7 +954,7 @@ async function runCustom(name, args) {
   const values = {}, opts = {};
   found.args.forEach((a, i) => { values[a.name] = a.many ? positional.slice(i) : positional[i] ?? a.def ?? null; });
   const missing = found.args.find((a) => !a.optional && (values[a.name] == null || (a.many && !values[a.name].length)));
-  if (missing) { console.error(`  Missing the "${missing.name}" argument.  som ${found.C.signature.replace(/\s*\{--[^}]+\}/g, '')}`); process.exitCode = 1; return true; }
+  if (missing) { console.error(`  Missing the "${missing.name}" argument.  kreft ${found.C.signature.replace(/\s*\{--[^}]+\}/g, '')}`); process.exitCode = 1; return true; }
   for (const op of found.opts) {
     const given = args.find((a) => a === '--' + op.name || a.startsWith(`--${op.name}=`));
     opts[op.name] = op.takes ? (given && given.includes('=') ? given.split('=').slice(1).join('=') : op.def) : Boolean(given);
@@ -978,8 +978,8 @@ commands.list = function (args) {
   const builtIn = Object.keys(commands).filter((c) => !['list', 'help', '--help', '-h', '--version', '-v'].includes(c)).sort();
   const groups = {};
   for (const c of builtIn) (groups[c.includes(':') ? c.split(':')[0] : ''] = groups[c.includes(':') ? c.split(':')[0] : ''] || []).push(c);
-  console.log(`\n  Som.js ${pkg.version}\n\n  Commands:`);
-  console.log('    new  dev  serve  build  update  db  vscode   (som help for their options)');
+  console.log(`\n  Kreft ${pkg.version}\n\n  Commands:`);
+  console.log('    new  dev  serve  build  update  db  vscode   (kreft help for their options)');
   console.log('    ' + (groups[''] || []).join('  '));
   for (const [g, list] of Object.entries(groups)) if (g) console.log(`  ${g}\n    ${list.join('  ')}`);
   const mine = customCommands(ctx.base);
