@@ -2,7 +2,7 @@
  * Jobs and background queue workers.
  *
  *   // app/Jobs/SendWelcomeEmail.js
- *   const { Job, Mail } = require('kreft/server')
+ *   const { Job, Mail } = require('kreftjs/server')
  *   class SendWelcomeEmail extends Job {
  *     static tries = 3          // try again after an error, up to 3 times
  *     static backoff = 10       // seconds to wait before trying again
@@ -15,7 +15,7 @@
  *   await dispatch(new SendWelcomeEmail(user), { delay: 60 })        // in a minute
  *   await dispatchSync(new SendWelcomeEmail(user))                   // now
  *
- * QUEUE_CONNECTION in .env: database (the jobs table; kreft dev and `kreft queue:work` run them) or sync (at once).
+ * QUEUE_CONNECTION in .env: database (the jobs table; kreftjs dev and `kreftjs queue:work` run them) or sync (at once).
  */
 const crypto = require('crypto');
 const fs = require('fs');
@@ -377,7 +377,7 @@ async function workOne({ queues = ['default'], log = () => {} } = {}) {
   }
 }
 
-// kreft queue:work — runs jobs as they come (stop with Ctrl+C)
+// kreftjs queue:work — runs jobs as they come (stop with Ctrl+C)
 async function work({ queues = ['default'], once = false, sleep = 1, maxJobs = Infinity, log = console.log, stopWhenEmpty = false } = {}) {
   const workerStartedAt = Date.now();
   let n = 0;

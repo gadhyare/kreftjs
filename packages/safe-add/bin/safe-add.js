@@ -367,19 +367,19 @@ function runSecurityAudit(npmCmd, project, auditData) {
 
 function printHelp() {
   console.log(`
-  ${bold('kreft add <packages...>') }  (alias: ${dim('kreft install')}, ${dim('kreft i')})
+  ${bold('kreftjs add <packages...>') }  (alias: ${dim('kreftjs install')}, ${dim('kreftjs i')})
 
   Enterprise-Grade Security Gatekeeper & Package Installer for Kreft.
   Runs anywhere on any machine with zero external dependencies.
 
   Usage:
-    kreft add <packages...>           Install package(s) with full security gatekeeper verification
-    kreft add express lodash          Install multiple packages safely
-    kreft add -D vitest               Install as devDependency
-    kreft add --check <pkg>           Inspect package security report without installing (alias: --dry-run)
-    kreft add -y <pkg>                Auto-confirm unverified packages in CI/CD (alias: --yes)
-    kreft add --allow-scripts <pkg>   Allow lifecycle scripts (postinstall/build)
-    kreft add --force <pkg>           Bypass security warnings & redundancy checks
+    kreftjs add <packages...>           Install package(s) with full security gatekeeper verification
+    kreftjs add express lodash          Install multiple packages safely
+    kreftjs add -D vitest               Install as devDependency
+    kreftjs add --check <pkg>           Inspect package security report without installing (alias: --dry-run)
+    kreftjs add -y <pkg>                Auto-confirm unverified packages in CI/CD (alias: --yes)
+    kreftjs add --allow-scripts <pkg>   Allow lifecycle scripts (postinstall/build)
+    kreftjs add --force <pkg>           Bypass security warnings & redundancy checks
 
   Security Verification Rules:
     1. Homoglyph & Shell Injection Shield:
@@ -414,7 +414,7 @@ async function runSafeAdd(args = []) {
     return;
   }
 
-  // Handle subcommands: 'kreft add <pkgs>', 'kreft install <pkgs>', 'kreft i <pkgs>'
+  // Handle subcommands: 'kreftjs add <pkgs>', 'kreftjs install <pkgs>', 'kreftjs i <pkgs>'
   let inputArgs = [...args];
   if (inputArgs[0] === 'add' || inputArgs[0] === 'install' || inputArgs[0] === 'i') {
     inputArgs = inputArgs.slice(1);

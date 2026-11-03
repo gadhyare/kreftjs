@@ -1,34 +1,34 @@
 /*
- * kreft build — turns a Kreft app into production files.
+ * kreftjs build — turns a Kreft app into production files.
  *
- *   kreft build                  build this folder into ./dist
- *   kreft build ./site           build another folder
- *   kreft build --out public     choose the output folder
- *   kreft build --base /         change <base href> in index.html
- *   kreft build --prerender      also save every page as ready HTML (needs: npm i -D jsdom)
- *   kreft build --prerender --urls urls.js   ... and the addresses in that file (pages that come from your data)
- *   kreft build --include docs   also copy another folder into the output
+ *   kreftjs build                  build this folder into ./dist
+ *   kreftjs build ./site           build another folder
+ *   kreftjs build --out public     choose the output folder
+ *   kreftjs build --base /         change <base href> in index.html
+ *   kreftjs build --prerender      also save every page as ready HTML (needs: npm i -D jsdom)
+ *   kreftjs build --prerender --urls urls.js   ... and the addresses in that file (pages that come from your data)
+ *   kreftjs build --include docs   also copy another folder into the output
  *
  * What it does:
- *   1. Compiles every .kreft file ahead of time into app.js (no .kreft files are downloaded in production).
+ *   1. Compiles every .kreftjs file ahead of time into app.js (no .kreftjs files are downloaded in production).
  *   2. Turns every expression in the views into a real function, so the app runs without
  *      eval / new Function — it works under a strict Content-Security-Policy.
  *   3. Collects all <style> blocks (scoped ones already scoped) into app.css.
  *   4. Moves inline <script> code from index.html into main.js.
- *   5. Copies kreft.js and every other file (images, fonts, .js) next to them.
+ *   5. Copies kreftjs.js and every other file (images, fonts, .js) next to them.
  *
  * No dependencies — only Node.js.
  */
 const fs = require('fs');
 const path = require('path');
-const Kreft = require('../kreft.js');
+const Kreftjs = require('../kreftjs.js');
 
 const { expandBlocks, prepareTemplate, splitKreft, splitInterp, exactBrace, stripBrace, interpToExpr, quoteBraceAttrs, expandSelfClosing,
-  scopeCss, hashString, propType, simplePathRE, fnExpRE, forAliasRE, stripTypeScript } = Kreft.__internal;
+  scopeCss, hashString, propType, simplePathRE, fnExpRE, forAliasRE, stripTypeScript } = Kreftjs.__internal;
 
 const deps = require('./deps.js');
-// component files: .kreft, or .som in a project made with Som.js
-const isComp = (f) => /\.(?:kreft|som)$/i.test(f);
+// component files: .kreftjs, or .kreft / .som in an older project
+const isComp = (f) => /\.(?:kreftjs|kreft|som)$/i.test(f);
 const SERVER_DIRS = new Set();
 const SKIP = new Set(['node_modules', '.git', '.vscode', '.idea', 'package.json', 'package-lock.json', '.DS_Store']);
 
@@ -53,13 +53,13 @@ module.exports = function build(args) {
   if (dist === root) fail('The output folder must be different from the app folder.');
   const project = deps.projectDir(root);
   const env = require('./env.js');
-  env.loadEnv(project); // PUBLIC_ values from .env go into app.js, as Kreft.env
+  env.loadEnv(project); // PUBLIC_ values from .env go into app.js, as Kreftjs.env
   // server code never goes into the built site: server/, backend app/ and routes/
   if (!lay.split) for (const dir of [root, project]) ['server', 'app', 'routes'].forEach((d) => SERVER_DIRS.add(path.join(dir, d)));
   SERVER_DIRS.add(lay.backend === lay.project ? path.join(project, 'server') : lay.backend);
-  const bare = new Set(), cssLinks = [];    // npm packages used by the .kreft files, and imported CSS files
+  const bare = new Set(), cssLinks = [];    // npm packages used by the .kreftjs files, and imported CSS files
 
-  // ---- 1. find and compile every .kreft file
+  // ---- 1. find and compile every .kreftjs file
   const kreftFiles = walk(root, dist).filter((f) => isComp(f));
   const fns = new Map();             // precompiled expression functions: key → source
   const components = [];
@@ -68,7 +68,7 @@ module.exports = function build(args) {
 
   addRouterTemplates(fns);           // the router's own <kreft-link> and <kreft-view> templates
 
-  // .kreft files in --include folders too: they land in the output as <folder>/…, so that is their path there
+  // .kreftjs files in --include folders too: they land in the output as <folder>/…, so that is their path there
   const jobs = kreftFiles.map((file) => [file, toUrlPath(path.relative(root, file)), root]);
   for (const dir of include) {
     const from = path.resolve(dir);
@@ -82,7 +82,7 @@ module.exports = function build(args) {
   const templateBar = createProgressBar(jobs.length, { label: 'Compiling templates' });
   for (const [file, rel, base] of jobs) {
     templateBar.tick(rel);
-    // routes/web.kreft and other route files: plain JavaScript with Route in scope, kept as a function
+    // routes/web.kreftjs and other route files: plain JavaScript with Route in scope, kept as a function
     if (/^routes\//.test(rel)) {
       const src = stripTypeScript(fs.readFileSync(file, 'utf8'));
       try { new Function('Route', src); } catch (e) { errors.push(`  ${rel}: ${e.message}`); continue; }
@@ -110,25 +110,25 @@ module.exports = function build(args) {
   const langHelper = require('./lang.js');
   const langDirs = langHelper.findLangDirs(root);
   const langData = langHelper.scanLangDir(langDirs);
-  const langInject = Object.keys(langData).length ? `Kreft.translations(${JSON.stringify(langData)});\n` : '';
+  const langInject = Object.keys(langData).length ? `Kreftjs.translations(${JSON.stringify(langData)});\n` : '';
 
   const precompiled = [...fns].map(([key, src]) => `F[${JSON.stringify(key)}] = ${src};`).join('\n');
-  const appJs = `/* Built by kreft build — do not edit. Rebuild from your .kreft files instead. */
+  const appJs = `/* Built by kreftjs build — do not edit. Rebuild from your .kreftjs files instead. */
 ${env.envScript(env.publicEnv())}
-(function (Kreft) {
-  if (!Kreft) throw new Error('Load kreft.js before app.js');
-  var F = Kreft.__precompiled;
+(function (Kreftjs) {
+  if (!Kreftjs) throw new Error('Load kreftjs.js before app.js');
+  var F = Kreftjs.__precompiled;
 ${langInject ? indent(langInject) : ''}
 ${indent(precompiled)}
 
 ${indent(components.join('\n\n'))}
-})(window.Kreft);
+})(window.Kreftjs);
 `;
   // app.js uses `with`, so it must stay a classic (non-module, non-strict) script — check it parses
   try { new Function(appJs); } catch (e) { fail('Internal error: app.js does not parse: ' + e.message); }
   write(dist, 'app.js', appJs);
   // the ready-made k-animate styles (fade, slide, scale, pop), first so your own CSS wins
-  write(dist, 'app.css', '/* Kreft k-animate presets */\n' + Kreft.__presetCss + '\n\n' + css.trim() + '\n');
+  write(dist, 'app.css', '/* Kreft k-animate presets */\n' + Kreftjs.__presetCss + '\n\n' + css.trim() + '\n');
 
   // copy everything else (images, fonts, plain .js files…)
   for (const file of walk(root, dist)) {
@@ -152,7 +152,7 @@ ${indent(components.join('\n\n'))}
       }
     }
   }
-  fs.copyFileSync(path.join(__dirname, '..', 'kreft.js'), path.join(dist, 'kreft.js'));
+  fs.copyFileSync(path.join(__dirname, '..', 'kreftjs.js'), path.join(dist, 'kreftjs.js'));
   for (const dir of include) {
     const from = path.resolve(dir);
     if (!fs.existsSync(from)) fail(`--include: ${dir} does not exist.`);
@@ -164,9 +164,9 @@ ${indent(components.join('\n\n'))}
     }
   }
 
-  // ---- 3. index.html: kreft.js + app.js + app.css, inline scripts moved to main.js
+  // ---- 3. index.html: kreftjs.js + app.js + app.css, inline scripts moved to main.js
   let html = fs.readFileSync(path.join(root, 'index.html'), 'utf8');
-  // an included folder that sits next to the app ('../docs/Docs.kreft') is inside the output: 'docs/Docs.kreft'
+  // an included folder that sits next to the app ('../docs/Docs.kreftjs') is inside the output: 'docs/Docs.kreftjs'
   for (const dir of include) {
     const up = toUrlPath(path.relative(root, path.resolve(dir)));
     if (up.startsWith('../')) html = html.split(`'${up}/`).join(`'${path.basename(up)}/`).split(`"${up}/`).join(`"${path.basename(up)}/`);
@@ -175,9 +175,9 @@ ${indent(components.join('\n\n'))}
   let sawKreft = false, placedMain = false;
   html = html.replace(/<script\b([^>]*)>([\s\S]*?)<\/script>/gi, (tag, attrs, body) => {
     const src = (attrs.match(/\bsrc\s*=\s*["']([^"']+)["']/i) || [])[1];
-    if (src && /(^|\/)(?:kreft|som)(\.min)?\.js$/i.test(src)) {
+    if (src && /(^|\/)(?:kreftjs|kreft|som)(\.min)?\.js$/i.test(src)) {
       sawKreft = true;
-      return '<script src="kreft.js"></script>\n  <script src="app.js"></script>';
+      return '<script src="kreftjs.js"></script>\n  <script src="app.js"></script>';
     }
     if (!src && body.trim() && !/type\s*=\s*["'](?!text\/javascript|module)/i.test(attrs)) {
       if (/type\s*=\s*["']module["']/i.test(attrs)) return tag; // leave modules as they are
@@ -189,7 +189,7 @@ ${indent(components.join('\n\n'))}
     return tag;
   });
   html = html.replace(/(<script\b[^>]*\bsrc=["'][^"']+?)\.ts(["'])/gi, '$1.js$2');
-  if (!sawKreft) fail('index.html has no <script src="…kreft.js">. Add one so the build knows where to load Kreft.');
+  if (!sawKreft) fail('index.html has no <script src="…kreftjs.js">. Add one so the build knows where to load Kreft.');
   if (mainJs) write(dist, 'main.js', mainJs);
   // ---- 4. npm packages: each one bundled into deps/, found through an import map; imported CSS as <link>s
   const map = {};
@@ -204,7 +204,7 @@ ${indent(components.join('\n\n'))}
   const links = cssLinks.map(({ spec, local }) => {
     if (local) return spec;
     const file = deps.packageFile(project, spec);
-    if (!file) fail(`The CSS file "${spec}" was not found in node_modules. Run:  kreft add ${(spec.match(deps.NAME) || [spec])[0]}`);
+    if (!file) fail(`The CSS file "${spec}" was not found in node_modules. Run:  kreftjs add ${(spec.match(deps.NAME) || [spec])[0]}`);
     const info = deps.packageJson(project, spec);
     copyCss(file, info.dir, path.join(dist, 'vendor', info.name));
     return toUrlPath(path.join('vendor', info.name, path.relative(info.dir, file)));
@@ -237,7 +237,7 @@ ${indent(components.join('\n\n'))}
       ...files.sort().map(([f, n]) => `  ${cyan(kb(n))}  ${toUrlPath(f)}`),
       '---',
       `  ${bold('Output:')}  ${dist}`,
-      `  ${bold('Preview:')} kreft dev ${path.relative(process.cwd(), dist) || '.'}`,
+      `  ${bold('Preview:')} kreftjs dev ${path.relative(process.cwd(), dist) || '.'}`,
     ];
     console.log('\n' + renderBox(lines, { width: 66, borderColor: green }) + '\n');
   };
@@ -256,12 +256,12 @@ function tsToJs(file, project) {
   return code.replace(/((?:from|import)\s*\(?\s*['"])(\.{1,2}\/[^'"]+?)\.ts(['"])/g, '$1$2.js$3');
 }
 
-/* ------------------------------------------------------------------ one .kreft file → JS */
+/* ------------------------------------------------------------------ one .kreftjs file → JS */
 function compileFile(file, rel, root) {
   const sp = splitKreft(fs.readFileSync(file, 'utf8'), rel);
   const name = sp.name;
 
-  // the script must parse; report the .kreft line if it doesn't
+  // the script must parse; report the .kreftjs line if it doesn't
   const run = `function ($scope, $h) { with ($scope) {\n${sp.code}\n} }`;
   try { new Function('return ' + run); } catch (e) { throw new Error(`script error: ${e.message}`); }
 
@@ -275,13 +275,13 @@ function compileFile(file, rel, root) {
     return `${JSON.stringify(p)}: { ${type ? `type: ${type.name}, ` : ''}default: function () { return (${expr}); } }`;
   });
 
-  // imports: other .kreft files become component references; .js modules load with import()
+  // imports: other .kreftjs files become component references; .js modules load with import()
   const comps = [], values = [], bare = [], cssImports = [];
   for (const stmt of sp.imports) {
     const m = stmt.match(/^import\s+(?:([\s\S]+?)\s+from\s+)?(['"])(.+?)\2/);
     if (!m) throw new Error(`can't read import: ${stmt}`);
     const [, what, , spec] = m;
-    if (/^(?:kreft|som)(\.js)?$/.test(spec)) continue;
+    if (/^(?:kreftjs|kreft|som)(\.js)?$/.test(spec)) continue;
     let target = /^\.{1,2}\//.test(spec) ? toUrlPath(path.relative(root, path.resolve(path.dirname(file), spec))) : spec;
     if (/^\.{1,2}\//.test(spec) && /\.ts$/i.test(spec)) target = target.replace(/\.ts$/i, '.js'); // TypeScript files are built into .js
     if (isComp(spec)) {
@@ -329,7 +329,7 @@ function compileFile(file, rel, root) {
 // `import { a, b as c } from './x.js'` → loaded with import() when the component is first used
 function loadValuesSource(values) {
   const lines = values.map(({ what, target, local }, i) => {
-    // files in the app resolve from <base href>, like .kreft paths; URLs and package names stay as written
+    // files in the app resolve from <base href>, like .kreftjs paths; URLs and package names stay as written
     const url = local ? `new URL(${JSON.stringify(target)}, document.baseURI).href` : JSON.stringify(target);
     const picks = [];
     if (what) what.split(/,(?![^{]*\})/).map((s) => s.trim()).forEach((part) => {
@@ -340,7 +340,7 @@ function loadValuesSource(values) {
       });
       else picks.push(`v[${JSON.stringify(part)}] = m${i}.default;`);
     });
-    return `return Kreft.__import(${url}).then(function (m${i}) { ${picks.join(' ')} })`;
+    return `return Kreftjs.__import(${url}).then(function (m${i}) { ${picks.join(' ')} })`;
   });
   return `function () { var v = {}; return Promise.resolve()${lines.map((l) => `.then(function () { ${l}; })`).join('')}.then(function () { return v; }); }`;
 }
@@ -518,7 +518,7 @@ function walk(dir, exclude) {
     if (SKIP.has(entry.name)) continue;
     if (entry.name === 'storage' && (entry.isSymbolicLink() || entry.isDirectory())) continue;
     // the database, its settings and its migrations stay on the server, never in the built site
-    if (/\.(db|sqlite3?)(-wal|-shm)?$/i.test(entry.name) || entry.name === 'kreft.config.json' || entry.name === 'som.config.json' || (entry.isDirectory() && entry.name === 'database')) continue;
+    if (/\.(db|sqlite3?)(-wal|-shm)?$/i.test(entry.name) || entry.name === 'kreftjs.config.json' || entry.name === 'kreft.config.json' || entry.name === 'som.config.json' || (entry.isDirectory() && entry.name === 'database')) continue;
     const full = path.join(dir, entry.name);
     if (exclude && full === exclude) continue;
     if (SERVER_DIRS.has(full)) continue; // server/ code runs on the server only

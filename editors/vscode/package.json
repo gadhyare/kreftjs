@@ -1,7 +1,7 @@
 {
-  "name": "kreft",
-  "displayName": "Kreft (.kreft files)",
-  "description": "Colors, brackets, formatting and snippets for Kreft .kreft component files (and .som files from Som.js).",
+  "name": "kreftjs",
+  "displayName": "Kreft (.kreftjs files)",
+  "description": "Colors, brackets, formatting and snippets for Kreft .kreftjs component files (and .kreft and .som files from older projects).",
   "version": "2.3.0",
   "publisher": "kreft",
   "license": "MIT",
@@ -15,17 +15,18 @@
   ],
   "main": "./extension.js",
   "activationEvents": [
-    "onLanguage:kreft"
+    "onLanguage:kreftjs"
   ],
   "contributes": {
     "languages": [
       {
-        "id": "kreft",
+        "id": "kreftjs",
         "aliases": [
           "Kreft",
-          "kreft"
+          "kreftjs"
         ],
         "extensions": [
+          ".kreftjs",
           ".kreft",
           ".som"
         ],
@@ -34,13 +35,13 @@
     ],
     "grammars": [
       {
-        "language": "kreft",
-        "scopeName": "source.kreft",
-        "path": "./syntaxes/kreft.tmLanguage.json",
+        "language": "kreftjs",
+        "scopeName": "source.kreftjs",
+        "path": "./syntaxes/kreftjs.tmLanguage.json",
         "embeddedLanguages": {
           "meta.embedded.block.html": "html",
           "source.css": "css",
-          "meta.embedded.expression.kreft": "javascript",
+          "meta.embedded.expression.kreftjs": "javascript",
           "meta.embedded.block.javascript": "javascript",
           "source.js": "javascript"
         }
@@ -48,8 +49,8 @@
     ],
     "snippets": [
       {
-        "language": "kreft",
-        "path": "./snippets/kreft.json"
+        "language": "kreftjs",
+        "path": "./snippets/kreftjs.json"
       }
     ]
   }

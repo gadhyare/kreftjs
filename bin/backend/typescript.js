@@ -1,16 +1,16 @@
 /*
  * TypeScript support across backend and frontend:
  *   - Backend: routes/api.ts, config/*.ts, server/*.ts, and every .ts file in app/ and database/ load like .js files.
- *   - Frontend: .ts modules (e.g. frontend/logic/*.ts) and .kreft components with TypeScript syntax work natively in
- *     both `kreft dev` and `kreft build`.
+ *   - Frontend: .ts modules (e.g. frontend/logic/*.ts) and .kreftjs components with TypeScript syntax work natively in
+ *     both `kreftjs dev` and `kreftjs build`.
  *
  * Uses `esbuild` when installed in the project, or falls back to Kreft's built-in zero-dependency TypeScript
- * compiler (`Kreft.stripTypeScript` + ESM-to-CJS transform) so TypeScript projects work out of the box with zero setup.
+ * compiler (`Kreftjs.stripTypeScript` + ESM-to-CJS transform) so TypeScript projects work out of the box with zero setup.
  */
 const fs = require('fs');
 const path = require('path');
 const Module = require('module');
-const Kreft = require('../../kreft.js');
+const Kreftjs = require('../../kreftjs.js');
 
 let installed = false;
 let esbuild = null;
@@ -134,7 +134,7 @@ function transpileTs(source, { filename = 'module.ts', format = 'cjs', projectDi
   }
   // Fallback 2: Kreft built-in zero-dependency TypeScript stripper
   if (jsCode == null) {
-    jsCode = Kreft.stripTypeScript(source);
+    jsCode = Kreftjs.stripTypeScript(source);
   }
 
   return format === 'cjs' ? esmToCjs(jsCode) : jsCode;

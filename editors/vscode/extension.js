@@ -163,7 +163,7 @@ function formatKreft(text, options = {}) {
 function activate(context) {
   if (!vscode || !vscode.languages) return;
 
-  const provider = vscode.languages.registerDocumentFormattingEditProvider('kreft', {
+  const provider = vscode.languages.registerDocumentFormattingEditProvider('kreftjs', {
     provideDocumentFormattingEdits(document, options) {
       const text = document.getText();
       const formatted = formatKreft(text, options);

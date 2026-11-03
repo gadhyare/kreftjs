@@ -1,7 +1,7 @@
 /*
  * Redis client and connection manager for Kreft.
  *
- *   const { Redis } = require('kreft/server')
+ *   const { Redis } = require('kreftjs/server')
  *
  *   await Redis.set('visits', 10)
  *   const visits = await Redis.get('visits')

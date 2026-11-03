@@ -1,9 +1,9 @@
-const { Hash } = require('kreft/server')
+const { Hash } = require('kreftjs/server')
 const User = require('../../../Models/User')
 const { signIn } = require('../../../Auth/Session')
 
 class RegisteredUserController {
-  // POST /api/register   (pages/auth/Register.kreft)
+  // POST /api/register   (pages/auth/Register.kreftjs)
   async store(req) {
     const data = await req.validate({
       name: 'required|string|max:255',

@@ -1,0 +1,90 @@
+<!-- Two-factor authentication: a code from an authenticator app after the password (pages/Profile.kreftjs).
+     /api/user/two-factor… in backend/routes/auth.js. Turning it on, off, and the recovery codes ask for the
+     password first (the app goes to /confirm-password and comes back). -->
+state setup = null           // { qr, secret } while turning it on
+state code = ''
+state codes = []             // recovery codes, shown after turning on or on request
+state problem = ''
+state busy = false
+
+derive enabled = Boolean($store.auth.user && $store.auth.user.two_factor_enabled)
+
+action refreshUser() { $store.auth.user = await api.get('/api/user') }
+action start() {
+  problem = ''; busy = true
+  try { setup = await api.post('/api/user/two-factor') }
+  catch (e) { if (e.status !== 423) problem = e.message }
+  finally { busy = false }
+}
+action confirm() {
+  problem = ''; busy = true
+  try {
+    const res = await api.post('/api/user/two-factor/confirm', { code })
+    codes = res.recovery_codes
+    setup = null; code = ''
+    await refreshUser()
+  } catch (e) { problem = e.message }
+  finally { busy = false }
+}
+action showCodes() {
+  problem = ''
+  try { codes = (await api.get('/api/user/two-factor/recovery-codes')).recovery_codes }
+  catch (e) { if (e.status !== 423) problem = e.message }
+}
+action regenerate() {
+  problem = ''
+  try { codes = (await api.post('/api/user/two-factor/recovery-codes')).recovery_codes }
+  catch (e) { if (e.status !== 423) problem = e.message }
+}
+action turnOff() {
+  problem = ''
+  try { await api.delete('/api/user/two-factor'); codes = []; setup = null; await refreshUser() }
+  catch (e) { if (e.status !== 423) problem = e.message }
+}
+
+<view>
+  <div class="card">
+    <h2>Two-factor authentication</h2>
+    <p class="muted">After your password, also ask for a code from an authenticator app on your phone (Google Authenticator, 1Password, Authy…).</p>
+    <p k-if="problem" class="alert danger" role="alert">{problem}</p>
+
+    <div k-if="enabled">
+      <p><span class="badge solid">On</span> Logging in asks for a code from your app.</p>
+      <div class="row">
+        <button @click={showCodes}>Show recovery codes</button>
+        <button k-if="codes.length" @click={regenerate}>New recovery codes</button>
+        <button class="danger" @click={turnOff}>Turn off</button>
+      </div>
+    </div>
+
+    <div k-elif="setup" class="setup">
+      <p>Scan this QR code with your authenticator app, or type the key into it. Then type the code the app shows.</p>
+      <div class="qr" k-html="setup.qr"></div>
+      <p class="key">Key: <code>{setup.secret}</code></p>
+      <form @submit.prevent={confirm} class="row">
+        <input k-model="code" inputmode="numeric" autocomplete="one-time-code" maxlength="6" placeholder="123456" aria-label="Code from the app">
+        <button class="primary" disabled={busy || code.length < 6}>Confirm</button>
+        <button type="button" class="ghost" @click="setup = null">Cancel</button>
+      </form>
+    </div>
+
+    <div k-else>
+      <p><span class="badge">Off</span></p>
+      <button class="primary" @click={start} disabled={busy}>Turn on</button>
+    </div>
+
+    <div k-if="codes.length" class="codes">
+      <p><strong>Recovery codes.</strong> Keep them somewhere safe, like a password manager. Each one lets you in once if you lose your phone.</p>
+      <ul>{for c in codes}<li><code>{c}</code></li>{/for}</ul>
+    </div>
+  </div>
+</view>
+
+<style scoped>
+.row { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
+.row input { width: 140px; letter-spacing: 0.2em; font-variant-numeric: tabular-nums; }
+.qr { width: 192px; height: 192px; border: 1px solid var(--border); margin: 12px 0; }
+.key code { word-break: break-all; }
+.codes { margin-top: 16px; padding: 16px; border: 1px solid var(--border); background: var(--accent); }
+.codes ul { list-style: none; padding: 0; margin: 8px 0 0; display: grid; grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); gap: 6px; }
+</style>

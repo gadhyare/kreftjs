@@ -1,4 +1,4 @@
-// JavaScript backend files → TypeScript (kreft new --ts, and kreft make:* in a TypeScript project):
+// JavaScript backend files → TypeScript (kreftjs new --ts, and kreftjs make:* in a TypeScript project):
 // require → import, module.exports → export default. Inline require('./X') stays (it works at run time).
 function toTs(code) {
   return code
@@ -26,8 +26,8 @@ const TSCONFIG = {
     types: ['node'],
     baseUrl: '.',
     paths: {
-      'kreft': ['./frontend/kreft.d.ts'],
-      'kreft/server': ['./backend/server.d.ts'],
+      'kreftjs': ['./frontend/kreftjs.d.ts'],
+      'kreftjs/server': ['./backend/server.d.ts'],
     },
   },
   include: ['backend/**/*.ts', 'backend/**/*.d.ts', 'frontend/**/*.ts', 'frontend/**/*.d.ts'],

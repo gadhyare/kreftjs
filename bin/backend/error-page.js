@@ -108,7 +108,7 @@ function generateSmartSolution(err, topFrame) {
   if (msg.includes('no such table') || msg.includes('does not exist')) {
     return {
       title: 'Pending Database Migration',
-      message: `The queried table does not exist yet. Run <code>kreft db:migrate</code> to apply pending migrations.`
+      message: `The queried table does not exist yet. Run <code>kreftjs db:migrate</code> to apply pending migrations.`
     };
   }
 

@@ -9,7 +9,7 @@
 
 Standard `npm install` blindly executes lifecycle scripts (`preinstall`, `install`, `postinstall`), allows disposable newly registered malicious packages, and is susceptible to **typosquatting** and **unicode homoglyph** attacks.
 
-`kreft` acts as an intelligent, automated security firewall between your project and the public npm registry.
+`kreftjs` acts as an intelligent, automated security firewall between your project and the public npm registry.
 
 ---
 
@@ -17,18 +17,18 @@ Standard `npm install` blindly executes lifecycle scripts (`preinstall`, `instal
 
 ### Run instantly with NPX (No installation needed)
 ```bash
-npx kreft add express lodash
+npx kreftjs add express lodash
 ```
 
 ### Install globally on any machine
 ```bash
-npm install -g kreft
+npm install -g kreftjs
 ```
 
-Once installed globally, you use the standard `kreft` command:
+Once installed globally, you use the standard `kreftjs` command:
 ```bash
-kreft add express
-kreft add -D vitest
+kreftjs add express
+kreftjs add -D vitest
 ```
 
 ---
@@ -69,24 +69,24 @@ kreft add -D vitest
 
 ```bash
 # Basic installation with full verification
-kreft add <packages...>
+kreftjs add <packages...>
 
 # Install as development dependency
-kreft add -D vitest @types/node
+kreftjs add -D vitest @types/node
 
 # Dry-run security inspection without installing
-kreft add --check <package>
-kreft add --dry-run <package>
+kreftjs add --check <package>
+kreftjs add --dry-run <package>
 
 # Auto-confirm in CI/CD non-interactive pipelines
-kreft add -y <package>
-kreft add --yes <package>
+kreftjs add -y <package>
+kreftjs add --yes <package>
 
 # Allow lifecycle scripts for verified packages needing native C++ builds
-kreft add --allow-scripts <package>
+kreftjs add --allow-scripts <package>
 
 # Force installation (bypass warnings)
-kreft add --force <package>
+kreftjs add --force <package>
 ```
 
 ---

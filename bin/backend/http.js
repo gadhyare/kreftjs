@@ -2,7 +2,7 @@
  * Routes, controllers, requests, responses and middleware.
  *
  *   // routes/api.js   (every address here starts with /api)
- *   const { Route } = require('kreft/server')
+ *   const { Route } = require('kreftjs/server')
  *   const PostController = require('../app/Http/Controllers/PostController')
  *
  *   Route.get('/hello', (req) => ({ hello: req.input('name', 'world') }))
@@ -13,7 +13,7 @@
  *   Route.prefix('admin').middleware(['auth', 'throttle:60,1']).group(() => { … })
  */
 const crypto = require('crypto');
-const { validate } = require('../../kreft.js');
+const { validate } = require('../../kreftjs.js');
 const { getConnection } = require('./query.js');
 
 /* ------------------------------------------------------------------ errors and responses */

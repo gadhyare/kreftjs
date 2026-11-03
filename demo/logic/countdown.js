@@ -1,6 +1,6 @@
 // use timer = countdown(10)  →  timer.left, timer.running, timer.start(), timer.stop(), timer.reset()
 export function countdown(seconds) {
-  const timer = Kreft.state({
+  const timer = Kreftjs.state({
     left: seconds,
     running: false,
     get done() { return this.left === 0 },
@@ -16,6 +16,6 @@ export function countdown(seconds) {
     reset() { this.stop(); this.left = seconds },
   })
   let id = null
-  Kreft.onDestroy(() => clearInterval(id))
+  Kreftjs.onDestroy(() => clearInterval(id))
   return timer
 }

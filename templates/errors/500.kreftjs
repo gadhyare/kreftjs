@@ -1,0 +1,11 @@
+<!-- errors/500.kreftjs: shown when a page can't be loaded, and after abort(500). The details are in the browser console. Change the words as you like. -->
+layout 'errors/minimal.kreftjs'
+prop status = 500
+prop title = ''
+prop message = ''
+
+<view>
+  <kreft-section name="code">500</kreft-section>
+  <kreft-section name="title">Server Error</kreft-section>
+  <kreft-section name="message">Something went wrong on our side. Try again in a moment.</kreft-section>
+</view>

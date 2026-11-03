@@ -5,10 +5,10 @@
  *   app/Http/Controllers/PostController.js
  *   app/Http/Middleware/Authenticate.js   'auth' in a route finds Authenticate.js (or Auth.js)
  *   app/Models/Post.js
- *   database/migrations/*.js              kreft migrate, kreft migrate:rollback, kreft migrate:fresh --seed
- *   database/seeders/DatabaseSeeder.js    kreft db:seed
+ *   database/migrations/*.js              kreftjs migrate, kreftjs migrate:rollback, kreftjs migrate:fresh --seed
+ *   database/seeders/DatabaseSeeder.js    kreftjs db:seed
  *
- * In your files:  const { Route, Model, DB, abort, response } = require('kreft/server')
+ * In your files:  const { Route, Model, DB, abort, response } = require('kreftjs/server')
  */
 const fs = require('fs');
 const path = require('path');
@@ -22,7 +22,7 @@ const { fake } = require('./fake.js');
 const migrator = require('./migrator.js');
 const { createSchema } = require('./schema.js');
 
-// require('kreft/server') works in a project even when Kreft is only installed globally
+// require('kreftjs/server') works in a project even when Kreft is only installed globally
 const SERVER_ENTRY = path.join(__dirname, '..', '..', 'server.js');
 let aliased = false;
 function installAlias() {
@@ -31,8 +31,8 @@ function installAlias() {
   const original = Module._resolveFilename;
   require('./typescript.js').registerTypeScript(process.cwd()); // .ts files in routes/, app/, database/
   Module._resolveFilename = function (request, ...rest) {
-    // somjs/server, som/server and @somjs/server are the Som.js names: older projects still require them
-    if (['kreft/server', '@kreft/server', 'somjs/server', 'som/server', '@somjs/server'].includes(request)) return SERVER_ENTRY;
+    // kreft/server and @kreft/server are the earlier Kreft names; somjs/server, som/server and @somjs/server the Som.js ones: older projects still require them
+    if (['kreftjs/server', '@kreftjs/server', 'kreft/server', '@kreft/server', 'somjs/server', 'som/server', '@somjs/server'].includes(request)) return SERVER_ENTRY;
     return original.call(this, request, ...rest);
   };
 }
@@ -171,7 +171,7 @@ function createBackend(baseDir, { db = null, production = false, log = console, 
     const known = { auth: 'Authenticate', guest: 'RedirectIfAuthenticated', verified: 'EnsureEmailIsVerified', 'password.confirm': 'RequirePassword', admin: 'EnsureIsAdmin', role: 'EnsureHasRole', abilities: 'CheckAbilities', ability: 'CheckForAnyAbility' }[name];
     const names = [name, p, p + 'Middleware', known].filter(Boolean);
     const file = names.map((n) => findFile(path.join(dir, n))).find(Boolean);
-    if (!file) throw new Error(`No middleware "${name}". Make it with:  kreft make:middleware ${p}`);
+    if (!file) throw new Error(`No middleware "${name}". Make it with:  kreftjs make:middleware ${p}`);
     if (!isInsideDir(file, path.resolve(baseDir, 'app'))) throw new Error(`Forbidden middleware path.`);
     return { fn: await loadModuleAsync(file), args };
   }
@@ -447,6 +447,6 @@ module.exports = {
   ...require('./mcp.js'),
   ...require('./config.js'), // config, Config, ConfigRepository
   ...require('./html.js'),   // cleanHtml, sanitizeHtml, stripTags, escapeHtml, e, unescapeHtml, SafeHtml, html
-  // for the kreft command
+  // for the kreftjs command
   createBackend, installAlias, migrator,
 };

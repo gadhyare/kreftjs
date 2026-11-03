@@ -1,0 +1,21 @@
+{
+  "Component": {
+    "prefix": "kreftjs",
+    "body": ["state ${1:count} = ${2:0}", "", "action ${3:add}() {", "  ${1:count}++", "}", "", "<view>", "  <button @click={${3:add}}>{${1:count}}</button>", "</view>", "", "<style scoped>", "  $0", "</style>"],
+    "description": "A new .kreftjs component"
+  },
+  "state": { "prefix": "state", "body": "state ${1:name} = ${2:0}", "description": "A value the view follows" },
+  "saved": { "prefix": "saved", "body": "saved ${1:name} = ${2:[]}", "description": "A value kept after a reload (localStorage)" },
+  "derive": { "prefix": "derive", "body": "derive ${1:name} = ${2:expression}", "description": "A value worked out from others" },
+  "load": { "prefix": "load", "body": "load ${1:posts} = api.get('${2:/api/posts}')", "description": "Load data: .data, .loading, .error" },
+  "action": { "prefix": "action", "body": ["action ${1:name}(${2}) {", "  $0", "}"], "description": "A function the view can call" },
+  "when": { "prefix": "when", "body": ["when ${1:condition} {", "  $0", "}"], "description": "Run when a condition becomes true" },
+  "watch": { "prefix": "watch", "body": ["watch ${1:value} {", "  $0", "}"], "description": "Run when a value changes (value, old)" },
+  "on": { "prefix": "on", "body": ["on ${1|start,ready,update,show,hide,destroy|} {", "  $0", "}"], "description": "Lifecycle" },
+  "layout": { "prefix": "layout", "body": "layout ${1:app}", "description": "This page goes inside layouts/<name>.kreftjs (layout none: no layout)" },
+  "section": { "prefix": "kreft-section", "body": ["<kreft-section name=\"${1:actions}\">", "  $0", "</kreft-section>"], "description": "Content for the layout's <kreft-yield name>" },
+  "yield": { "prefix": "kreft-yield", "body": "<kreft-yield name=\"${1:actions}\">${0}</kreft-yield>", "description": "In a layout: where a page's <kreft-section> goes" },
+  "for": { "prefix": "for", "body": ["{for ${1:item} in ${2:items} key ${1:item}.id}", "  $0", "{empty}", "  <p>Nothing yet.</p>", "{/for}"], "description": "Loop over a list" },
+  "k-if": { "prefix": "k-if", "body": "k-if={${1:condition}}", "description": "Show only when true" },
+  "kreft-wait": { "prefix": "kreft-wait", "body": ["<kreft-wait>", "  $0", "  <p k-waiting>Loading…</p>", "  <p k-failed=\"error\">Could not load: {error.message}</p>", "</kreft-wait>"], "description": "Show something until everything inside has loaded" }
+}

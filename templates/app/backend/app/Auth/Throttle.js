@@ -2,7 +2,7 @@
 // The 'throttle:6,1' route limit counts per address; this one stops a guesser who changes address:
 //   const wait = await Throttle.wait('login', email, 10)    // seconds to wait, 0 when allowed
 //   if (wait) abort(429, …)   …   await Throttle.hit('login', email, 900)   …   await Throttle.clear('login', email)
-const { Cache, Hash } = require('kreft/server')
+const { Cache, Hash } = require('kreftjs/server')
 
 const key = (scope, id) => `throttle:${scope}:${Hash.sha256(String(id).trim().toLowerCase())}`
 

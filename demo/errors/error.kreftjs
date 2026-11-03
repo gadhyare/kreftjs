@@ -1,0 +1,11 @@
+<!-- errors/error.kreftjs: any other status, like abort(409) or abort(422, 'That name is taken.') -->
+layout 'errors/minimal.kreftjs'
+prop status = 400
+prop title = 'Error'
+prop message = ''
+
+<view>
+  <kreft-section name="code">{status}</kreft-section>
+  <kreft-section name="title">{title}</kreft-section>
+  <kreft-section name="message">{message || 'Something went wrong with this request.'}</kreft-section>
+</view>

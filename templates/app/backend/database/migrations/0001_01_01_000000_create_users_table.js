@@ -1,4 +1,4 @@
-// The tables for user authentication. kreft dev runs it by itself (or: kreft migrate).
+// The tables for user authentication. kreftjs dev runs it by itself (or: kreftjs migrate).
 module.exports = {
   up(schema) {
     schema.create('users', (table) => {

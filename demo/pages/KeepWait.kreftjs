@@ -1,0 +1,56 @@
+<!-- keep: tabs and pages put away instead of removed (on show / on hide) · <kreft-wait>: a loading view until everything inside has loaded -->
+import NoteTab from '../components/NoteTab.kreftjs'
+import TimerTab from '../components/TimerTab.kreftjs'
+import SlowCard from '../components/SlowCard.kreftjs'
+
+state tab = 'NoteTab'
+state keepOn = true
+state round = 1
+state tabs = [{ name: 'NoteTab', label: 'Note' }, { name: 'TimerTab', label: 'Timer' }]
+
+<view>
+  <section class="card">
+    <h1>Keep and wait</h1>
+    <p class="lead"><code>keep</code> puts a component away when you switch, and brings it back exactly as it was.</p>
+    <div class="tabs" role="tablist">
+      {for t in tabs key t.name}
+        <button role="tab" class={tab === t.name ? 'on' : ''} aria-selected={tab === t.name ? 'true' : 'false'} @click="tab = t.name">{t.label}</button>
+      {/for}
+      <label class="check"><input type="checkbox" k-model="keepOn"> keep</label>
+    </div>
+    <div class="panel" k-if="keepOn"><kreft-component :is="tab" keep k-animate.after="fade"></kreft-component></div>
+    <div class="panel" k-else><kreft-component :is="tab"></kreft-component></div>
+    <p class="muted">Without <code>keep</code>, the note is empty and the timer starts from 0 every time.</p>
+  </section>
+
+  <section class="card">
+    <h2><code>&lt;kreft-wait&gt;</code></h2>
+    <p class="muted">Shows <code>k-waiting</code> until every component, <code>load</code> and async <code>on start</code> inside is ready, or <code>k-failed</code> if one fails.</p>
+    <button @click="round++">Load again</button>
+    {for r in [round] key r}
+      <div class="waits">
+        <kreft-wait>
+          <SlowCard ms={1200}></SlowCard>
+          <div k-waiting class="skeleton">Loading the person…</div>
+          <p k-failed="error" class="bad">Could not load: {error.message}</p>
+        </kreft-wait>
+        <kreft-wait>
+          <SlowCard ms={800} fail={true}></SlowCard>
+          <div k-waiting class="skeleton">Loading another one…</div>
+          <p k-failed="error" class="bad">Could not load: {error.message}</p>
+        </kreft-wait>
+      </div>
+    {/for}
+  </section>
+</view>
+
+<style scoped>
+.tabs { display: flex; gap: 6px; align-items: center; margin-bottom: 10px; flex-wrap: wrap; }
+.tabs button.on { background: var(--ink); color: #fff; border-color: var(--ink); }
+.tabs .check { margin-left: auto; }
+.panel { min-height: 120px; }
+.waits { display: grid; gap: 10px; margin-top: 12px; }
+.skeleton { padding: 12px; color: var(--muted); background: linear-gradient(90deg, var(--accent), var(--accent), var(--accent)); background-size: 200% 100%; animation: shimmer 1.2s infinite linear; }
+@keyframes shimmer { to { background-position: -200% 0; } }
+.bad { color: var(--destructive); margin: 0; padding: 12px; background: var(--destructive-bg); }
+</style>

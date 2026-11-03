@@ -1,7 +1,7 @@
 /*
  * QR codes, with no package to install: for two-factor setup, links on a phone, tickets…
  *
- *   const { QR } = require('kreft/server')
+ *   const { QR } = require('kreftjs/server')
  *   QR.svg('otpauth://totp/…')            // '<svg …>' — put it in a page with k-html
  *   QR.matrix('hello')                     // [[true, false, …], …] for your own drawing
  *

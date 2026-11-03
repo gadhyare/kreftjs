@@ -2,12 +2,12 @@
  * Electron.js Desktop Support for Kreft
  *
  * Commands:
- *   kreft electron:init     Add Electron files to an existing project (alias: kreft make:electron)
- *   kreft electron:dev      Run the app in an Electron desktop window with hot reload (alias: kreft electron)
- *   kreft electron:build    Build static bundle (kreft build) and package desktop installer (electron-builder)
+ *   kreftjs electron:init     Add Electron files to an existing project (alias: kreftjs make:electron)
+ *   kreftjs electron:dev      Run the app in an Electron desktop window with hot reload (alias: kreftjs electron)
+ *   kreftjs electron:build    Build static bundle (kreftjs build) and package desktop installer (electron-builder)
  *
  * CLI flag:
- *   kreft new my-app --electron
+ *   kreftjs new my-app --electron
  */
 const fs = require('fs');
 const path = require('path');
@@ -286,16 +286,16 @@ function init(args = []) {
   const pkg = JSON.parse(fs.readFileSync(pkgFile, 'utf8'));
   pkg.main = 'electron/main.js';
   pkg.scripts = pkg.scripts || {};
-  pkg.scripts['electron'] = 'kreft electron';
-  pkg.scripts['electron:dev'] = 'kreft electron:dev';
-  pkg.scripts['electron:build'] = 'kreft electron:build';
+  pkg.scripts['electron'] = 'kreftjs electron';
+  pkg.scripts['electron:dev'] = 'kreftjs electron:dev';
+  pkg.scripts['electron:build'] = 'kreftjs electron:build';
 
   pkg.devDependencies = pkg.devDependencies || {};
   if (!pkg.devDependencies['electron']) pkg.devDependencies['electron'] = '^34.2.0';
   if (!pkg.devDependencies['electron-builder']) pkg.devDependencies['electron-builder'] = '^25.1.8';
 
   pkg.build = pkg.build || {
-    appId: `com.kreft.${(pkg.name || 'app').toLowerCase().replace(/[^a-z0-9]/g, '')}`,
+    appId: `com.kreftjs.${(pkg.name || 'app').toLowerCase().replace(/[^a-z0-9]/g, '')}`,
     productName: pkg.name ? pkg.name.replace(/-/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase()) : 'Kreft Desktop',
     directories: { output: 'dist-electron' },
     files: ['dist/**/*', 'electron/**/*', 'package.json'],
@@ -317,8 +317,8 @@ function init(args = []) {
 
   Next:
     npm install            (install electron & electron-builder)
-    kreft electron:dev       (start dev server & launch desktop window)
-    kreft electron:build     (build production installer)
+    kreftjs electron:dev       (start dev server & launch desktop window)
+    kreftjs electron:build     (build production installer)
 `);
 }
 
@@ -379,7 +379,7 @@ function dev(args = []) {
 
   // 1. Start dev server child process
   console.log('  Starting Kreft dev server & Electron desktop window…');
-  const kreftCli = path.join(__dirname, 'kreft.js');
+  const kreftCli = path.join(__dirname, 'kreftjs.js');
   const server = spawn(process.execPath, [kreftCli, 'dev', ...serverArgs], {
     cwd: root,
     stdio: 'inherit',
@@ -411,7 +411,7 @@ function dev(args = []) {
 
     electronProcess.on('error', (err) => {
       if (err.code === 'ENOENT') {
-        console.error('\n  Electron is not installed locally. Run:  kreft add -D electron\n');
+        console.error('\n  Electron is not installed locally. Run:  kreftjs add -D electron\n');
       } else {
         console.error('  Electron launch error: ' + err.message);
       }
@@ -445,7 +445,7 @@ function build(args = []) {
 
   // 1. Build Kreft frontend for desktop with relative base
   console.log('\n  Step 1: Building Kreft static bundle with relative base (./)…');
-  const kreftCli = path.join(__dirname, 'kreft.js');
+  const kreftCli = path.join(__dirname, 'kreftjs.js');
   const buildProc = spawn(process.execPath, [kreftCli, 'build', '--base', './', ...args], {
     cwd: root,
     stdio: 'inherit',
@@ -467,7 +467,7 @@ function build(args = []) {
 
     packProc.on('error', (err) => {
       if (err.code === 'ENOENT') {
-        console.error('\n  electron-builder is not installed. Run:  kreft add -D electron-builder\n');
+        console.error('\n  electron-builder is not installed. Run:  kreftjs add -D electron-builder\n');
       } else {
         console.error('  Packaging error: ' + err.message);
       }

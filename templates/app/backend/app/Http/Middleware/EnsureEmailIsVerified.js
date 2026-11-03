@@ -1,5 +1,5 @@
 // 'verified' in the routes: the user has opened the link in the "Verify your email" email
-const { abort } = require('kreft/server')
+const { abort } = require('kreftjs/server')
 
 class EnsureEmailIsVerified {
   async handle(req, next) {

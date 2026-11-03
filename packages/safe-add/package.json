@@ -1,11 +1,12 @@
 {
-  "name": "kreft",
+  "name": "kreftjs",
   "version": "1.0.1",
   "description": "Enterprise-Grade Security Gatekeeper & Safe Package Installer for Kreft",
   "main": "index.js",
   "bin": {
-    "som": "bin/safe-add.js",
-    "kreft": "bin/safe-add.js"
+    "kreftjs": "bin/safe-add.js",
+    "kreft": "bin/safe-add.js",
+    "som": "bin/safe-add.js"
   },
   "scripts": {
     "test": "node bin/safe-add.js --help"

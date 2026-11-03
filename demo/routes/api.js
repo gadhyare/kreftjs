@@ -1,6 +1,6 @@
 // The demo's API: every address here starts with /api.
-// kreft dev --backend demo loads it (see package.json). List them: node bin/kreft.js route:list --backend demo
-const { Route, DB, Cache, config, getMemoryStats } = require('kreft/server')
+// kreftjs dev --backend demo loads it (see package.json). List them: node bin/kreftjs.js route:list --backend demo
+const { Route, DB, Cache, config, getMemoryStats } = require('kreftjs/server')
 const TaskController = require('../app/Http/Controllers/TaskController')
 
 // GET, POST /api/tasks · GET, PUT, PATCH /api/tasks/{task}  (TaskController)

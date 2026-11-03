@@ -1,11 +1,11 @@
-const { DB, Hash, ValidationError, same } = require('kreft/server')
+const { DB, Hash, ValidationError, same } = require('kreftjs/server')
 const User = require('../../../Models/User')
 const PersonalAccessToken = require('../../../Models/PersonalAccessToken')
 
 const MINUTES = 60 // how long a reset link works
 
 class NewPasswordController {
-  // POST /api/reset-password   (pages/auth/ResetPassword.kreft)
+  // POST /api/reset-password   (pages/auth/ResetPassword.kreftjs)
   async store(req) {
     const data = await req.validate({
       token: 'required',

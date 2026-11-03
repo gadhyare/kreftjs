@@ -1,4 +1,4 @@
-const { response } = require('kreft/server')
+const { response } = require('kreftjs/server')
 const Task = require('../../Models/Task')
 const StoreTaskRequest = require('../Requests/StoreTaskRequest')
 const UpdateTaskRequest = require('../Requests/UpdateTaskRequest')

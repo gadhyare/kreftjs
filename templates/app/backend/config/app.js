@@ -2,7 +2,7 @@
  * Application Configuration
  *
  * Global settings for the application. Access with:
- *   const { config } = require('kreft/server')
+ *   const { config } = require('kreftjs/server')
  *   config('app.name')
  */
 module.exports = {

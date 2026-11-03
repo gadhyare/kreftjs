@@ -2,11 +2,11 @@
  * Folder guard: Kreft notices when the folder it works in is deleted, moved or put in the Trash.
  *
  * A running process keeps working on a folder that was moved away (the files are still there, under a new
- * name), so `kreft dev` would carry on serving a project you thought was gone, and a terminal opened in the
+ * name), so `kreftjs dev` would carry on serving a project you thought was gone, and a terminal opened in the
  * old folder would run commands against the Trash. The operating system cannot be asked to refuse the
  * delete, so Kreft says it loudly instead:
  *   - every command first checks that the folder it runs in is not deleted or in the Trash;
- *   - `kreft dev`, `kreft serve` and the queue / schedule workers check every second and stop with a message.
+ *   - `kreftjs dev`, `kreftjs serve` and the queue / schedule workers check every second and stop with a message.
  */
 const fs = require('fs');
 const path = require('path');

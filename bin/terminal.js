@@ -167,7 +167,7 @@ function renderDevBanner({
     lines.push(`  ${c.dim('•')} ${c.bold('Database:')} ${c.green(database)}`);
   }
   if (routesCount > 0) {
-    lines.push(`  ${c.dim('•')} ${c.bold('API:')}      ${c.cyan(routesCount + ' routes')} ${c.dim('(kreft route:list)')}`);
+    lines.push(`  ${c.dim('•')} ${c.bold('API:')}      ${c.cyan(routesCount + ' routes')} ${c.dim('(kreftjs route:list)')}`);
   }
   if (serverRoutesCount > 0) {
     lines.push(`  ${c.dim('•')} ${c.bold('Server:')}   ${c.cyan(serverRoutesCount + ' custom endpoints')}`);

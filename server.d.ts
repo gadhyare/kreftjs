@@ -1,4 +1,4 @@
-// Types for require('kreft/server'): routes, controllers, models, migrations, seeders, middleware.
+// Types for require('kreftjs/server'): routes, controllers, models, migrations, seeders, middleware.
 
 export type Rules = Record<string, string | string[]>
 
@@ -658,7 +658,7 @@ export interface ConfigFn {
   reload(projectRoot?: string): ConfigFn
   repository: any
 }
-/** configuration from config/*.js and kreft.config.json: config('app.name') */
+/** configuration from config/*.js and kreftjs.config.json: config('app.name') */
 export declare const config: ConfigFn
 export declare const Config: ConfigFn
 export declare const SEO: {
@@ -733,7 +733,7 @@ export declare const Event: {
 }
 export declare function event(event: object | string, ...payload: any[]): Promise<any[]>
 
-/** Queued jobs: await dispatch(new SendWelcome(user)); kreft dev or kreft queue:work runs them */
+/** Queued jobs: await dispatch(new SendWelcome(user)); kreftjs dev or kreftjs queue:work runs them */
 export declare class Job {
   static tries: number
   static backoff: number | number[]
@@ -931,7 +931,7 @@ interface Task {
 }
 export declare const Schedule: { call(fn: () => any): Task; job(job: Job): Task; command(line: string): Task }
 
-/** Your own commands in app/Console/Commands (kreft make:command SendReport) */
+/** Your own commands in app/Console/Commands (kreftjs make:command SendReport) */
 export declare class Command {
   static signature: string
   static description: string

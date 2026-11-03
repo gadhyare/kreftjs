@@ -1,15 +1,15 @@
 /*
- * Kreft DevTools — a panel inside the page (opened by the "K" button or Alt+Shift+D while `kreft dev` runs).
+ * Kreft DevTools — a panel inside the page (opened by the "K" button or Alt+Shift+D while `kreftjs dev` runs).
  *   Components  the live component tree; pick one to see and change its props, state and derived values
- *   Stores      every Kreft.store: change values, $reset()
+ *   Stores      every Kreftjs.store: change values, $reset()
  *   Route       the current route and every route of the router
  *   Timeline    store actions and bus messages, newest first
  */
 (function () {
   'use strict';
-  const Kreft = window.Kreft;
-  if (!Kreft || !Kreft.__devtools) return console.warn('[Kreft] DevTools need Kreft 1.5 or newer.');
-  const dt = Kreft.__devtools;
+  const Kreftjs = window.Kreftjs;
+  if (!Kreft || !Kreftjs.__devtools) return console.warn('[Kreft] DevTools need Kreft 1.5 or newer.');
+  const dt = Kreftjs.__devtools;
 
   const host = document.createElement('div');
   host.setAttribute('data-kreft-devtools', '');
@@ -40,7 +40,7 @@
     .split { display: flex; flex-direction: column; gap: 6px }
   </style>
   <div class="panel">
-    <header><b>Kreft</b><span>DevTools · ${Kreft.version}</span><button data-act="close" title="Close (Alt+Shift+D)">×</button></header>
+    <header><b>Kreft</b><span>DevTools · ${Kreftjs.version}</span><button data-act="close" title="Close (Alt+Shift+D)">×</button></header>
     <nav><button data-tab="components" class="on">Components</button><button data-tab="stores">Stores</button><button data-tab="route">Route</button><button data-tab="timeline">Timeline</button></nav>
     <main></main>
   </div>`;
@@ -94,7 +94,7 @@
   }
   function renderStores() {
     const names = Object.keys(dt.stores);
-    if (!names.length) return '<div class="muted">No stores. Make one with Kreft.store(\'cart\', { … }).</div>';
+    if (!names.length) return '<div class="muted">No stores. Make one with Kreftjs.store(\'cart\', { … }).</div>';
     return names.map((n) => {
       const s = dt.stores[n];
       const data = {};

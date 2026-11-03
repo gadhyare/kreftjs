@@ -1,0 +1,207 @@
+{
+  "$schema": "https://raw.githubusercontent.com/martinring/tmlanguage/master/tmlanguage.json",
+  "name": "Kreft",
+  "scopeName": "source.kreftjs",
+  "patterns": [
+    { "include": "#view" },
+    { "include": "#style" },
+    { "include": "#script" },
+    { "include": "#comment" },
+    { "include": "#kreft-keywords" },
+    { "include": "source.js" }
+  ],
+  "repository": {
+    "comment": {
+      "patterns": [
+        {
+          "begin": "<!--",
+          "end": "-->",
+          "name": "comment.block.html"
+        },
+        {
+          "begin": "/\\*",
+          "end": "\\*/",
+          "name": "comment.block.js"
+        },
+        {
+          "match": "//.*$",
+          "name": "comment.line.double-slash.js"
+        }
+      ]
+    },
+    "kreft-keywords": {
+      "patterns": [
+        {
+          "match": "^\\s*(layout)\\s+(['\"]?[\\w./-]+['\"]?)\\s*$",
+          "captures": {
+            "1": { "name": "keyword.control.kreftjs storage.type.kreftjs" },
+            "2": { "name": "string.unquoted.kreftjs" }
+          }
+        },
+        {
+          "match": "\\b(prop|state|saved|derive|load|use|share|receive|event)\\s+([A-Za-z_$][\\w$]*)",
+          "captures": {
+            "1": { "name": "keyword.control.kreftjs storage.type.kreftjs" },
+            "2": { "name": "variable.other.readwrite.kreftjs variable.other.property.kreftjs" }
+          }
+        },
+        {
+          "match": "\\b(action)\\s+([A-Za-z_$][\\w$]*)",
+          "captures": {
+            "1": { "name": "keyword.control.kreftjs storage.type.function.kreftjs" },
+            "2": { "name": "entity.name.function.kreftjs" }
+          }
+        },
+        {
+          "match": "\\b(when|watch)\\b",
+          "captures": {
+            "1": { "name": "keyword.control.kreftjs" }
+          }
+        },
+        {
+          "match": "\\b(on)\\s+(start|ready|update|show|hide|destroy)\\b",
+          "captures": {
+            "1": { "name": "keyword.control.kreftjs" },
+            "2": { "name": "support.function.kreftjs entity.name.function.kreftjs" }
+          }
+        },
+        {
+          "match": "\\s(as)\\s+(?=['\"])",
+          "captures": {
+            "1": { "name": "keyword.operator.kreftjs" }
+          }
+        }
+      ]
+    },
+    "script": {
+      "begin": "(<)(script)\\b([^>]*)(>)",
+      "beginCaptures": {
+        "1": { "name": "punctuation.definition.tag.begin.html" },
+        "2": { "name": "entity.name.tag.script.html" },
+        "3": { "patterns": [{ "include": "text.html.basic#attribute" }] },
+        "4": { "name": "punctuation.definition.tag.end.html" }
+      },
+      "end": "(</)(script)\\s*(>)",
+      "endCaptures": {
+        "1": { "name": "punctuation.definition.tag.begin.html" },
+        "2": { "name": "entity.name.tag.script.html" },
+        "3": { "name": "punctuation.definition.tag.end.html" }
+      },
+      "contentName": "meta.embedded.block.javascript source.js",
+      "patterns": [
+        { "include": "#kreft-keywords" },
+        { "include": "source.js" }
+      ]
+    },
+    "view": {
+      "begin": "(<)(view)\\b([^>]*)(>)",
+      "beginCaptures": {
+        "1": { "name": "punctuation.definition.tag.begin.html" },
+        "2": { "name": "entity.name.tag.kreftjs" },
+        "4": { "name": "punctuation.definition.tag.end.html" }
+      },
+      "end": "(</)(view)\\s*(>)",
+      "endCaptures": {
+        "1": { "name": "punctuation.definition.tag.begin.html" },
+        "2": { "name": "entity.name.tag.kreftjs" },
+        "3": { "name": "punctuation.definition.tag.end.html" }
+      },
+      "contentName": "meta.embedded.block.html",
+      "patterns": [
+        { "include": "#blocks" },
+        { "include": "#kreft-directives" },
+        { "include": "#component-tag" },
+        { "include": "#interpolation" },
+        { "include": "text.html.basic" }
+      ]
+    },
+    "kreft-directives": {
+      "patterns": [
+        {
+          "match": "\\b(@[a-zA-Z0-9_.:-]+)\\b",
+          "name": "entity.other.attribute-name.event.kreftjs keyword.operator.kreftjs"
+        },
+        {
+          "match": "\\b([ks]-(?:if|else-if|else|show|hide|model|animate|html|ref|[a-z-]+))\\b",
+          "name": "entity.other.attribute-name.directive.kreftjs keyword.control.directive.kreftjs"
+        }
+      ]
+    },
+    "blocks": {
+      "match": "(\\{)\\s*(for|/for|empty)\\b([^}]*)(\\})",
+      "captures": {
+        "1": { "name": "punctuation.section.embedded.begin.kreftjs" },
+        "2": { "name": "keyword.control.loop.kreftjs" },
+        "3": {
+          "patterns": [
+            { "match": "\\b(in|of|key|animate)\\b", "name": "keyword.control.kreftjs" },
+            { "include": "source.js" }
+          ]
+        },
+        "4": { "name": "punctuation.section.embedded.end.kreftjs" }
+      }
+    },
+    "interpolation": {
+      "begin": "(?<!\\\\)\\{",
+      "beginCaptures": {
+        "0": { "name": "punctuation.section.embedded.begin.kreftjs" }
+      },
+      "end": "\\}",
+      "endCaptures": {
+        "0": { "name": "punctuation.section.embedded.end.kreftjs" }
+      },
+      "contentName": "meta.embedded.expression.kreftjs source.js",
+      "patterns": [
+        { "include": "#braces" },
+        { "include": "source.js" }
+      ]
+    },
+    "braces": {
+      "begin": "\\{",
+      "end": "\\}",
+      "patterns": [
+        { "include": "#braces" },
+        { "include": "source.js" }
+      ]
+    },
+    "style": {
+      "begin": "(<)(style)\\b([^>]*)(>)",
+      "beginCaptures": {
+        "1": { "name": "punctuation.definition.tag.begin.html" },
+        "2": { "name": "entity.name.tag.style.html" },
+        "3": {
+          "patterns": [
+            { "match": "\\bscoped\\b", "name": "entity.other.attribute-name.html" }
+          ]
+        },
+        "4": { "name": "punctuation.definition.tag.end.html" }
+      },
+      "end": "(</)(style)\\s*(>)",
+      "endCaptures": {
+        "1": { "name": "punctuation.definition.tag.begin.html" },
+        "2": { "name": "entity.name.tag.style.html" },
+        "3": { "name": "punctuation.definition.tag.end.html" }
+      },
+      "contentName": "source.css",
+      "patterns": [
+        { "include": "source.css" }
+      ]
+    },
+    "component-tag": {
+      "begin": "(</?)((?!(?:a|abbr|address|area|article|aside|audio|b|base|bdi|bdo|blockquote|body|br|button|canvas|caption|cite|code|col|colgroup|data|datalist|dd|del|details|dfn|dialog|div|dl|dt|em|embed|fieldset|figcaption|figure|footer|form|h[1-6]|head|header|hgroup|hr|html|i|iframe|img|input|ins|kbd|label|legend|li|link|main|map|mark|menu|meta|meter|nav|noscript|object|ol|optgroup|option|output|p|param|picture|pre|progress|q|rp|rt|ruby|s|samp|script|search|section|select|slot|small|source|span|strong|style|sub|summary|sup|svg|table|tbody|td|template|textarea|tfoot|th|thead|time|title|tr|track|u|ul|var|video|wbr|path|g|circle|rect|line|polyline|polygon|ellipse|defs|use|text|tspan|symbol|clipPath|mask|linearGradient|radialGradient|stop)(?![\\w-]))[A-Za-z][\\w.-]*)(?=[\\s/>])",
+      "beginCaptures": {
+        "1": { "name": "punctuation.definition.tag.begin.html" },
+        "2": { "name": "support.class.component.kreftjs" }
+      },
+      "end": "(/?>)",
+      "endCaptures": {
+        "1": { "name": "punctuation.definition.tag.end.html" }
+      },
+      "name": "meta.tag.component.kreftjs",
+      "patterns": [
+        { "include": "#kreft-directives" },
+        { "include": "text.html.basic#attribute" }
+      ]
+    }
+  }
+}

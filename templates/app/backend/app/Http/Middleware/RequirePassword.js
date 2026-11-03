@@ -1,6 +1,6 @@
 // 'password.confirm' in the routes: the user typed their password again in the last 3 hours
-// (pages/auth/ConfirmPassword.kreft). Otherwise the answer is 423 and the app asks for it.
-const { abort } = require('kreft/server')
+// (pages/auth/ConfirmPassword.kreftjs). Otherwise the answer is 423 and the app asks for it.
+const { abort } = require('kreftjs/server')
 
 const TIMEOUT = Number(process.env.PASSWORD_TIMEOUT || 10800) // seconds
 

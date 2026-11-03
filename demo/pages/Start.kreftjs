@@ -1,0 +1,576 @@
+<!-- The start page: what Kreft is, shown with a component that runs right here -->
+layout plain
+
+state name = 'Enterprise User'
+state count = 0
+state copied = false
+derive double = count * 2
+
+state words = [
+  { word: 'state', says: 'a value that can change', to: '/basics' },
+  { word: 'saved', says: 'a value kept after a reload', to: '/saved' },
+  { word: 'derive', says: 'a value worked out from others', to: '/basics' },
+  { word: 'load', says: 'data from an API or a database', to: '/posts' },
+  { word: 'action', says: 'something the page can do', to: '/basics' },
+  { word: 'when', says: 'run once a condition becomes true', to: '/lifecycle' },
+  { word: 'watch', says: 'run each time a value changes', to: '/lifecycle' },
+  { word: 'on', says: 'start, ready, update, show, hide, destroy', to: '/lifecycle' },
+  { word: 'prop', says: 'a value from the parent', to: '/components' },
+  { word: 'event', says: 'a message to the parent', to: '/components' },
+  { word: 'use', says: 'a shared store or shared logic', to: '/sharing' },
+  { word: 'share', says: 'a value for everything inside', to: '/sharing' },
+]
+state parts = [
+  { title: 'Router', text: 'Clean URLs, nested pages, guards.', to: '/router' },
+  { title: 'Database & ORM', text: 'SQLite, MySQL or PostgreSQL with Active Record.', to: '/backend' },
+  { title: 'Forms & Validation', text: 'Expressive validation rules in the page and on the server.', to: '/posts' },
+  { title: 'HTML Security', text: 'Built-in XSS sanitization, SafeHtml & k-html filtering.', to: '/security' },
+  { title: 'Redis & Queues', text: 'Zero-dependency RESP2 Redis client, locks, jobs & Pub/Sub.', to: '/backend' },
+  { title: 'Animations', text: 'Things come and go with k-animate.', to: '/animations' },
+  { title: 'Server & MCP', text: 'Controllers, middleware, and AI Agent MCP server.', to: '/server' },
+  { title: 'Dev tools & Errors', text: 'Hot reload, DevTools, and Interactive ErrorMonitor.', to: '/error-monitor' },
+  { title: 'Desktop & Vite', text: 'Build desktop apps with Electron or bundle with Vite.', to: '/tools' },
+]
+
+action add() { count++ }
+action copy() {
+  navigator.clipboard && navigator.clipboard.writeText('kreftjs new my-app --db sqlite')
+  copied = true
+  setTimeout(() => (copied = false), 1500)
+}
+
+<view>
+  <div class="welcome-container">
+    <!-- Ambient Red/Coral Glow Orbs -->
+    <div class="glow-orb glow-top-left" aria-hidden="true"></div>
+    <div class="glow-orb glow-bottom-right" aria-hidden="true"></div>
+
+    <!-- Main Hero Section -->
+    <section class="hero-grid">
+      <!-- Left Column: Copy, Headlines & CTA Badges -->
+      <div class="hero-copy">
+        <h1 class="hero-headline">
+          The Enterprise<br>
+          JavaScript<br>
+          Framework.
+        </h1>
+
+        <p class="hero-tagline">Built for scale, speed, and safety.</p>
+
+        <p class="hero-summary">
+          Kreft is a zero-dependency, full-stack JavaScript framework featuring its own component language, built-in SQL ORM, state management, migrations, auth, queues, and desktop packaging—all self-contained with no build steps required.
+        </p>
+
+        <!-- CTA Buttons -->
+        <div class="cta-actions">
+          <kreft-link to="/docs" class="pill-btn primary">Read the docs</kreft-link>
+          <kreft-link to="/basics" class="pill-btn ghost">Browse Features</kreft-link>
+          <kreft-link to="/docs" class="pill-btn ghost">Quick Start v1.x</kreft-link>
+        </div>
+
+        <!-- Badges Row -->
+        <div class="feature-badges">
+          <span class="badge highlight">✓ 0 Dependencies</span>
+          <span class="badge">✓ Built-in SQL ORM</span>
+          <span class="badge">✓ Authentication &amp; Gates</span>
+          <span class="badge">✓ TypeScript &amp; JS Choice</span>
+        </div>
+      </div>
+
+      <!-- Right Column: Code Window & Floating Live Card -->
+      <div class="hero-visual">
+        <!-- Dark Code Terminal -->
+        <div class="terminal-card">
+          <div class="terminal-bar">
+            <div class="window-dots">
+              <span class="mac-dot red"></span>
+              <span class="mac-dot yellow"></span>
+              <span class="mac-dot green"></span>
+            </div>
+            <span class="tab-title">Hello.ts.kreftjs</span>
+            <div class="terminal-bar-end"></div>
+          </div>
+
+          <div class="terminal-body">
+            <!-- Red dot indicator on right edge from the screenshot -->
+            <span class="terminal-side-dot" aria-hidden="true"></span>
+
+            <pre class="terminal-code"><code><span class="syn-k">state</span> <span class="syn-id">name</span><span class="syn-colon">:</span> <span class="syn-t">string</span> = <span class="syn-s">"Enterprise User"</span>
+<span class="syn-k">state</span> <span class="syn-id">count</span><span class="syn-colon">:</span> <span class="syn-t">number</span> = <span class="syn-n">0</span>
+<span class="syn-k">derive</span> <span class="syn-id">double</span><span class="syn-colon">:</span> <span class="syn-t">number</span> = <span class="syn-id">count</span> <span class="syn-op">*</span> <span class="syn-n">2</span>
+
+<span class="syn-k">action</span> <span class="syn-id">add</span>()<span class="syn-colon">:</span> <span class="syn-t">void</span> \{ <span class="syn-id">count</span><span class="syn-op">++</span> }
+
+<span class="syn-tag">&lt;view&gt;</span>
+  <span class="syn-tag">&lt;h2&gt;</span>Hello <span class="syn-expr">\{name}</span><span class="syn-tag">&lt;/h2&gt;</span>
+  <span class="syn-tag">&lt;button</span> <span class="syn-attr">@click</span>=<span class="syn-expr">\{add}</span><span class="syn-tag">&gt;</span>
+    Clicks: <span class="syn-expr">\{count}</span>
+  <span class="syn-tag">&lt;/button&gt;</span>
+<span class="syn-tag">&lt;/view&gt;</span></code></pre>
+          </div>
+        </div>
+
+        <!-- Floating Live Preview Card -->
+        <div class="floating-preview">
+          <div class="preview-eyebrow">Heading</div>
+          <h2 class="preview-name">Hello {name || 'Enterprise User'}</h2>
+
+          <div class="preview-field">
+            <input k-model="name" class="preview-input" placeholder="Enterprise User" aria-label="User name input">
+          </div>
+
+          <div class="preview-toolbar">
+            <button class="preview-click-btn" @click={add} aria-label="Increment click count">
+              Clicks: {count}
+            </button>
+
+            <div class="preview-metrics" aria-hidden="true">
+              <!-- Mini Bar Chart matching mockup -->
+              <svg class="metric-chart" width="46" height="24" viewBox="0 0 46 24" fill="none">
+                <rect x="2" y="15" width="4" height="9" rx="1.5" fill="#e2e8f0"/>
+                <rect x="9" y="11" width="4" height="13" rx="1.5" fill="#cbd5e1"/>
+                <rect x="16" y="7" width="4" height="17" rx="1.5" fill="#94a3b8"/>
+                <rect x="23" y="1" width="4" height="23" rx="1.5" fill="#0f172a"/>
+                <rect x="30" y="9" width="4" height="15" rx="1.5" fill="#10b981"/>
+                <rect x="37" y="5" width="4" height="19" rx="1.5" fill="#059669"/>
+              </svg>
+              <!-- Database Coin Stack Icon -->
+              <svg class="metric-db" width="22" height="24" viewBox="0 0 24 24" fill="none">
+                <ellipse cx="12" cy="4.5" rx="8" ry="2.5" stroke="#475569" stroke-width="1.8" fill="#f8fafc"/>
+                <path d="M4 4.5v5c0 1.38 3.58 2.5 8 2.5s8-1.12 8-2.5v-5" stroke="#475569" stroke-width="1.8"/>
+                <path d="M4 9.5v5c0 1.38 3.58 2.5 8 2.5s8-1.12 8-2.5v-5" stroke="#475569" stroke-width="1.8"/>
+                <circle cx="16" cy="18" r="4.5" fill="#f8fafc" stroke="#475569" stroke-width="1.5"/>
+                <text x="16" y="20.5" font-size="6.5" font-weight="bold" fill="#475569" text-anchor="middle">K</text>
+              </svg>
+            </div>
+          </div>
+
+          <div class="preview-badges">
+            <span class="pill-indicator">
+              <span class="pill-indicator-dot"></span>
+            </span>
+            <span class="pill-item"><span class="dot-bullet red-bullet"></span> SQL ORM</span>
+            <span class="pill-item"><span class="dot-bullet green-bullet"></span> Auth</span>
+            <span class="pill-item"><span class="dot-bullet teal-bullet"></span> queues</span>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- Additional Architecture Sections -->
+    <section class="language">
+      <h2>The whole language fits on one screen</h2>
+      <dl>
+        {for w in words key w.word}
+          <div><dt><kreft-link to={w.to}>{w.word}</kreft-link></dt><dd>{w.says}</dd></div>
+        {/for}
+      </dl>
+    </section>
+
+    <section class="inside">
+      <h2>Also in the box</h2>
+      <ul>
+        {for p in parts key p.title}
+          <li><kreft-link to={p.to}><strong>{p.title}</strong><span>{p.text}</span></kreft-link></li>
+        {/for}
+      </ul>
+    </section>
+
+    <section class="begin">
+      <h2>Start a project</h2>
+      <div class="term">
+        <code>kreftjs new my-app --db sqlite</code>
+        <button class="sm" @click={copy} aria-label="Copy the command">{copied ? 'Copied' : 'Copy'}</button>
+      </div>
+      <p>Then <code>cd my-app</code> and <code>npm run dev</code>. Coming from Vue? The <kreft-link to="/docs">docs</kreft-link> have a table with the Kreft name for every Vue feature.</p>
+    </section>
+  </div>
+</view>
+
+<style scoped>
+.welcome-container {
+  position: relative;
+  overflow: visible;
+  padding: 40px 0 72px;
+}
+
+/* Red/Coral Ambient Glow Orbs (Subtle in dark & light) */
+.glow-orb {
+  position: absolute;
+  border-radius: 50%;
+  pointer-events: none;
+  z-index: 0;
+}
+.glow-top-left {
+  top: -40px;
+  left: -60px;
+  width: 460px;
+  height: 460px;
+  background: radial-gradient(circle, rgba(239, 68, 68, 0.18) 0%, rgba(239, 68, 68, 0.06) 45%, transparent 75%);
+  filter: blur(60px);
+}
+.glow-bottom-right {
+  top: 140px;
+  right: 60px;
+  width: 480px;
+  height: 400px;
+  background: radial-gradient(circle, rgba(239, 68, 68, 0.15) 0%, rgba(239, 68, 68, 0.05) 50%, transparent 75%);
+  filter: blur(65px);
+}
+
+/* 2-Column Hero Grid */
+.hero-grid {
+  position: relative;
+  z-index: 1;
+  display: grid;
+  grid-template-columns: minmax(0, 1.05fr) minmax(0, 0.95fr);
+  gap: 48px;
+  align-items: center;
+  padding-bottom: 72px;
+}
+
+/* Left Copy */
+.hero-copy {
+  max-width: 540px;
+}
+.hero-headline {
+  font-size: clamp(38px, 5.2vw, 66px);
+  line-height: 1.05;
+  letter-spacing: -0.04em;
+  font-weight: 800;
+  color: var(--foreground);
+  margin: 0;
+}
+.hero-tagline {
+  font-size: 24px;
+  font-weight: 600;
+  letter-spacing: -0.025em;
+  color: var(--foreground);
+  margin: 18px 0 16px;
+}
+.hero-summary {
+  font-size: 15.5px;
+  line-height: 1.62;
+  color: var(--muted);
+  margin: 0 0 32px;
+}
+
+/* CTA Pill Buttons */
+.cta-actions {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+  align-items: center;
+  margin-bottom: 24px;
+}
+.pill-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 9999px;
+  padding: 10px 22px;
+  font-size: 14px;
+  font-weight: 500;
+  text-decoration: none;
+  transition: all 0.15s ease;
+  border: 1px solid transparent;
+}
+.pill-btn.primary {
+  background: var(--primary);
+  color: var(--primary-foreground);
+  font-weight: 600;
+}
+.pill-btn.primary:hover {
+  background: var(--primary-hover);
+}
+.pill-btn.ghost {
+  background: var(--card);
+  color: var(--foreground);
+  border: 1px solid var(--border);
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.04);
+}
+.pill-btn.ghost:hover {
+  background: var(--accent);
+  border-color: var(--border);
+}
+
+/* Feature Checkmark Badges */
+.feature-badges {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  align-items: center;
+}
+.badge {
+  font-size: 12.5px;
+  font-weight: 500;
+  padding: 6px 14px;
+  border-radius: 9999px;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  background: var(--accent);
+  color: var(--foreground);
+  border: 1px solid var(--border);
+}
+.badge.highlight {
+  background: rgba(239, 68, 68, 0.15);
+  color: #ef4444;
+  border-color: rgba(239, 68, 68, 0.35);
+  box-shadow: 0 2px 8px rgba(239, 68, 68, 0.2);
+}
+
+/* Right Visual Stack */
+.hero-visual {
+  position: relative;
+  display: flex;
+  justify-content: flex-end;
+  padding: 10px 10px 30px 10px;
+}
+
+/* Code Terminal Window */
+.terminal-card {
+  background: #0f172a;
+  border-radius: 18px;
+  box-shadow: 0 25px 60px -15px rgba(0, 0, 0, 0.4), 0 0 1px 1px rgba(255, 255, 255, 0.08);
+  border: 1px solid #1e293b;
+  overflow: hidden;
+  width: 100%;
+  max-width: 510px;
+  position: relative;
+  z-index: 1;
+}
+.terminal-bar {
+  display: grid;
+  grid-template-columns: 80px 1fr 80px;
+  align-items: center;
+  padding: 12px 18px;
+  background: #090d16;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+}
+.window-dots {
+  display: flex;
+  gap: 7px;
+  align-items: center;
+}
+.mac-dot {
+  width: 11px;
+  height: 11px;
+  border-radius: 50%;
+  display: inline-block;
+}
+.mac-dot.red { background: #ff5f56; }
+.mac-dot.yellow { background: #ffbd2e; }
+.mac-dot.green { background: #27c93f; }
+
+.tab-title {
+  font-family: var(--mono, ui-monospace, monospace);
+  font-size: 13px;
+  color: #94a3b8;
+  letter-spacing: -0.01em;
+  text-align: center;
+}
+.terminal-bar-end {
+  height: 11px;
+}
+
+.terminal-body {
+  position: relative;
+}
+
+/* Red indicator dot on right edge from the screenshot */
+.terminal-side-dot {
+  position: absolute;
+  top: 96px;
+  right: 0px;
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: #ef4444;
+  box-shadow: 0 0 8px rgba(239, 68, 68, 0.8);
+  z-index: 3;
+}
+
+.terminal-code {
+  margin: 0;
+  padding: 24px 28px 56px;
+  font-family: 'JetBrains Mono', 'Fira Code', ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  font-size: 14px;
+  line-height: 1.75;
+  color: #f8fafc;
+  overflow-x: auto;
+}
+.syn-k { color: #f87171; font-weight: 500; }
+.syn-id { color: #f8fafc; }
+.syn-colon { color: #94a3b8; }
+.syn-t { color: #93c5fd; }
+.syn-s { color: #86efac; }
+.syn-n { color: #c084fc; }
+.syn-op { color: #f87171; }
+.syn-tag { color: #60a5fa; }
+.syn-attr { color: #38bdf8; }
+.syn-expr { color: #f8fafc; }
+
+/* Floating Live Preview Card */
+.floating-preview {
+  position: absolute;
+  right: -12px;
+  bottom: -28px;
+  width: 330px;
+  background: var(--card);
+  border-radius: 16px;
+  border: 1px solid var(--border);
+  box-shadow: 0 20px 45px -10px rgba(0, 0, 0, 0.3), 0 2px 8px -2px rgba(0, 0, 0, 0.1);
+  padding: 22px 24px;
+  z-index: 2;
+  box-sizing: border-box;
+}
+.preview-eyebrow {
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--muted);
+  margin-bottom: 2px;
+}
+.preview-name {
+  font-size: 21px;
+  font-weight: 800;
+  color: var(--foreground);
+  margin: 0 0 14px;
+  letter-spacing: -0.03em;
+  line-height: 1.2;
+}
+.preview-field {
+  margin-bottom: 14px;
+}
+.preview-input {
+  width: 100%;
+  box-sizing: border-box;
+  height: 38px;
+  padding: 0 12px;
+  border-radius: 8px;
+  border: 1.5px solid var(--border);
+  font-size: 14px;
+  background: var(--background);
+  color: var(--foreground);
+  outline: none;
+  transition: border-color 0.15s ease;
+}
+.preview-input:focus {
+  border-color: var(--foreground);
+}
+.preview-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 14px;
+}
+.preview-click-btn {
+  background: var(--primary);
+  color: var(--primary-foreground);
+  border: none;
+  border-radius: 6px;
+  padding: 8px 18px;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: opacity 0.15s ease;
+}
+.preview-click-btn:hover {
+  opacity: 0.9;
+}
+.preview-metrics {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.metric-chart {
+  display: block;
+}
+.metric-db {
+  display: block;
+}
+
+.preview-badges {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--muted);
+  border-top: 1px solid var(--border);
+  padding-top: 14px;
+}
+.pill-indicator {
+  width: 26px;
+  height: 12px;
+  border-radius: 6px;
+  background: #64748b;
+  display: inline-flex;
+  align-items: center;
+  padding: 0 2px;
+}
+.pill-indicator-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: #ffffff;
+  display: inline-block;
+}
+.pill-item {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+.dot-bullet {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  display: inline-block;
+}
+.dot-bullet.red-bullet { background: #ef4444; }
+.dot-bullet.green-bullet { background: #10b981; }
+.dot-bullet.teal-bullet { background: #06b6d4; }
+
+/* Subsections */
+section + section { border-top: 1px solid var(--border); }
+.language, .inside, .begin { padding: 56px 0; }
+.language h2, .inside h2, .begin h2 { font-size: 24px; letter-spacing: -0.03em; margin: 0 0 24px; color: var(--foreground); }
+dl { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); column-gap: 40px; margin: 0; border-top: 1px solid var(--border); }
+dl div { display: grid; grid-template-columns: 96px 1fr; gap: 12px; padding: 10px 0; border-bottom: 1px solid var(--border); align-items: baseline; }
+dt a { font-family: var(--mono); font-size: 13px; font-weight: 500; color: var(--foreground); text-decoration: none; }
+dt a:hover { text-decoration: underline; }
+dd { margin: 0; color: var(--muted); }
+.inside ul { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); border-top: 1px solid var(--border); border-left: 1px solid var(--border); }
+.inside li { border-right: 1px solid var(--border); border-bottom: 1px solid var(--border); }
+.inside a { display: grid; gap: 4px; padding: 20px; height: 100%; color: var(--foreground); text-decoration: none; }
+.inside a:hover { background: var(--accent); }
+.inside a strong { font-size: 15px; font-weight: 600; color: var(--foreground); }
+.inside a span { color: var(--muted); }
+.term { display: flex; align-items: center; justify-content: space-between; gap: 12px; border: 1px solid var(--border); background: var(--accent); padding: 8px 8px 8px 16px; max-width: 480px; margin-bottom: 16px; border-radius: 6px; }
+.term code { background: none; font-size: 14px; padding: 0; color: var(--foreground); }
+.term code::before { content: '$ '; color: var(--muted); }
+.term button { background: var(--primary); color: var(--primary-foreground); border: none; padding: 6px 12px; border-radius: 4px; font-size: 12px; cursor: pointer; }
+.begin p { color: var(--muted); max-width: 40em; }
+
+@media (max-width: 960px) {
+  .hero-grid { grid-template-columns: 1fr; gap: 40px; }
+  .hero-copy { max-width: 100%; }
+  .hero-visual { justify-content: center; width: 100%; padding: 0; }
+  .terminal-card { max-width: 100%; }
+  .floating-preview { position: static; width: 100%; max-width: 100%; margin-top: 20px; right: 0; bottom: 0; }
+  .inside ul { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+@media (max-width: 640px) {
+  .welcome-container { padding: 24px 0 48px; }
+  .hero-headline { font-size: 36px; }
+  .hero-tagline { font-size: 20px; }
+  .cta-actions { flex-direction: column; width: 100%; }
+  .pill-btn { width: 100%; text-align: center; }
+  .feature-badges { gap: 6px; }
+  .badge { font-size: 11.5px; padding: 5px 10px; }
+  .inside ul { grid-template-columns: 1fr; }
+  dl { grid-template-columns: 1fr; }
+  dl div { grid-template-columns: 1fr; gap: 4px; }
+}
+</style>

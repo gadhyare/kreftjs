@@ -1,13 +1,13 @@
 /*
  * .env files and environment management.
  *
- *   # .env  (never sent to the browser, never copied by kreft build)
+ *   # .env  (never sent to the browser, never copied by kreftjs build)
  *   APP_NAME="My shop"
  *   DATABASE_URL=sqlite:database/app.db
  *   MAIL_PASSWORD=secret
  *   PUBLIC_APP_NAME=${APP_NAME}            ← PUBLIC_ values also reach the browser: env.PUBLIC_APP_NAME
  *
- * Read by kreft dev, kreft serve, kreft build and kreft db. Values already set in the real environment win,
+ * Read by kreftjs dev, kreftjs serve, kreftjs build and kreftjs db. Values already set in the real environment win,
  * so a server can override the file. In server/*.js: process.env.MAIL_PASSWORD (or ctx.env).
  */
 const fs = require('fs');
@@ -91,7 +91,7 @@ function publicEnv() {
   Object.keys(process.env).filter((k) => PUBLIC.test(k)).sort().forEach((k) => { out[k] = process.env[k]; });
   return out;
 }
-// a <script> that gives the page Kreft.env (the JSON can't close the tag)
+// a <script> that gives the page Kreftjs.env (the JSON can't close the tag)
 const envScript = (obj) => `window.__KREFT_ENV__ = ${JSON.stringify(obj).replace(/</g, '\\u003c').replace(/[\u2028\u2029]/g, (c) => '\\u' + c.charCodeAt(0).toString(16))};`;
 
 module.exports = { loadEnv, parse, publicEnv, envScript };

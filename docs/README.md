@@ -2,10 +2,10 @@
 
 ## Introduction
 
-Kreft is a small reactive framework with its own component language. You write a component in a `.kreft` file: declare your state, derived values and actions in plain words, then describe the page in a `<view>`. The framework also ships a full Node.js backend (routes, controllers, models, migrations, queues, mail) so one project can cover the whole stack.
+Kreft is a small reactive framework with its own component language. You write a component in a `.kreftjs` file: declare your state, derived values and actions in plain words, then describe the page in a `<view>`. The framework also ships a full Node.js backend (routes, controllers, models, migrations, queues, mail) so one project can cover the whole stack.
 
 ```html
-<!-- Counter.kreft -->
+<!-- Counter.kreftjs -->
 state count = 0
 derive double = count * 2
 action add() { count++ }
@@ -19,10 +19,10 @@ action add() { count++ }
 
 | Part | What it gives you |
 |---|---|
-| **The `.kreft` language** | `state`, `derive`, `action`, `watch`, props, events, slots, stores, a router with layouts and nested routes, forms with validation, animations. |
+| **The `.kreftjs` language** | `state`, `derive`, `action`, `watch`, props, events, slots, stores, a router with layouts and nested routes, forms with validation, animations. |
 | **The backend** | `Route`, controllers, an Active Record `Model`, migrations, seeders, factories, jobs, mail, cache, file storage, policies, scheduling. |
 | **Authentication** | Sign-in pages, password reset, email verification, two-factor codes, device sessions and API tokens, ready in every new project. |
-| **Tooling** | `kreft dev` with hot reload that keeps state, DevTools, an error monitor, `kreft build`, TypeScript, Vite and Electron support. |
+| **Tooling** | `kreftjs dev` with hot reload that keeps state, DevTools, an error monitor, `kreftjs build`, TypeScript, Vite and Electron support. |
 | **Security by default** | Escaped views, CSRF protection, hashed passwords, rate limits, hardened package installs. See [Security overview](#security-overview). |
 
 ### How the docs are organised
@@ -34,16 +34,16 @@ action add() { count++ }
 5. **Security** and **Reference** are for checking details.
 
 > [!NOTE]
-> Some chapters mention a few tools by name only (for example `kreft make:model`). Run `kreft list` to see every command that your installed version has.
+> Some chapters mention a few tools by name only (for example `kreftjs make:model`). Run `kreftjs list` to see every command that your installed version has.
 
 ## Installation
 
 You need [Node.js](https://nodejs.org) 22.5 or newer (it includes npm). Node 22.5 also gives you SQLite without installing anything.
 
-Install the `kreft` command once, so it works everywhere:
+Install the `kreftjs` command once, so it works everywhere:
 
 ```bash
-npm i -g kreft
+npm i -g kreftjs
 ```
 
 Working on Kreft itself? Run `npm link` inside its folder instead.
@@ -51,30 +51,30 @@ Working on Kreft itself? Run `npm link` inside its folder instead.
 Check that it works:
 
 ```bash
-kreft about
+kreftjs about
 ```
 
 ### Migrating from Som.js
 
-Kreft is Som.js under a new name, and an existing project keeps working without edits:
+Kreft is Som.js under a new name (the package and command are `kreftjs`), and an existing project keeps working without edits. `kreft`, an earlier spelling of the new name, is accepted in the same places:
 
-- **Files:** `.som` files still compile, next to `.kreft` ones. A name that is missing with one extension is tried with the other. Everything the tools write is `.kreft`.
+- **Files:** `.som` (and `.kreft`) files still compile, next to `.kreftjs` ones. A name that is missing with one extension is tried with the others. Everything the tools write is `.kreftjs`.
 - **Templates:** `s-if`, `s-each` and every other `s-` directive are read as `k-if`, `k-each` …, and `<som-view>`, `<som-link>` … as `<kreft-view>`, `<kreft-link>` …
-- **JavaScript:** `Som` is the old name of `Kreft` (same object, deprecated), and `Som.compileSom` is `Kreft.compile`.
-- **Command:** `som` still runs `kreft` and prints a one-line notice.
-- **Server code:** `require('somjs/server')` (also `som/server`, `@somjs/server`) still works; new code uses `require('kreft/server')`.
-- **Settings:** `som.config.json` and `SOM_` environment variables (`SOM_SSR`, `SOM_ALLOWED_HOSTS` …) are read when the `kreft.config.json` file or the `KREFT_` variable is missing.
+- **JavaScript:** `Som` and `Kreft` are other names for `Kreftjs` (same object; `Som` is deprecated), and `Som.compileSom` is `Kreftjs.compile`.
+- **Command:** `som` and `kreft` still run `kreftjs`; `som` prints a one-line notice.
+- **Server code:** `require('somjs/server')` (also `som/server`, `@somjs/server`, `kreft/server`) still works; new code uses `require('kreftjs/server')`.
+- **Settings:** `kreft.config.json`, `som.config.json` and `SOM_` environment variables (`SOM_SSR`, `SOM_ALLOWED_HOSTS` …) are read when the `kreftjs.config.json` file or the `KREFT_` variable is missing.
 - **Cookies:** new projects use `kreft_session`, `kreft_2fa` and `kreft_bypass`. An existing project keeps its `som_` names until you change `app/Auth/Session.js`, and the framework's CSRF check accepts both.
 - **Kept on purpose:** the `som_migrations` table, the `som:` prefix of saved data in `localStorage`, and the `som:` Redis keys of the queue. Renaming them needs a migration, planned for 3.1.
 
-To move a project over, rename `*.som` to `*.kreft` (and the paths that mention them), run `kreft update` and replace `s-` with `k-`.
+To move a project over, rename `*.som` (or `*.kreft`) to `*.kreftjs` (and the paths that mention them), run `kreftjs update` and replace `s-` with `k-`.
 
 ## Your first app
 
 Create a project, move into it and start the development server:
 
 ```bash
-kreft new my-app            # asks: JavaScript or TypeScript?
+kreftjs new my-app            # asks: JavaScript or TypeScript?
 cd my-app
 npm run dev
 ```
@@ -90,19 +90,19 @@ The new project already has a working login page. `npm run dev` creates the tabl
 
 ### The smallest possible app
 
-You can use Kreft without any project at all. An app is an HTML page plus `.kreft` files:
+You can use Kreft without any project at all. An app is an HTML page plus `.kreftjs` files:
 
 ```html
 <!-- index.html -->
 <div id="app"></div>
-<script src="kreft.js"></script>
+<script src="kreftjs.js"></script>
 <script>
-  Kreft.app('App.kreft').mount('#app')
+  Kreftjs.app('App.kreftjs').mount('#app')
 </script>
 ```
 
 ```html
-<!-- App.kreft -->
+<!-- App.kreftjs -->
 state name = 'World'
 
 <view>
@@ -112,20 +112,20 @@ state name = 'World'
 ```
 
 > [!WARNING]
-> `.kreft` files need a web server. Browsers refuse to load files from `file://`, so always open your app through `npm run dev` or any other server.
+> `.kreftjs` files need a web server. Browsers refuse to load files from `file://`, so always open your app through `npm run dev` or any other server.
 
 ## Project structure
 
-`kreft new` creates two folders that never mix: `frontend/` is what browsers receive, `backend/` is the server and is never reachable over HTTP.
+`kreftjs new` creates two folders that never mix: `frontend/` is what browsers receive, `backend/` is the server and is never reachable over HTTP.
 
 ```text
 my-app/
 ├── frontend/
 │   ├── index.html          entry point
-│   ├── App.kreft             root component and router container
-│   ├── routes/web.kreft      page routes
-│   ├── layouts/            app.kreft (signed in), guest.kreft (sign-in pages)
-│   ├── pages/              one .kreft file per screen, auth/ for sign-in pages
+│   ├── App.kreftjs             root component and router container
+│   ├── routes/web.kreftjs      page routes
+│   ├── layouts/            app.kreftjs (signed in), guest.kreftjs (sign-in pages)
+│   ├── pages/              one .kreftjs file per screen, auth/ for sign-in pages
 │   ├── components/         reusable pieces
 │   ├── ui.css              the design system
 │   └── tests/              component tests
@@ -139,31 +139,31 @@ my-app/
 │   └── routes/             api.js, auth.js, console.js
 ├── .env                    secrets and settings (never commit it)
 ├── package.json
-└── kreft.config.json         CLI options
+└── kreftjs.config.json         CLI options
 ```
 
 ### Why the two folders matter
 
-- `kreft dev` and `kreft build` serve only `frontend/`. The `backend/` folder, database files and `.env` have no web address.
-- On macOS and Linux `kreft new` gives `backend/` and `.env` permissions that only the owner can read.
-- Files such as `.env`, `*.db`, `*.pem`, `package.json` and `kreft.config.json` are refused even if requested by name.
+- `kreftjs dev` and `kreftjs build` serve only `frontend/`. The `backend/` folder, database files and `.env` have no web address.
+- On macOS and Linux `kreftjs new` gives `backend/` and `.env` permissions that only the owner can read.
+- Files such as `.env`, `*.db`, `*.pem`, `package.json` and `kreftjs.config.json` are refused even if requested by name.
 
 ### Adding a CSS library
 
-Any CSS library works. Add its `<link>` to `index.html`, or install it and import the file from a `.kreft` file; it becomes a `<link>` added once, and `kreft build` copies it (with its fonts and images) into `dist/vendor/`.
+Any CSS library works. Add its `<link>` to `index.html`, or install it and import the file from a `.kreftjs` file; it becomes a `<link>` added once, and `kreftjs build` copies it (with its fonts and images) into `dist/vendor/`.
 
 ```html
 import 'bootstrap/dist/css/bootstrap.min.css'   // npm i bootstrap
-import './theme.css'                            // your own file, next to this .kreft file
+import './theme.css'                            // your own file, next to this .kreftjs file
 ```
 
 ### npm packages in the browser
 
-Install a package with `kreft add`, then import it in any `.kreft` file:
+Install a package with `kreftjs add`, then import it in any `.kreftjs` file:
 
 ```bash
-kreft add dayjs nanoid lodash
-kreft add -D esbuild      # once per project: it prepares packages for the browser
+kreftjs add dayjs nanoid lodash
+kreftjs add -D esbuild      # once per project: it prepares packages for the browser
 ```
 
 ```html
@@ -177,13 +177,13 @@ state id = nanoid()
 </view>
 ```
 
-`kreft dev` serves each package as one browser-ready file and tells the browser where it is with an import map. Old-style packages (`module.exports`, such as lodash) work too.
+`kreftjs dev` serves each package as one browser-ready file and tells the browser where it is with an import map. Old-style packages (`module.exports`, such as lodash) work too.
 
 # The Kreft language
 
-## Components and the .kreft file
+## Components and the .kreftjs file
 
-A `.kreft` file has three parts:
+A `.kreftjs` file has three parts:
 
 1. **The script**: everything outside `<view>` and `<style>`. Each line starts with a keyword.
 2. **`<view>`**: the HTML of the component.
@@ -203,7 +203,7 @@ A `.kreft` file has three parts:
 | `event` | `event save, remove` | Events this component sends to its parent with `send('save', data)`. |
 | `use` | `use cart` | Use a shared store. `use mouse = trackMouse()` uses shared logic from a `.js` file. |
 | `share` / `receive` | `share theme = 'dark'` | Give a value to everything inside this component / take a value a parent shared. |
-| `import` | `import Card from './Card.kreft'` | Use another component or a JavaScript module. |
+| `import` | `import Card from './Card.kreftjs'` | Use another component or a JavaScript module. |
 | `saved` | `saved todos = []` | Like `state`, but kept in the browser (localStorage). |
 | `load` | `load users = api.get('/api/users')` | Loads data and gives `users.data`, `users.loading`, `users.error`, `users.reload()`. |
 
@@ -212,7 +212,7 @@ Inside the script you use names **directly**: write `count++`, not `this.count++
 ### A complete example
 
 ```html
-<!-- TodoPage.kreft -->
+<!-- TodoPage.kreftjs -->
 state todos = []
 state text = ''
 
@@ -248,7 +248,7 @@ when todos.length && remaining === 0 {
 - An `action` that uses `await` becomes async automatically.
 - A line that does not start with a keyword is normal JavaScript (`let timer`, `const max = 10`). Your actions can use it, but the view cannot. Use `state`, `derive` or `action` for anything the view needs.
 - Every Kreft function is available in the script: `bus`, `store`, `signal`, `watch`, `tick`, `send`, `props`, `$route`, `$router`.
-- Errors name the file and line, for example `"state" needs a name, like: state count = 0 (Bad.kreft, line 3)`.
+- Errors name the file and line, for example `"state" needs a name, like: state count = 0 (Bad.kreftjs, line 3)`.
 
 ### Lifecycle
 
@@ -401,13 +401,13 @@ app.directive('focus', {
 Register it once by its path, or import it where you need it:
 
 ```js
-Kreft.app('App.kreft')
-  .component('UserCard', 'components/UserCard.kreft')
+Kreftjs.app('App.kreftjs')
+  .component('UserCard', 'components/UserCard.kreftjs')
   .mount('#app')
 ```
 
 ```html
-import UserCard from './UserCard.kreft'
+import UserCard from './UserCard.kreftjs'
 
 <view>
   <user-card name="Alice Smith" age={30}></user-card>
@@ -419,7 +419,7 @@ In the view, write component names in **kebab-case** (`<user-card>`).
 ### Props: parent to child
 
 ```html
-<!-- UserCard.kreft -->
+<!-- UserCard.kreftjs -->
 prop name
 prop age = 0
 prop admin = false
@@ -438,7 +438,7 @@ The default's type decides how plain text attributes are read: `age="30"` become
 ### Events: child to parent
 
 ```html
-<!-- TodoItem.kreft -->
+<!-- TodoItem.kreftjs -->
 prop todo
 event remove
 
@@ -459,7 +459,7 @@ action removeTodo(id) { todos = todos.filter((t) => t.id !== id) }
 ### `k-model` on a component
 
 ```html
-<!-- Toggle.kreft -->
+<!-- Toggle.kreftjs -->
 prop modelValue = false
 event update:modelValue
 
@@ -477,7 +477,7 @@ Named models: `k-model:title="pageTitle"` uses `prop title` and the event `updat
 ### Slots
 
 ```html
-<!-- Card.kreft -->
+<!-- Card.kreftjs -->
 prop items = []
 
 <view>
@@ -535,7 +535,7 @@ on hide { timer.stop() }    <!-- it was put away -->
 |---|---|
 | Parent to child | `prop` |
 | Child to parent | `event` + `send()`, or `k-model` |
-| Many components, anywhere | stores: `Kreft.store()` + `use` |
+| Many components, anywhere | stores: `Kreftjs.store()` + `use` |
 | A parent to everything inside it | `share` / `receive` |
 | "Something happened" messages | `bus.send()` / `bus.on()` |
 
@@ -544,7 +544,7 @@ on hide { timer.stop() }    <!-- it was put away -->
 Create a store once in your page's script:
 
 ```js
-Kreft.store('cart', {
+Kreftjs.store('cart', {
   items: [],
   get count() { return this.items.length },
   get total() { return this.items.reduce((s, p) => s + p.price, 0) },
@@ -552,7 +552,7 @@ Kreft.store('cart', {
 })
 ```
 
-Use it in any `.kreft` file. Every component sees the same data:
+Use it in any `.kreftjs` file. Every component sees the same data:
 
 ```html
 use cart
@@ -567,15 +567,15 @@ Every store also has `$patch` (change several values at once), `$reset()` (back 
 
 ### Shared logic
 
-Logic that many components need goes in a `.js` file as a function. It can use `Kreft.state`, `Kreft.watch`, `Kreft.onDestroy` and the rest:
+Logic that many components need goes in a `.js` file as a function. It can use `Kreftjs.state`, `Kreftjs.watch`, `Kreftjs.onDestroy` and the rest:
 
 ```js
 // logic/mouse.js
 export function trackMouse() {
-  const pos = Kreft.state({ x: 0, y: 0 })
+  const pos = Kreftjs.state({ x: 0, y: 0 })
   const move = (e) => { pos.x = e.clientX; pos.y = e.clientY }
   window.addEventListener('pointermove', move)
-  Kreft.onDestroy(() => window.removeEventListener('pointermove', move))
+  Kreftjs.onDestroy(() => window.removeEventListener('pointermove', move))
   return pos
 }
 ```
@@ -590,7 +590,7 @@ use mouse = trackMouse()
 ### Share and receive
 
 ```html
-<!-- Layout.kreft -->
+<!-- Layout.kreftjs -->
 state settings = { theme: 'dark', lang: 'so' }
 share settings = settings
 
@@ -600,7 +600,7 @@ receive settings
 <view><p>Theme: {settings.theme}</p></view>
 ```
 
-Share a `state` object and every receiver updates when it changes. `Kreft.app(…).share('key', value)` shares with the whole app.
+Share a `state` object and every receiver updates when it changes. `Kreftjs.app(…).share('key', value)` shares with the whole app.
 
 ### Event bus
 
@@ -632,17 +632,17 @@ saved token = '' as 'auth.token'    <!-- choose the storage key yourself -->
 A store keeps its plain values when you add `saved`:
 
 ```js
-Kreft.store('cart', { items: [] }, { saved: true })            // or { saved: ['items'] } for some fields
+Kreftjs.store('cart', { items: [] }, { saved: true })            // or { saved: ['items'] } for some fields
 ```
 
 From JavaScript:
 
 ```js
-const theme = Kreft.saved('theme', 'light')    // a signal: theme.value = 'dark' is saved
-Kreft.storage.set('user', { name: 'Alice Smith' })
-Kreft.storage.get('user')
-Kreft.storage.remove('user')
-Kreft.storage.clear()                          // removes only what Kreft saved
+const theme = Kreftjs.saved('theme', 'light')    // a signal: theme.value = 'dark' is saved
+Kreftjs.storage.set('user', { name: 'Alice Smith' })
+Kreftjs.storage.get('user')
+Kreftjs.storage.remove('user')
+Kreftjs.storage.clear()                          // removes only what Kreft saved
 ```
 
 > [!WARNING]
@@ -653,22 +653,22 @@ Kreft.storage.clear()                          // removes only what Kreft saved
 ### Defining routes
 
 ```js
-const router = Kreft.router({
+const router = Kreftjs.router({
   routes: [
-    { path: '/', component: 'pages/Home.kreft', meta: { title: 'Home' } },
-    { path: '/users/:id', name: 'user', component: 'pages/User.kreft', props: true },
-    { path: '/posts/:slug?', component: 'pages/Posts.kreft' },
+    { path: '/', component: 'pages/Home.kreftjs', meta: { title: 'Home' } },
+    { path: '/users/:id', name: 'user', component: 'pages/User.kreftjs', props: true },
+    { path: '/posts/:slug?', component: 'pages/Posts.kreftjs' },
     { path: '/old', redirect: '/' },
-    { path: '/admin', component: 'pages/Admin.kreft', guard: () => isAdmin() || '/login' },
-    { path: '*', component: 'pages/NotFound.kreft' },
+    { path: '/admin', component: 'pages/Admin.kreftjs', guard: () => isAdmin() || '/login' },
+    { path: '*', component: 'pages/NotFound.kreftjs' },
   ],
 })
 
-Kreft.app('App.kreft').use(router).mount('#app')
+Kreftjs.app('App.kreftjs').use(router).mount('#app')
 ```
 
 ```html
-<!-- App.kreft -->
+<!-- App.kreftjs -->
 <view>
   <nav>
     <kreft-link to="/">Home</kreft-link>
@@ -681,7 +681,7 @@ Kreft.app('App.kreft').use(router).mount('#app')
 With `props: true`, the `:id` parameter arrives as a prop:
 
 ```html
-<!-- pages/User.kreft -->
+<!-- pages/User.kreftjs -->
 prop id
 derive user = users.find(id)
 action back() { $router.back() }
@@ -701,11 +701,11 @@ Each page file is loaded the first time someone opens it.
 
 ### Route files
 
-New projects keep their pages in `frontend/routes/web.kreft`, and `index.html` only points to it:
+New projects keep their pages in `frontend/routes/web.kreftjs`, and `index.html` only points to it:
 
 ```js
-Kreft.router({
-  routes: ['routes/web.kreft', 'routes/shop.kreft'],
+Kreftjs.router({
+  routes: ['routes/web.kreftjs', 'routes/shop.kreftjs'],
   layout: 'app',
   errors: 'errors',
   middleware: {
@@ -716,27 +716,27 @@ Kreft.router({
 ```
 
 ```js
-// routes/web.kreft
-Route.view('/', 'pages/Home.kreft').name('home').title('Home')
-Route.view('/posts/:id', 'pages/Post.kreft')
+// routes/web.kreftjs
+Route.view('/', 'pages/Home.kreftjs').name('home').title('Home')
+Route.view('/posts/:id', 'pages/Post.kreftjs')
 
 Route.middleware('auth').group(() => {
-  Route.view('/dashboard', 'pages/Dashboard.kreft').middleware('verified')
+  Route.view('/dashboard', 'pages/Dashboard.kreftjs').middleware('verified')
 })
 
 Route.layout('guest').middleware('guest').group(() => {
-  Route.view('/login', 'pages/auth/Login.kreft').title('Log in')
+  Route.view('/login', 'pages/auth/Login.kreftjs').title('Log in')
 })
 
 Route.prefix('/account').name('account.').middleware('auth').group(() => {
-  Route.view('/settings', 'pages/account/Settings.kreft').children(() => {
-    Route.view('', 'pages/account/General.kreft')       // /account/settings
-    Route.view('mail', 'pages/account/Mail.kreft')      // /account/settings/mail
+  Route.view('/settings', 'pages/account/Settings.kreftjs').children(() => {
+    Route.view('', 'pages/account/General.kreftjs')       // /account/settings
+    Route.view('mail', 'pages/account/Mail.kreftjs')      // /account/settings/mail
   })
 })
 
 Route.redirect('/home', '/')
-Route.fallback('pages/NotFound.kreft')
+Route.fallback('pages/NotFound.kreftjs')
 ```
 
 | On a route | What it does |
@@ -756,7 +756,7 @@ Route.fallback('pages/NotFound.kreft')
 A layout is the frame around your pages: bar, menu, footer. Put it in `layouts/` and use `<slot>` where the page goes.
 
 ```html
-<!-- layouts/app.kreft -->
+<!-- layouts/app.kreftjs -->
 state menuOpen = false
 
 <view>
@@ -767,7 +767,7 @@ state menuOpen = false
 
 | Where | What you write |
 |---|---|
-| Every page | `Kreft.router({ layout: 'app', routes })` |
+| Every page | `Kreftjs.router({ layout: 'app', routes })` |
 | One route and its children | `{ path: '/admin', component: …, layout: 'admin' }` |
 | Inside a page file | `layout admin` on its own line |
 | No layout | `layout: false` on the route, or `layout none` in the page |
@@ -788,15 +788,15 @@ A page can also fill other places in its layout:
 
 ### Error pages
 
-Each HTTP error can have its own page in `errors/`. Turn them on with `errors: 'errors'` in the router. New projects already have the folder (`kreft make:errors` adds it to an older one):
+Each HTTP error can have its own page in `errors/`. Turn them on with `errors: 'errors'` in the router. New projects already have the folder (`kreftjs make:errors` adds it to an older one):
 
 ```text
-errors/401.kreft 402.kreft 403.kreft 404.kreft 419.kreft 429.kreft 500.kreft 503.kreft
-errors/error.kreft      any other status
-errors/minimal.kreft    the shared frame
+errors/401.kreftjs 402.kreftjs 403.kreftjs 404.kreftjs 419.kreftjs 429.kreftjs 500.kreftjs 503.kreftjs
+errors/error.kreftjs      any other status
+errors/minimal.kreftjs    the shared frame
 ```
 
-An unknown address shows `errors/404.kreft`; a page that cannot load shows `errors/500.kreft`. From any `.kreft` file, `abort(404)` (also `$router.abort()` and `Kreft.abort()`) shows the matching page:
+An unknown address shows `errors/404.kreftjs`; a page that cannot load shows `errors/500.kreftjs`. From any `.kreftjs` file, `abort(404)` (also `$router.abort()` and `Kreftjs.abort()`) shows the matching page:
 
 ```html
 prop id
@@ -815,7 +815,7 @@ If you cannot change the server, use `mode: 'hash'`; URLs then look like `/#/use
 
 ## Fetching data
 
-The global `api` client is available in every `.kreft` file, and `Kreft.api` in plain JavaScript:
+The global `api` client is available in every `.kreftjs` file, and `Kreftjs.api` in plain JavaScript:
 
 ```js
 const users = await api.get('/api/users', { query: { page: 2 } })
@@ -830,7 +830,7 @@ await api.delete('/api/users/1')
 `load` declares a reactive resource. It handles the loading state, the error, and fetches again when the values it reads change:
 
 ```html
-<!-- pages/Posts.kreft -->
+<!-- pages/Posts.kreftjs -->
 state query = ''
 state page = 1
 
@@ -866,7 +866,7 @@ load posts = api.get('/api/posts', { query: { q: query || undefined, page } })
 
 ### Tables
 
-For tables served by `kreft dev --db` or the automatic table API, `table(name)` gives ready-made calls:
+For tables served by `kreftjs dev --db` or the automatic table API, `table(name)` gives ready-made calls:
 
 ```html
 const posts = table('posts')
@@ -900,16 +900,16 @@ action save() {
 ### Settings
 
 ```js
-Kreft.api.setup({
+Kreftjs.api.setup({
   base: '/api',                               // then api.get('users') is /api/users
-  token: () => Kreft.storage.get('token'),      // sent as Authorization: Bearer …
+  token: () => Kreftjs.storage.get('token'),      // sent as Authorization: Bearer …
   headers: { 'Accept-Language': 'en' },
   timeout: 10000,
 })
 
-Kreft.api.onError((e) => { if (e.status === 401) location.href = '/login' })
+Kreftjs.api.onError((e) => { if (e.status === 401) location.href = '/login' })
 
-const github = Kreft.api.create({ base: 'https://api.github.com' })    // a second client
+const github = Kreftjs.api.create({ base: 'https://api.github.com' })    // a second client
 ```
 
 Options for one request: `query`, `headers`, `timeout`, `signal` (to cancel) and `full: true` (returns `{ data, status, headers }`).
@@ -919,14 +919,14 @@ Requests to your own backend also send `X-XSRF-TOKEN` from the `XSRF-TOKEN` cook
 ### A practice API
 
 ```bash
-kreft dev --api db.json              # a REST API at /api, made from a JSON file
-kreft dev --api db.json --delay 500  # answer slowly, to see loading states
+kreftjs dev --api db.json              # a REST API at /api, made from a JSON file
+kreftjs dev --api db.json --delay 500  # answer slowly, to see loading states
 ```
 
 It gives GET and POST on `/api/posts`, GET, PUT, PATCH and DELETE on `/api/posts/1`, search with `?q=text`, filters with `?field=value`, and standard paging and sorting.
 
 > [!WARNING]
-> `--api` and `--db` are for development. They have no login. `kreft dev` answers only your own computer, and refuses requests that change data when they come from another web site, but do not expose them to the internet. In production, write real routes (see [Routing](#routing)).
+> `--api` and `--db` are for development. They have no login. `kreftjs dev` answers only your own computer, and refuses requests that change data when they come from another web site, but do not expose them to the internet. In production, write real routes (see [Routing](#routing)).
 
 ## Forms and validation
 
@@ -979,7 +979,7 @@ Put translation files in a `lang/` folder: `lang/` or `frontend/lang/` in your p
 
 A message uses `:name` for values. For plurals, separate the forms with `|`: `{0} No apples|{1} One apple|[2,*] :count apples`. Under the hood, categories use the browser's `Intl.PluralRules` for the current locale.
 
-Change the language with `Kreft.locale('ar')`. The page's `<html lang>` and `dir` update, and every view re-renders. `Kreft.fallbackLocale('en')` sets the fallback, `Kreft.locales()` lists loaded languages, and `Kreft.translations('so', { … })` registers more text from code.
+Change the language with `Kreftjs.locale('ar')`. The page's `<html lang>` and `dir` update, and every view re-renders. `Kreftjs.fallbackLocale('en')` sets the fallback, `Kreftjs.locales()` lists loaded languages, and `Kreftjs.translations('so', { … })` registers more text from code.
 
 ### Direction
 
@@ -1016,10 +1016,10 @@ On the server, request language comes from `?lang=`, the `lang` cookie or `Accep
 
 ## Using Kreft from JavaScript
 
-You can write components as plain objects. The rules match the `.kreft` language: values are state, getters are derived values, functions are actions.
+You can write components as plain objects. The rules match the `.kreftjs` language: values are state, getters are derived values, functions are actions.
 
 ```js
-Kreft.app({
+Kreftjs.app({
   count: 0,
   get double() { return this.count * 2 },
   add() { this.count++ },
@@ -1027,35 +1027,35 @@ Kreft.app({
 }).mount('#app')
 ```
 
-| JavaScript | Same as in `.kreft` |
+| JavaScript | Same as in `.kreftjs` |
 |---|---|
-| `Kreft.state({ … })` | `state` + `derive` + `action` together, for code outside components. |
-| `Kreft.signal(0)` | One value, read and written with `.value`. |
-| `Kreft.derived(() => …)` | `derive` |
-| `Kreft.watch(source, (value, old) => …)` | `watch` |
-| `Kreft.effect(() => …)` | Runs again whenever what it reads changes. |
-| `Kreft.tick()` | Wait until the page has updated. |
+| `Kreftjs.state({ … })` | `state` + `derive` + `action` together, for code outside components. |
+| `Kreftjs.signal(0)` | One value, read and written with `.value`. |
+| `Kreftjs.derived(() => …)` | `derive` |
+| `Kreftjs.watch(source, (value, old) => …)` | `watch` |
+| `Kreftjs.effect(() => …)` | Runs again whenever what it reads changes. |
+| `Kreftjs.tick()` | Wait until the page has updated. |
 
-`Kreft.render(view, data)` turns a view and data into an HTML string, with every directive working and every value escaped. Use it for emails and print views:
+`Kreftjs.render(view, data)` turns a view and data into an HTML string, with every directive working and every value escaped. Use it for emails and print views:
 
 ```js
-Kreft.render(`<ul><li k-each="u in users">{u}</li></ul>`, { users: ['Alex', 'Alice'] })
+Kreftjs.render(`<ul><li k-each="u in users">{u}</li></ul>`, { users: ['Alex', 'Alice'] })
 // <ul><li>Alex</li><li>Alice</li></ul>
 ```
 
 ### Server templates
 
-Blade and similar engines use `{{ }}`; Kreft uses `{ }`, so they do not clash. Put `kreft.js` and your `.kreft` files in your public folder and mount as usual.
+Blade and similar engines use `{{ }}`; Kreft uses `{ }`, so they do not clash. Put `kreftjs.js` and your `.kreftjs` files in your public folder and mount as usual.
 
 # Backend
 
 ## Routing
 
-A project made with `kreft new` has a Node.js backend. `kreft dev` and `kreft serve` load `backend/routes/api.js` by themselves, every address in it starts with `/api`, and `kreft dev` picks up each change you save. The backend folder never reaches the browser.
+A project made with `kreftjs new` has a Node.js backend. `kreftjs dev` and `kreftjs serve` load `backend/routes/api.js` by themselves, every address in it starts with `/api`, and `kreftjs dev` picks up each change you save. The backend folder never reaches the browser.
 
 ```js
 // routes/api.js
-const { Route } = require('kreft/server')
+const { Route } = require('kreftjs/server')
 const PostController = require('../app/Http/Controllers/PostController')
 
 Route.get('/hello', (req) => ({ hello: req.input('name', 'world') }))      // GET /api/hello
@@ -1072,14 +1072,14 @@ Route.prefix('admin').middleware(['auth', 'admin']).group(() => { … })
 
 - Parameters are written `{post}`, or `{post?}` when optional.
 - A route can have a name (`.name('…')`), a pattern (`.whereNumber('id')`) and middleware (`.middleware('auth')`).
-- `kreft route:list` prints every route with its name, controller and middleware.
+- `kreftjs route:list` prints every route with its name, controller and middleware.
 
 ### Namespaces
 
 PHP-style namespaces are supported for controllers, models and relations:
 
 ```js
-const { Route, use, namespace } = require('kreft/server')
+const { Route, use, namespace } = require('kreftjs/server')
 
 const User = use('App\\Models\\User')
 const { DashboardController, UserController } = namespace('App\\Http\\Controllers\\Admin')
@@ -1095,7 +1095,7 @@ Route.namespace('Admin').group(() => {
 A controller method gets the request first, then the route's parameters. What it returns is sent as JSON; returning nothing answers `204`.
 
 ```js
-const { response, abort } = require('kreft/server')
+const { response, abort } = require('kreftjs/server')
 const Post = require('../../Models/Post')
 
 class PostController {
@@ -1118,7 +1118,7 @@ class PostController {
 module.exports = PostController
 ```
 
-Generate one with `kreft make:controller PostController --api` (also `--model Post`, `--route=api`, `--auth`).
+Generate one with `kreftjs make:controller PostController --api` (also `--model Post`, `--route=api`, `--auth`).
 
 ### The request
 
@@ -1137,7 +1137,7 @@ For bigger endpoints, move rules and authorization out of the controller:
 
 ```js
 // app/Http/Requests/StorePostRequest.js
-const { FormRequest } = require('kreft/server')
+const { FormRequest } = require('kreftjs/server')
 
 class StorePostRequest extends FormRequest {
   authorize(req) { return req.user != null }           // false answers 403
@@ -1154,7 +1154,7 @@ return PostResource.collection(await Post.paginate(15))          // { data, meta
 await req.authorize('update', post)                              // app/Policies/PostPolicy.js
 ```
 
-Generate them with `kreft make:request`, `kreft make:resource` and `kreft make:policy`.
+Generate them with `kreftjs make:request`, `kreftjs make:resource` and `kreftjs make:policy`.
 
 ### Passing data from controllers to pages
 
@@ -1166,7 +1166,7 @@ Models are Active Record classes, like Eloquent:
 
 ```js
 // app/Models/Post.js
-const { Model, Str } = require('kreft/server')
+const { Model, Str } = require('kreftjs/server')
 
 class Post extends Model {
   static fillable = ['title', 'body', 'user_id']        // what create() and update() may fill
@@ -1260,7 +1260,7 @@ A seeder fills starting data:
 
 ```js
 // database/seeders/DatabaseSeeder.js
-const { Seeder } = require('kreft/server')
+const { Seeder } = require('kreftjs/server')
 const Post = require('../../app/Models/Post')
 
 class DatabaseSeeder extends Seeder {
@@ -1283,14 +1283,14 @@ await User.factory().count(10).has(Post.factory().count(3), 'posts').create()
 
 | Command | What it does |
 |---|---|
-| `kreft migrate` | Runs the new migrations (`kreft dev` does this by itself). |
-| `kreft migrate:rollback` | Undoes the last batch (`--step 2` for the last two). |
-| `kreft migrate:fresh --seed` | Drops every table, migrates again, then seeds. |
-| `kreft migrate:status` | Which migrations ran. |
-| `kreft db:seed` | Runs `DatabaseSeeder` (`--class PostSeeder` for another). |
-| `kreft make:model Post -mfsc` | A model plus migration (`-m`), factory (`-f`), seeder (`-s`), controller (`-c`), page (`-p`), route (`-r`). |
-| `kreft make:migration create_posts_table` | `add_x_to_posts_table` makes a `schema.table` one. |
-| `kreft make:seeder`, `kreft make:middleware` | The files, in the right folders. |
+| `kreftjs migrate` | Runs the new migrations (`kreftjs dev` does this by itself). |
+| `kreftjs migrate:rollback` | Undoes the last batch (`--step 2` for the last two). |
+| `kreftjs migrate:fresh --seed` | Drops every table, migrates again, then seeds. |
+| `kreftjs migrate:status` | Which migrations ran. |
+| `kreftjs db:seed` | Runs `DatabaseSeeder` (`--class PostSeeder` for another). |
+| `kreftjs make:model Post -mfsc` | A model plus migration (`-m`), factory (`-f`), seeder (`-s`), controller (`-c`), page (`-p`), route (`-r`). |
+| `kreftjs make:migration create_posts_table` | `add_x_to_posts_table` makes a `schema.table` one. |
+| `kreftjs make:seeder`, `kreftjs make:middleware` | The files, in the right folders. |
 
 > [!NOTE]
 > `migrate:fresh` and `db:wipe` destroy data. They are meant for development databases only.
@@ -1301,18 +1301,18 @@ New projects come with every sign-in screen and the backend behind it:
 
 | Page | Address | What it does |
 |---|---|---|
-| `pages/auth/Login.kreft` | `/login` | Log in with email and password. |
-| `pages/auth/Register.kreft` | `/register` | Make an account and get an email to verify the address. |
-| `pages/auth/ForgotPassword.kreft` | `/forgot-password` | Email a link to choose a new password. |
-| `pages/auth/ResetPassword.kreft` | `/reset-password/:token` | The link from that email. |
-| `pages/auth/VerifyEmail.kreft` | `/verify-email` | "Check your email", and the link from it opens `/verify-email/:id/:hash`. |
-| `pages/auth/ConfirmPassword.kreft` | `/confirm-password` | Type the password again before something serious. |
-| `pages/Dashboard.kreft`, `pages/Profile.kreft` | `/dashboard`, `/profile` | The first page after logging in; account settings. |
+| `pages/auth/Login.kreftjs` | `/login` | Log in with email and password. |
+| `pages/auth/Register.kreftjs` | `/register` | Make an account and get an email to verify the address. |
+| `pages/auth/ForgotPassword.kreftjs` | `/forgot-password` | Email a link to choose a new password. |
+| `pages/auth/ResetPassword.kreftjs` | `/reset-password/:token` | The link from that email. |
+| `pages/auth/VerifyEmail.kreftjs` | `/verify-email` | "Check your email", and the link from it opens `/verify-email/:id/:hash`. |
+| `pages/auth/ConfirmPassword.kreftjs` | `/confirm-password` | Type the password again before something serious. |
+| `pages/Dashboard.kreftjs`, `pages/Profile.kreftjs` | `/dashboard`, `/profile` | The first page after logging in; account settings. |
 
 ### How a login works
 
 - A login puts a token in an **HttpOnly cookie**. Page scripts cannot read it, so a script injected into a page cannot steal it. Only a hash of the token is stored in the database.
-- Every change (POST, PUT, PATCH, DELETE) also needs the `X-XSRF-TOKEN` header to match the `XSRF-TOKEN` cookie. `Kreft.api` does this for you.
+- Every change (POST, PUT, PATCH, DELETE) also needs the `X-XSRF-TOKEN` header to match the `XSRF-TOKEN` cookie. `Kreftjs.api` does this for you.
 - A script or an app that sends `device_name` when it logs in gets an **API token** (`Authorization: Bearer 5|…`) instead.
 - Passwords are hashed with scrypt. Reset links expire after 60 minutes and sign the user out everywhere.
 - Session ids change on every login, so a session cannot be planted in a browser beforehand.
@@ -1330,7 +1330,7 @@ Route.delete('/account', …).middleware(['auth', 'password.confirm'])   // asks
 Helpers you can use anywhere in the backend:
 
 ```js
-const { Hash, Str, Url, Mail, Crypt } = require('kreft/server')
+const { Hash, Str, Url, Mail, Crypt } = require('kreftjs/server')
 
 Hash.make('secret')                      // store this, never the password
 Hash.check('secret', user.password)      // true or false
@@ -1355,7 +1355,7 @@ await Mail.send({ to, subject, text })   // printed in the terminal until MAIL_U
 
 ### Admin users
 
-An admin is a user whose `is_admin` column is true. The test user is one; give the rights to others on the Users page, or with `kreft make:admin you@example.com`. Use `Route.middleware(['auth', 'admin'])` for admin-only routes.
+An admin is a user whose `is_admin` column is true. The test user is one; give the rights to others on the Users page, or with `kreftjs make:admin you@example.com`. Use `Route.middleware(['auth', 'admin'])` for admin-only routes.
 
 ## Middleware
 
@@ -1363,7 +1363,7 @@ Middleware runs before the controller and can stop the request or change the ans
 
 ```js
 // app/Http/Middleware/EnsureIsAdmin.js     ('ensure-is-admin' in a route, or 'ensure-is-admin:editor')
-const { abort } = require('kreft/server')
+const { abort } = require('kreftjs/server')
 
 class EnsureIsAdmin {
   async handle(req, next, role = 'admin') {
@@ -1399,7 +1399,7 @@ Exempt a route with `.withoutMiddleware('csrf')`, or `new VerifyCsrfToken({ exce
 
 ## Queues, mail, cache and files
 
-Each tool has its own folder in `backend/app/` and a `kreft make:` command:
+Each tool has its own folder in `backend/app/` and a `kreftjs make:` command:
 
 ```js
 await dispatch(new SendWelcome(user))                   // app/Jobs: runs in the background (tries, backoff, failed())
@@ -1422,7 +1422,7 @@ await SendWelcome.dispatch(user).delay(60).onQueue('mail')
 > [!WARNING]
 > `dispatch` sends the job when you `await` it (or call `.then`). Calling it and forgetting the `await` sends nothing.
 
-Queued jobs, listeners, mail and notifications run in the background. `kreft dev` and `kreft serve` work through the `jobs` table every second. Control workers with `kreft queue:work`, `queue:failed`, `queue:retry all`, `queue:flush`. Choose the driver with `QUEUE_CONNECTION` (`database`, `redis`, `sync`).
+Queued jobs, listeners, mail and notifications run in the background. `kreftjs dev` and `kreftjs serve` work through the `jobs` table every second. Control workers with `kreftjs queue:work`, `queue:failed`, `queue:retry all`, `queue:flush`. Choose the driver with `QUEUE_CONNECTION` (`database`, `redis`, `sync`).
 
 ### Uploads
 
@@ -1439,7 +1439,7 @@ Schedule.job(new SendDailyReport()).weekdays().at('08:00')
 Schedule.command('send:report Daily').hourly()
 ```
 
-`kreft dev` and `kreft serve` check the schedule every minute. Set `SCHEDULER=off` to run it from cron with `kreft schedule:run`; `kreft schedule:list` shows what is planned.
+`kreftjs dev` and `kreftjs serve` check the schedule every minute. Set `SCHEDULER=off` to run it from cron with `kreftjs schedule:run`; `kreftjs schedule:list` shows what is planned.
 
 ### Redis
 
@@ -1453,7 +1453,7 @@ REDIS_PREFIX=kreft_
 ```
 
 ```bash
-kreft redis:ping        # PONG (1ms) — 127.0.0.1:6379/0
+kreftjs redis:ping        # PONG (1ms) — 127.0.0.1:6379/0
 ```
 
 Redis also gives you atomic locks (`Cache.lock('report', 30)`) and publish/subscribe.
@@ -1463,7 +1463,7 @@ Redis also gives you atomic locks (`Cache.lock('report', 30)`) and publish/subsc
 Settings come from `.env`, `backend/config/*.js` and defaults, through one helper:
 
 ```js
-const { config } = require('kreft/server')
+const { config } = require('kreftjs/server')
 
 config('app.name', 'My app')
 config('database.default', 'sqlite')
@@ -1484,7 +1484,7 @@ PUBLIC_SESSION_WARNING=2        # minutes of warning before that
 AUTH_TOKEN_DAYS=30              # a token unused for this many days stops working
 ```
 
-`PUBLIC_` values are copied into the browser (`Kreft.env`); never put secrets in them.
+`PUBLIC_` values are copied into the browser (`Kreftjs.env`); never put secrets in them.
 
 ### Behind a proxy
 
@@ -1511,7 +1511,7 @@ Backend code is tested with Node's own test runner and an in-memory SQLite datab
 // tests/models/post.test.js
 const test = require('node:test')
 const assert = require('node:assert/strict')
-const { createSchema, setConnection } = require('kreft/server')
+const { createSchema, setConnection } = require('kreftjs/server')
 const { connect } = require('kreft/bin/db.js')
 const Post = require('../../backend/app/Models/Post')
 
@@ -1533,27 +1533,27 @@ test('a post can be created and found', async () => {
 
 To test a whole project's tables, run its real migrations instead of building the schema by hand: `migrator.migrate(db, 'backend/database/migrations')`.
 
-Component pages for the browser live in `frontend/tests/` and are opened with `kreft dev`.
+Component pages for the browser live in `frontend/tests/` and are opened with `kreftjs dev`.
 
 # Tooling
 
 ## Command line
 
-Run `kreft list` to see every command your installed version has, and `kreft help` for the options of the main ones.
+Run `kreftjs list` to see every command your installed version has, and `kreftjs help` for the options of the main ones.
 
 ### The main commands
 
 | Command | What it does |
 |---|---|
-| `kreft new my-app` | Makes a project (`--js`, `--ts`, `--db sqlite`, `--ui tailwind`). |
-| `kreft dev` | Development server with hot reload (`--port`, `--host`, `--db`, `--api`, `--server`, `--backend`, `--seed`, `--no-hot`, `--gc`). |
-| `kreft build` | Compiles the app into plain files in `dist/` (`--out`, `--base`, `--prerender`). |
-| `kreft serve [dist]` | Runs a built app for real users. Answers everyone, serves only the tables you list. |
-| `kreft update` | Updates npm packages and refreshes `kreft.js` (`--core`, `--npm`, `--latest`, `--check`). |
-| `kreft add <package>` | A safer `npm install`. See [Packages](#packages). |
-| `kreft about`, `kreft env`, `kreft log`, `kreft tinker` | Versions and folders, environment, logs, a console with your models (`await User.count()`). |
-| `kreft down --secret=x` / `kreft up` | Maintenance mode: visitors get `503`, and `/x` lets you in. |
-| `kreft vscode` | Installs colors, snippets and folding for `.kreft` files in VS Code, Cursor and VSCodium. |
+| `kreftjs new my-app` | Makes a project (`--js`, `--ts`, `--db sqlite`, `--ui tailwind`). |
+| `kreftjs dev` | Development server with hot reload (`--port`, `--host`, `--db`, `--api`, `--server`, `--backend`, `--seed`, `--no-hot`, `--gc`). |
+| `kreftjs build` | Compiles the app into plain files in `dist/` (`--out`, `--base`, `--prerender`). |
+| `kreftjs serve [dist]` | Runs a built app for real users. Answers everyone, serves only the tables you list. |
+| `kreftjs update` | Updates npm packages and refreshes `kreftjs.js` (`--core`, `--npm`, `--latest`, `--check`). |
+| `kreftjs add <package>` | A safer `npm install`. See [Packages](#packages). |
+| `kreftjs about`, `kreftjs env`, `kreftjs log`, `kreftjs tinker` | Versions and folders, environment, logs, a console with your models (`await User.count()`). |
+| `kreftjs down --secret=x` / `kreftjs up` | Maintenance mode: visitors get `503`, and `/x` lets you in. |
+| `kreftjs vscode` | Installs colors, snippets and folding for `.kreftjs` files in VS Code, Cursor and VSCodium. |
 
 ### Generators and database
 
@@ -1566,20 +1566,20 @@ Run `kreft list` to see every command your installed version has, and `kreft hel
 | `schedule:` | `run`, `work`, `list` |
 | Others | `route:list`, `cache:clear`, `storage:link`, `key:generate`, `event:list`, `log:clear` |
 
-`kreft dev --seed` seeds a brand-new database the first time. `kreft key:generate` writes a 256-bit `APP_KEY` into `.env` (`--show` prints it instead).
+`kreftjs dev --seed` seeds a brand-new database the first time. `kreftjs key:generate` writes a 256-bit `APP_KEY` into `.env` (`--show` prints it instead).
 
 ### Development server safety
 
-- `kreft dev` answers only this computer (`127.0.0.1`) and only requests whose `Host` is a local name (`localhost`, `127.0.0.1`, `::1`, `*.localhost`). This stops DNS-rebinding attacks, where a web page tries to reach your dev server through its own domain name.
+- `kreftjs dev` answers only this computer (`127.0.0.1`) and only requests whose `Host` is a local name (`localhost`, `127.0.0.1`, `::1`, `*.localhost`). This stops DNS-rebinding attacks, where a web page tries to reach your dev server through its own domain name.
 - To reach it through a tunnel or another name, set `KREFT_ALLOWED_HOSTS=my-tunnel.example`. To share it on your network, use `--host 0.0.0.0`.
 - Requests that change data in `--api` or `--db` mode are refused when they come from another web site (a browser `Origin` that is not local).
-- **Moving or deleting the project folder.** The operating system cannot refuse a delete, so the server says so after it happens: if the project folder is deleted or moved to the Trash while `kreft dev` or `kreft serve` runs, it stops at once with a message. Any `kreft` command started from a deleted folder or one in the Trash refuses to run. Stop the server with <kbd>Ctrl</kbd>+<kbd>C</kbd> before you move or delete a project.
+- **Moving or deleting the project folder.** The operating system cannot refuse a delete, so the server says so after it happens: if the project folder is deleted or moved to the Trash while `kreftjs dev` or `kreftjs serve` runs, it stops at once with a message. Any `kreftjs` command started from a deleted folder or one in the Trash refuses to run. Stop the server with <kbd>Ctrl</kbd>+<kbd>C</kbd> before you move or delete a project.
 
 ## Developer tools
 
 Everything here comes with Kreft. Nothing else to install.
 
-**Hot reload.** While `kreft dev` runs, save a `.kreft` file and only that component is swapped; its state stays. A `.css` file is reloaded without a page refresh, and an error shows an overlay with the file and line.
+**Hot reload.** While `kreftjs dev` runs, save a `.kreftjs` file and only that component is swapped; its state stays. A `.css` file is reloaded without a page refresh, and an error shows an overlay with the file and line.
 
 **Kreft DevTools.** The **S** button in the corner (or <kbd>Alt</kbd>+<kbd>Shift</kbd>+<kbd>D</kbd>) opens a panel:
 
@@ -1590,9 +1590,9 @@ Everything here comes with Kreft. Nothing else to install.
 | Route | The current route and every route, with a button to go there. |
 | Timeline | Store actions and bus messages as they happen. |
 
-The button and the panel only exist under `kreft dev`; built apps never include them.
+The button and the panel only exist under `kreftjs dev`; built apps never include them.
 
-**Types.** `kreft.d.ts` describes everything in `Kreft`, so TypeScript and your editor know it. `kreft new` copies it into new projects, and `kreft update --core` refreshes it.
+**Types.** `kreftjs.d.ts` describes everything in `Kreft`, so TypeScript and your editor know it. `kreftjs new` copies it into new projects, and `kreftjs update --core` refreshes it.
 
 ### Error monitor
 
@@ -1600,16 +1600,16 @@ In development, an uncaught error on the server shows an interactive page instea
 
 - A stack explorer that hides vendor frames and highlights yours.
 - A source preview around the failing line.
-- A suggestion engine for common mistakes (a method typo on a model, reading a property of `undefined`, a missing table that needs `kreft migrate`).
+- A suggestion engine for common mistakes (a method typo on a model, reading a property of `undefined`, a missing table that needs `kreftjs migrate`).
 - The request: method, URL, route and query values, body, headers and client address. Passwords, tokens, cookies and CSRF values are masked.
 - Copy the error as Markdown for an issue, or as JSON.
 
 The page is only shown when `APP_ENV` is not `production` and `APP_DEBUG` is true. **In production the same error answers a plain `Server error.`** with no stack or file names.
 
-Frontend errors use the same design through `errors/ErrorMonitor.kreft`; pass it a caught exception:
+Frontend errors use the same design through `errors/ErrorMonitor.kreftjs`; pass it a caught exception:
 
 ```html
-import ErrorMonitor from 'errors/ErrorMonitor.kreft'
+import ErrorMonitor from 'errors/ErrorMonitor.kreftjs'
 state caught = null
 
 <view>
@@ -1619,43 +1619,43 @@ state caught = null
 
 ## Build and deploy
 
-`kreft build` compiles your app ahead of time:
+`kreftjs build` compiles your app ahead of time:
 
 ```bash
-npm run build      # or: kreft build
-npm run preview    # check the result: kreft dev dist
+npm run build      # or: kreftjs build
+npm run preview    # check the result: kreftjs dev dist
 ```
 
 | File | What it is |
 |---|---|
 | `index.html` | Your page, now loading the files below. |
-| `kreft.js` | The framework. |
-| `app.js` | Every `.kreft` file, already compiled. |
+| `kreftjs.js` | The framework. |
+| `app.js` | Every `.kreftjs` file, already compiled. |
 | `app.css` | All `<style>` blocks; scoped ones already scoped. |
 | `main.js` | The inline `<script>` code from `index.html`. |
-| `deps/`, `vendor/` | The npm packages and CSS your `.kreft` files import, minified. |
+| `deps/`, `vendor/` | The npm packages and CSS your `.kreftjs` files import, minified. |
 
 What you get:
 
 - **A faster first load.** The browser downloads one `app.js` and compiles nothing.
 - **A strict Content-Security-Policy works.** Every expression becomes a real function, so the built app never uses `eval` or `new Function`.
-- **Errors before you deploy.** A mistake in any `.kreft` file stops the build and names the file and line.
+- **Errors before you deploy.** A mistake in any `.kreftjs` file stops the build and names the file and line.
 
-Options: `kreft build ./site --out public` builds another folder, and `--base /` changes `<base href>`. Upload the output folder to any static host.
+Options: `kreftjs build ./site --out public` builds another folder, and `--base /` changes `<base href>`. Upload the output folder to any static host.
 
 ### Ready HTML for every page: `--prerender`
 
 ```bash
 npm i -D jsdom                              # once per project
-kreft build --prerender                       # every route without :params
-kreft build --prerender /users/1,/users/2     # and these addresses too
+kreftjs build --prerender                       # every route without :params
+kreftjs build --prerender /users/1,/users/2     # and these addresses too
 ```
 
 Each page is opened in a simulated browser, its data loaded, and the result saved as `dist/<page>/index.html`, so visitors and search engines get finished HTML.
 
 The tags a page sets with `.seo({...})` or `meta` (description, canonical, Open Graph, Twitter, `hreflang`, JSON-LD, `lang` and `dir`) are saved in the page's HTML too, so link previews and crawlers that don't run JavaScript see them. A canonical written in `index.html` is kept for the home page only. A page where the app shows its error page is skipped.
 
-Pages that come from your data (`/posts/:slug`) need their addresses: `kreft build --prerender --urls urls.js`. The file is `urls.json` (a list), `urls.txt` (one address per line), or `urls.js` (a list, or an async function that returns it).
+Pages that come from your data (`/posts/:slug`) need their addresses: `kreftjs build --prerender --urls urls.js`. The file is `urls.json` (a list), `urls.txt` (one address per line), or `urls.js` (a list, or an async function that returns it).
 
 ### SEO for pages from your database: `backend/routes/seo.js`
 
@@ -1678,53 +1678,53 @@ module.exports = {
       alternates: { en: `https://example.com/posts/${slug}`, ar: `https://example.com/ar/posts/${slug}` },
     }
   },
-  // the addresses of your data pages, for `kreft sitemap`: '/path' or { path, lastmod }
+  // the addresses of your data pages, for `kreftjs sitemap`: '/path' or { path, lastmod }
   urls: async () => (await Post.all()).map((p) => ({ path: '/posts/' + p.slug, lastmod: p.updated_at })),
 }
 ```
 
-`kreft dev` and `kreft serve` answer a page request with `index.html` plus the tags of the first matching address (`:param` and a trailing `/*` work). Set `APP_URL` and each page also gets its `canonical`. An address that isn't listed is the normal page. The browser keeps these tags until the first navigation, then the router's own tags take over.
+`kreftjs dev` and `kreftjs serve` answer a page request with `index.html` plus the tags of the first matching address (`:param` and a trailing `/*` work). Set `APP_URL` and each page also gets its `canonical`. An address that isn't listed is the normal page. The browser keeps these tags until the first navigation, then the router's own tags take over.
 
 ### Whole pages for crawlers
 
-A crawler or link preview (Googlebot, Bingbot, WhatsApp, Facebook, X, Slack, Telegram …) that doesn't run JavaScript would see an empty `<div id="app">`. For these visitors `kreft dev` and `kreft serve` open the page in the same simulated browser as `--prerender`, wait until its data has loaded, and answer with the page already drawn. If the app shows its `errors/404.kreft` page, the answer has status 404. A page that `kreft build --prerender` already drew is sent as it is. Everyone else gets the normal page.
+A crawler or link preview (Googlebot, Bingbot, WhatsApp, Facebook, X, Slack, Telegram …) that doesn't run JavaScript would see an empty `<div id="app">`. For these visitors `kreftjs dev` and `kreftjs serve` open the page in the same simulated browser as `--prerender`, wait until its data has loaded, and answer with the page already drawn. If the app shows its `errors/404.kreftjs` page, the answer has status 404. A page that `kreftjs build --prerender` already drew is sent as it is. Everyone else gets the normal page.
 
 ```bash
 npm i -D jsdom        # once per project
 KREFT_SSR=bots          # default: crawlers and link previews only
 KREFT_SSR=all           # every visitor
 KREFT_SSR=off           # never
-KREFT_SSR_TTL=300       # seconds a drawn page is kept (kreft dev never keeps them)
+KREFT_SSR_TTL=300       # seconds a drawn page is kept (kreftjs dev never keeps them)
 ```
 
 At most two pages are drawn at a time; the other crawlers wait for their turn (up to 15 seconds, 20 at once), and the same address asked twice is drawn once. A page that takes longer than 15 seconds, fails, or is not a page of the app is not tried again for 30 seconds, and the normal page is sent meanwhile, as it is when jsdom is missing. The query string is part of the address (`/search?q=sofa` is its own page). Images, styles and fonts from other sites are not downloaded while drawing, scripts are. Responses carry `Vary: User-Agent` and the same security headers as every other page. The simulated browser introduces itself with a secret `User-Agent` that changes on every start, so it is never drawn again.
 
-### Sitemap and robots.txt: `kreft sitemap`
+### Sitemap and robots.txt: `kreftjs sitemap`
 
 ```bash
-kreft sitemap --url https://example.com                  # public/sitemap.xml and public/robots.txt
-kreft sitemap --url https://example.com --urls urls.js   # and the addresses in that file
+kreftjs sitemap --url https://example.com                  # public/sitemap.xml and public/robots.txt
+kreftjs sitemap --url https://example.com --urls urls.js   # and the addresses in that file
 ```
 
-It lists the routes of `Kreft.router({ routes })` in `index.html` and `routes/web.kreft`, skipping redirects and patterns like `/posts/:id`, plus the `urls` of `backend/routes/seo.js` and `--urls`. A `lastmod` is written only when you give one (a database date such as `2026-01-02 10:00:00` becomes `2026-01-02`). A route can list `alternates: { en: '/about', ar: '/ar/about' }` for `xhtml:link` entries.
+It lists the routes of `Kreftjs.router({ routes })` in `index.html` and `routes/web.kreftjs`, skipping redirects and patterns like `/posts/:id`, plus the `urls` of `backend/routes/seo.js` and `--urls`. A `lastmod` is written only when you give one (a database date such as `2026-01-02 10:00:00` becomes `2026-01-02`). A route can list `alternates: { en: '/about', ar: '/ar/about' }` for `xhtml:link` entries.
 
 ### Deploying the backend
 
 ```bash
-NODE_ENV=production kreft serve dist
+NODE_ENV=production kreftjs serve dist
 ```
 
 Before you do, work through the [Production checklist](#production-checklist).
 
 ## TypeScript
 
-TypeScript works in the browser (`.kreft` files and `.ts` modules) and on the server (`routes/api.ts`, `app/**/*.ts`, migrations, seeders).
+TypeScript works in the browser (`.kreftjs` files and `.ts` modules) and on the server (`routes/api.ts`, `app/**/*.ts`, migrations, seeders).
 
 ```bash
-kreft new my-app --ts
+kreftjs new my-app --ts
 ```
 
-Inside a `.kreft` file you can write `interface`, `type`, `enum`, `import type`, and typed `prop`, `state`, `derive` and `saved`. `kreft make:*` writes `.ts` files when the project has a `tsconfig.json` (or with `--ts`; `--js` forces JavaScript).
+Inside a `.kreftjs` file you can write `interface`, `type`, `enum`, `import type`, and typed `prop`, `state`, `derive` and `saved`. `kreftjs make:*` writes `.ts` files when the project has a `tsconfig.json` (or with `--ts`; `--js` forces JavaScript).
 
 Execution needs no setup: Kreft uses `esbuild` if installed, otherwise Node's built-in type stripping (Node 22.6+), otherwise its own zero-dependency stripper.
 
@@ -1733,35 +1733,35 @@ Execution needs no setup: Kreft uses `esbuild` if installed, otherwise Node's bu
 
 ## Vite and Electron
 
-**Vite.** If your team prefers the Vite ecosystem, Kreft has a plugin that compiles `.kreft` files on the fly:
+**Vite.** If your team prefers the Vite ecosystem, Kreft has a plugin that compiles `.kreftjs` files on the fly:
 
 ```bash
-kreft vite:init       # writes vite.config.js with the Kreft plugin
-kreft vite:dev        # Vite dev server with the backend API proxied
-kreft vite:build      # optimised bundle with code splitting
-kreft vite:preview
+kreftjs vite:init       # writes vite.config.js with the Kreft plugin
+kreftjs vite:dev        # Vite dev server with the backend API proxied
+kreftjs vite:build      # optimised bundle with code splitting
+kreftjs vite:preview
 ```
 
 **Electron.** Turn the same app into a desktop application:
 
 ```bash
-kreft electron:init   # electron/main.js and electron/preload.js (alias: kreft make:electron)
-kreft electron        # dev server plus a desktop window, with hot reload
-kreft electron:build  # a static build, packaged for Windows, macOS and Linux
+kreftjs electron:init   # electron/main.js and electron/preload.js (alias: kreftjs make:electron)
+kreftjs electron        # dev server plus a desktop window, with hot reload
+kreftjs electron:build  # a static build, packaged for Windows, macOS and Linux
 ```
 
 The window runs with `contextIsolation` and `sandbox` on and `nodeIntegration` off. Only a small set of desktop functions (minimise, maximise, dialogs, app info) is exposed to your pages as `window.kreftDesktop`. Links to other sites open in the system browser, and navigation away from the app is blocked.
 
 ## Packages
 
-`kreft add` is a safer `npm install`:
+`kreftjs add` is a safer `npm install`:
 
 ```bash
-kreft add pg mysql2                 # install packages
-kreft add -D vitest                 # a development dependency
-kreft add --dry-run some-package    # inspect without installing
-kreft add --allow-scripts better-sqlite3   # allow build scripts for a trusted native package
-kreft add --force dotenv            # ignore a warning
+kreftjs add pg mysql2                 # install packages
+kreftjs add -D vitest                 # a development dependency
+kreftjs add --dry-run some-package    # inspect without installing
+kreftjs add --allow-scripts better-sqlite3   # allow build scripts for a trusted native package
+kreftjs add --force dotenv            # ignore a warning
 ```
 
 What it checks before and after installing:
@@ -1788,7 +1788,7 @@ Kreft includes a Model Context Protocol server, so an AI coding agent can see yo
 ### Local use (stdio)
 
 ```bash
-kreft mcp
+kreftjs mcp
 ```
 
 ```json
@@ -1801,7 +1801,7 @@ kreft mcp
 
 ### Over HTTP
 
-`kreft dev` and `kreft serve` also answer at `/mcp`. Set a token and send it:
+`kreftjs dev` and `kreftjs serve` also answer at `/mcp`. Set a token and send it:
 
 ```env
 MCP_TOKEN=a-long-random-secret
@@ -1836,7 +1836,7 @@ Kreft is built so the safe thing is the default. This chapter lists what is prot
 
 - **Escaped views.** Everything in `{ }`, `k-text` and attributes is shown as text. `<script>` in a user's bio is only text.
 - **`k-html` is cleaned**, not trusted. Kreft parses the HTML the way the browser does, in a document that runs nothing, then removes scripts, frames, forms, SVG and MathML, every `on…` attribute, `srcdoc`, and addresses that start with `javascript:` or an unsafe `data:`. Even so, bind only HTML you trust or that the server already cleaned.
-- **A strict Content-Security-Policy works** with built apps. `kreft build` turns every expression into a function ahead of time, so there is no `eval` and no `new Function`. Without a build, views compile in the browser and a strict CSP blocks that.
+- **A strict Content-Security-Policy works** with built apps. `kreftjs build` turns every expression into a function ahead of time, so there is no `eval` and no `new Function`. Without a build, views compile in the browser and a strict CSP blocks that.
 - **Prototype pollution is blocked.** Paths and keys such as `__proto__`, `constructor` and `prototype` are ignored in views, translations and JSON bodies.
 - **A login cookie is HttpOnly**, so a script on your page cannot read it.
 
@@ -1846,17 +1846,17 @@ Kreft is built so the safe thing is the default. This chapter lists what is prot
 
 Kreft uses the double-submit cookie pattern. Any safe request gets an `XSRF-TOKEN` cookie; any request that changes data (POST, PUT, PATCH, DELETE) from a browser must send the same value back in `X-XSRF-TOKEN` (or `X-CSRF-TOKEN`, a `_token` field). The comparison is constant-time, and a wrong or missing token answers `419`.
 
-- `Kreft.api` sends the header by itself. HTML forms add `<input type="hidden" name="_token" value="{csrfToken}">`.
+- `Kreftjs.api` sends the header by itself. HTML forms add `<input type="hidden" name="_token" value="{csrfToken}">`.
 - `Route.csrfCookie('/csrf-cookie')` gives a single-page app an endpoint to get the cookie first.
 - Exempt only what must be (webhooks): `.withoutMiddleware('csrf')`.
 - Requests that carry only an API bearer token and no cookie are not browser sessions and do not need CSRF.
 
 #### HTML on the server
 
-Anything built into HTML on the server should go through the helpers in `kreft/server`:
+Anything built into HTML on the server should go through the helpers in `kreftjs/server`:
 
 ```js
-const { escapeHtml, cleanHtml, SafeHtml, html } = require('kreft/server')
+const { escapeHtml, cleanHtml, SafeHtml, html } = require('kreftjs/server')
 
 escapeHtml(userText)                         // turn text into safe text
 cleanHtml(userHtml)                          // keep a small set of tags and attributes, drop the rest
@@ -1898,18 +1898,18 @@ Files get random names. Unknown extensions are stored as `.bin`. Public files ar
 #### The database
 
 - Values travel as parameters. Table and column names are quoted.
-- The automatic table API (`--db`) is a development tool with no login. `kreft serve` only serves the tables you list in `kreft.config.json`, with `write: false` and `hidden: [...]` where needed; hidden columns cannot be read or used to sort.
+- The automatic table API (`--db`) is a development tool with no login. `kreftjs serve` only serves the tables you list in `kreftjs.config.json`, with `write: false` and `hidden: [...]` where needed; hidden columns cannot be read or used to sort.
 - Raw SQL helpers (`whereRaw`, `selectRaw`, `orderByRaw`, `DB.raw`) are for your own SQL; pass user values in their parameter array.
 
 #### Packages
 
-`kreft add` blocks install scripts, typosquats and look-alike names, flags very new packages, and pins exact versions. See [Packages](#packages).
+`kreftjs add` blocks install scripts, typosquats and look-alike names, flags very new packages, and pins exact versions. See [Packages](#packages).
 
 ### What stays your job
 
 - **Check access on the server.** Client route guards decide what to show, not who may read data. Every route that returns private data needs `auth` and, where it matters, `admin` or a policy.
 - **Never trust HTML you did not clean**, and never put secrets in `PUBLIC_` variables or localStorage.
-- **Keep dependencies and Node.js up to date** (`kreft update`, `npm audit`).
+- **Keep dependencies and Node.js up to date** (`kreftjs update`, `npm audit`).
 - **Protect the machine.** Kreft cannot protect a database, a server or a `.env` file that others can read.
 
 ## Production checklist
@@ -1920,35 +1920,35 @@ Go through this before your first real user:
 |---|---|
 | `NODE_ENV=production` and `APP_ENV=production` | Turns off debug pages, enables HSTS and the https redirect, and makes security errors fatal. |
 | `APP_DEBUG=false` | Never show stack traces or source code to visitors. |
-| `APP_KEY` set to a 32-byte key (`kreft key:generate`) | In production the app refuses to start without a key of at least 16 bytes. A random per-process key would also break sessions on restart. |
+| `APP_KEY` set to a 32-byte key (`kreftjs key:generate`) | In production the app refuses to start without a key of at least 16 bytes. A random per-process key would also break sessions on restart. |
 | `APP_URL=https://your.site` | Used for links in emails, the https redirect and secure cookies. |
 | `TRUSTED_PROXIES` set if you use a proxy | Otherwise every visitor shares the proxy's address and rate limits. |
 | A real `DATABASE_URL` and a backup plan | SQLite is fine for small apps; use MySQL or PostgreSQL for several servers. |
 | `CACHE_STORE=redis` or `database`, `QUEUE_CONNECTION=redis` or `database` | `memory` is per process. Account lockouts live in the cache, so they are shared between servers only with `database` or `redis`. |
 | `MAIL_URL` set | Otherwise emails are only printed in the terminal. |
 | `MCP_TOKEN` set, or MCP left off | The MCP endpoint is disabled in production without it. |
-| Tables listed in `kreft.config.json`, or no `--db` at all | `kreft serve` serves only the tables you list. |
+| Tables listed in `kreftjs.config.json`, or no `--db` at all | `kreftjs serve` serves only the tables you list. |
 | No test user | Do not run `--seed` against production; delete `test@example.com` if it exists. |
 | HTTPS in front of the app | Cookies are `Secure` in production and on `https` URLs. |
-| `npm audit` and `kreft update` | Fix known vulnerabilities before release. |
+| `npm audit` and `kreftjs update` | Fix known vulnerabilities before release. |
 
 > [!NOTE]
 > Kreft does not replace a security review. For regulated or high-risk systems, have the app, its infrastructure and its dependencies reviewed by someone who does that professionally.
 
 ## Known limits
 
-- Without a build, views are compiled in the browser with `new Function`, which a strict Content-Security-Policy blocks. Use `kreft build` for production.
+- Without a build, views are compiled in the browser with `new Function`, which a strict Content-Security-Policy blocks. Use `kreftjs build` for production.
 - Inside a view, `<` directly followed by a letter starts a tag, so write `{a < b}` with a space.
 - The memory of which two-factor codes were already used, and login tickets, is kept per process. Behind several servers, a code can be replayed once on each. The per-account lockout (kept in the cache) still limits guessing.
 - The sanitizer removes unsafe markup; it is not a substitute for choosing carefully what HTML you show.
 - `--prerender` makes static HTML at build time. On a running server whole pages are drawn only for crawlers and link previews; every other visitor gets the page drawn by the browser, and an address the app does not have answers 200 (the app shows its own 404 page) unless `seo.js` says otherwise.
-- `.kreft` files must be served over `http://` or `https://`, not opened from `file://`.
+- `.kreftjs` files must be served over `http://` or `https://`, not opened from `file://`.
 
 # Reference
 
 ## Environment variables
 
-Set these in `.env` (never commit it). Variables that start with `PUBLIC_` are copied into the browser as `Kreft.env`; never put a secret in one.
+Set these in `.env` (never commit it). Variables that start with `PUBLIC_` are copied into the browser as `Kreftjs.env`; never put a secret in one.
 
 ### App
 
@@ -1957,9 +1957,9 @@ Set these in `.env` (never commit it). Variables that start with `PUBLIC_` are c
 | `APP_NAME`, `APP_URL` | Name and public address (used in emails, https redirects, secure cookies). |
 | `APP_ENV`, `NODE_ENV` | `production` turns on production behaviour (either one is enough). |
 | `APP_DEBUG` | `true` shows the interactive error page outside production. |
-| `APP_KEY` | Encrypts sessions and signs links. Make it with `kreft key:generate`; required in production. |
+| `APP_KEY` | Encrypts sessions and signs links. Make it with `kreftjs key:generate`; required in production. |
 | `APP_LOCALE`, `APP_FALLBACK_LOCALE`, `APP_TIMEZONE` | Language and time zone defaults. |
-| `HOST`, `PORT` | Where `kreft serve` listens. |
+| `HOST`, `PORT` | Where `kreftjs serve` listens. |
 | `FORCE_HTTPS` | `true` redirects plain HTTP in production. |
 | `MAX_BODY_KB` | Largest request body accepted. |
 
@@ -1972,7 +1972,7 @@ Set these in `.env` (never commit it). Variables that start with `PUBLIC_` are c
 | `CACHE_STORE` | `database`, `file`, `memory` or `redis`. Also `CACHE_PREFIX`, `CACHE_DEFAULT_TTL`. |
 | `QUEUE_CONNECTION` | `database`, `redis` or `sync`. Also `QUEUE_NAMES`, `QUEUE_WORKER`. |
 | `REDIS_URL`, or `REDIS_HOST` `REDIS_PORT` `REDIS_USERNAME` `REDIS_PASSWORD` `REDIS_DB` `REDIS_TLS` `REDIS_PREFIX` | Redis connection. |
-| `SCHEDULER` | `off` hands scheduling to cron (`kreft schedule:run`). |
+| `SCHEDULER` | `off` hands scheduling to cron (`kreftjs schedule:run`). |
 | `MAX_QUERY_ROWS`, `HARD_QUERY_LIMIT` | Upper limits on rows a query may return. |
 | `FILESYSTEM_DISK` | `local` or `public`. |
 
@@ -1994,9 +1994,9 @@ Set these in `.env` (never commit it). Variables that start with `PUBLIC_` are c
 | Variable | Meaning |
 |---|---|
 | `TRUSTED_PROXIES`, `TRUSTED_PROXY_HOPS` | Which proxies' `X-Forwarded-For` is believed, and how many stand in front with `*`. |
-| `KREFT_ALLOWED_HOSTS` | Extra host names `kreft dev` answers to. |
+| `KREFT_ALLOWED_HOSTS` | Extra host names `kreftjs dev` answers to. |
 | `MCP_TOKEN`, `MCP_ALLOWED_ORIGIN`, `MCP_QUERY_TIMEOUT_MS` | MCP endpoint token, one extra allowed browser origin, and the query time limit. |
-| `MAIL_URL`, `MAIL_FROM` | `smtp://user:password@host:587` sends real email (needs `kreft add nodemailer`). |
+| `MAIL_URL`, `MAIL_FROM` | `smtp://user:password@host:587` sends real email (needs `kreftjs add nodemailer`). |
 | `LOG_LEVEL`, `LOG_CHANNEL` | `debug`, `info`, `notice`, `warning`, `error`, `critical`. |
 | `AUTO_GC`, `AUTO_GC_THRESHOLD_MB`, `AUTO_GC_INTERVAL_MS` | The memory watchdog. |
 
@@ -2004,19 +2004,19 @@ Set these in `.env` (never commit it). Variables that start with `PUBLIC_` are c
 
 | Group | Names |
 |---|---|
-| `.kreft` keywords | `state` `derive` `action` `when` `watch` `on` `prop` `event` `use` `share` `receive` `import` `saved` `load` `layout` |
+| `.kreftjs` keywords | `state` `derive` `action` `when` `watch` `on` `prop` `event` `use` `share` `receive` `import` `saved` `load` `layout` |
 | In the script | `send` `props` `bus` `store` `$route` `$router` `tick` and every `Kreft` function |
 | In the view | `{expr}` `attr={expr}` `@event` `k-if` `k-elif` `k-else` `k-each` `k-key` `k-model` `k-show` `k-text` `k-html` `k-ref` `k-skip` `k-once` `k-memo` `k-animate` `{for}` |
-| App | `Kreft.app(rootOrPath)` then `.component()` `.directive()` `.share()` `.use()` `.mount()` `.unmount()` |
+| App | `Kreftjs.app(rootOrPath)` then `.component()` `.directive()` `.share()` `.use()` `.mount()` `.unmount()` |
 | Data | `store` (`$patch` `$reset` `$watch`) `state` `signal` `derived` `readonly` `saved` `storage` |
 | Reacting | `watch` `effect` `tick` `onCleanup` `onReady` `onUpdate` `onShow` `onHide` `onDestroy` |
 | Sharing | `bus` (`on` `once` `off` `send`) `share` `receive` |
 | Forms | `form(values, rules)` (`$error` `$errors` `$valid` `$busy` `$submit` `$check` `$reset` `$setErrors`) and `validate(values, rules)` |
 | Server data | `table(name)` and `api` (`get` `post` `put` `patch` `delete` `setup` `create` `onError`) |
-| Languages | `$t` `$choice` `$locale` `$dir`, `Kreft.locale()` `Kreft.translations()` |
-| Router | `Kreft.router()` with `.go` `.replace` `.back` `.before` `.after` `.route`, and `children` for nested routes |
-| Engine | `Kreft.render(view, data, options)` |
-| Server | `Route` `Model` `DB` `Seeder` `Hash` `Str` `Url` `Mail` `Crypt` `Cache` `Storage` `Schedule` `config` `response` `abort` and the helpers in `require('kreft/server')` |
+| Languages | `$t` `$choice` `$locale` `$dir`, `Kreftjs.locale()` `Kreftjs.translations()` |
+| Router | `Kreftjs.router()` with `.go` `.replace` `.back` `.before` `.after` `.route`, and `children` for nested routes |
+| Engine | `Kreftjs.render(view, data, options)` |
+| Server | `Route` `Model` `DB` `Seeder` `Hash` `Str` `Url` `Mail` `Crypt` `Cache` `Storage` `Schedule` `config` `response` `abort` and the helpers in `require('kreftjs/server')` |
 
 ## Compared with other frameworks
 
@@ -2025,7 +2025,7 @@ Kreft is one framework for the browser and the server. The others below each cov
 | | **Kreft** | **Next.js** | **Nuxt** | **Astro** | **AdonisJS** | **NestJS** |
 |---|---|---|---|---|---|---|
 | **What it is** | Frontend and backend in one | React framework | Vue framework | Content sites with islands of interactivity | Backend (MVC) | Backend (modules, dependency injection) |
-| **Components** | `.kreft` files, no Virtual DOM | React | Vue | Astro files; React, Vue, Svelte … inside | none (Edge templates, or Inertia) | none |
+| **Components** | `.kreftjs` files, no Virtual DOM | React | Vue | Astro files; React, Vue, Svelte … inside | none (Edge templates, or Inertia) | none |
 | **Pages drawn on the server** | At build time (`--prerender`), and for crawlers and link previews on request | Yes, for every visitor | Yes, for every visitor | Yes, mostly at build time | Only with Inertia | no |
 | **Database layer** | Active Record `Model`, migrations, seeders, factories | none (use Prisma, Drizzle …) | none | none | Lucid (Active Record) | none (TypeORM, Prisma, MikroORM …) |
 | **Sign-in, 2FA, API tokens** | Built in, in every new project | none (Auth.js …) | none (a module) | none | Built in | none (Passport, your own) |
@@ -2044,15 +2044,15 @@ Kreft is one framework for the browser and the server. The others below each cov
 - **AdonisJS:** you want the same Laravel-like backend with a larger community and years of production use, and you will bring your own frontend.
 - **NestJS:** you build a large API or microservices with many teams, and you want strict structure and dependency injection.
 
-**Things to weigh before choosing Kreft:** it is young and has one small community, few third-party packages are made for `.kreft` files, and nobody has run it at large scale yet. See [Known limits](#known-limits).
+**Things to weigh before choosing Kreft:** it is young and has one small community, few third-party packages are made for `.kreftjs` files, and nobody has run it at large scale yet. See [Known limits](#known-limits).
 
 ## Coming from Vue
 
 | Vue | Kreft |
 |---|---|
-| `.vue` single-file component | `.kreft` file: script, `<view>`, `<style scoped>` |
-| `ref()`, `reactive()`, `computed()` | `state`, `derive` (JS: `Kreft.signal`, `Kreft.state`, `Kreft.derived`) |
-| `watch`, `watchEffect` | `watch x { }`, `when cond { }` (JS: `Kreft.watch`, `Kreft.effect`) |
+| `.vue` single-file component | `.kreftjs` file: script, `<view>`, `<style scoped>` |
+| `ref()`, `reactive()`, `computed()` | `state`, `derive` (JS: `Kreftjs.signal`, `Kreftjs.state`, `Kreftjs.derived`) |
+| `watch`, `watchEffect` | `watch x { }`, `when cond { }` (JS: `Kreftjs.watch`, `Kreftjs.effect`) |
 | `{{ x }}`, `:attr`, `@click` | `{x}`, `attr={x}`, `@click={fn}` |
 | `v-if`, `v-else-if`, `v-else`, `v-show` | `k-if`, `k-elif`, `k-else`, `k-show` |
 | `v-for` with `:key` | `{for x in list key x.id}` … `{/for}`, or `k-each` + `k-key` |
@@ -2063,17 +2063,17 @@ Kreft is one framework for the browser and the server. The others below each cov
 | `onMounted`, `onUpdated`, `onUnmounted` | `on ready`, `on update`, `on destroy` |
 | `<KeepAlive>`, `<Teleport>`, `<Suspense>` | `keep`, `<kreft-portal>`, `<kreft-wait>` |
 | `<Transition>` | `k-animate="fade"` |
-| Vue Router with nested routes | `Kreft.router()`, `<kreft-view>`, `<kreft-link>`, `children` |
-| Pinia | `Kreft.store()` + `use`, with `{ saved: true }` |
-| Vite dev server | `kreft dev` (or `kreft vite:dev`) |
-| Nuxt static generation | `kreft build --prerender` |
+| Vue Router with nested routes | `Kreftjs.router()`, `<kreft-view>`, `<kreft-link>`, `children` |
+| Pinia | `Kreftjs.store()` + `use`, with `{ saved: true }` |
+| Vite dev server | `kreftjs dev` (or `kreftjs vite:dev`) |
+| Nuxt static generation | `kreftjs build --prerender` |
 | Nuxt `server/api` | `server/*.js` served at `/api/*` |
 
 ## Glossary
 
 | Term | Meaning |
 |---|---|
-| **Component** | A `.kreft` file: script, view and style together. |
+| **Component** | A `.kreftjs` file: script, view and style together. |
 | **State** | A value that can change; the view follows it. |
 | **Derived value** | A value calculated from other values; stays up to date by itself. |
 | **Store** | State shared by many components. |

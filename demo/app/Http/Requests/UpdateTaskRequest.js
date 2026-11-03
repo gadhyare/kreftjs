@@ -1,4 +1,4 @@
-const { FormRequest } = require('kreft/server')
+const { FormRequest } = require('kreftjs/server')
 
 class UpdateTaskRequest extends FormRequest {
   /**

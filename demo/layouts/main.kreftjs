@@ -1,0 +1,205 @@
+<!-- The main layout: the bar, the menu with one page per feature, and the page in <slot>.
+     Every route uses it (Kreftjs.router({ layout: 'main' })). Moving between pages keeps it: the menu stays as it is. -->
+state menuOpen = false
+state version = Kreftjs.version
+state menu = [
+  { title: 'Start', links: [
+    { to: '/', label: 'Start', hint: 'what Kreft is' },
+    { to: '/docs', label: 'Documentation', hint: 'Guides and API reference' },
+  ] },
+  { title: 'Basics', links: [
+    { to: '/basics', label: 'Basics', hint: 'state · derive · action' },
+    { to: '/lifecycle', label: 'Lifecycle', hint: 'when · watch · on' },
+  ] },
+  { title: 'Views', links: [
+    { to: '/loops', label: 'Loops', hint: '{for} · {empty}' },
+    { to: '/forms', label: 'Forms', hint: 'k-model' },
+    { to: '/directives', label: 'Directives', hint: 'k-if · k-show · k-ref · portal' },
+    { to: '/animations', label: 'Animations', hint: 'k-animate · lists that move' },
+    { to: '/fast', label: 'Fast views', hint: 'k-once · k-memo · on update' },
+  ] },
+  { title: 'Components', links: [
+    { to: '/components', label: 'Components', hint: 'props · slots · k-model' },
+    { to: '/keep', label: 'Keep and wait', hint: 'keep · kreft-wait' },
+  ] },
+  { title: 'Data', links: [
+    { to: '/saved', label: 'Saved data', hint: 'localStorage' },
+    { to: '/sharing', label: 'Sharing', hint: 'store · share · bus' },
+    { to: '/shop', label: 'Shop', hint: 'a saved store' },
+    { to: '/posts', label: 'Posts', hint: 'API: GET POST PUT PATCH DELETE' },
+    { to: '/online', label: 'Online API', hint: 'fetch · async/await · try/catch' },
+    { to: '/database', label: 'Database', hint: 'SQLite · MySQL · PostgreSQL' },
+    { to: '/backend', label: 'Backend', hint: 'routes · controllers · models · middleware' },
+    { to: '/server', label: 'Server code', hint: 'server/*.js · any npm package' },
+    { to: '/logic', label: 'Shared logic', hint: 'use x = … · $patch · $reset' },
+  ] },
+  { title: 'Router', links: [
+    { to: '/users', label: 'Users', hint: 'params · props' },
+    { to: '/router', label: 'Router', hint: 'query · guards · go' },
+    { to: '/settings', label: 'Settings', hint: 'nested routes' },
+    { to: '/layouts', label: 'Layouts', hint: 'layouts · sections' },
+  ] },
+  { title: 'Tools', links: [
+    { to: '/security', label: 'HTML Security', hint: 'cleanHtml · k-html · idle timer' },
+    { to: '/error-monitor', label: 'Error Monitor', hint: 'stack trace · smart solutions' },
+    { to: '/render', label: 'Template engine', hint: 'Kreftjs.render' },
+    { to: '/tools', label: 'Dev tools', hint: 'hot reload · kreftjs add · Electron' },
+  ] },
+]
+
+// close the menu on phones after choosing a page or pressing Escape
+watch $route.path { menuOpen = false }
+
+action onKeydown(e) {
+  if (e.key === 'Escape' && menuOpen) {
+    menuOpen = false
+  }
+}
+on ready {
+  window.addEventListener('keydown', onKeydown)
+}
+on destroy {
+  window.removeEventListener('keydown', onKeydown)
+}
+
+<view>
+  <site-header menu open={menuOpen} @toggle="menuOpen = !menuOpen"></site-header>
+  <div class="frame">
+    <div class="sidebar-backdrop {menuOpen ? 'open' : ''}" @click="menuOpen = false" aria-hidden="true"></div>
+    <nav class="sidebar {menuOpen ? 'open' : ''}" aria-label="Features">
+      <div class="sidebar-mobile-header">
+        <span class="sidebar-mobile-title">Menu</span>
+        <button class="sidebar-close-btn" @click="menuOpen = false" aria-label="Close menu">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6L6 18M6 6l12 12"/></svg>
+        </button>
+      </div>
+      {for group in menu}
+        <p class="group">{group.title}</p>
+        {for link in group.links key link.to}
+          <kreft-link to={link.to} title={link.hint}>{link.label}</kreft-link>
+        {/for}
+      {/for}
+      <p class="version">Kreft {version}</p>
+    </nav>
+    <main>
+      <slot></slot>
+    </main>
+  </div>
+</view>
+
+<style scoped>
+.frame {
+  display: grid;
+  grid-template-columns: 256px minmax(0, 1fr);
+  align-items: start;
+  font-family: var(--font);
+  color: var(--foreground);
+  width: 100%;
+  max-width: calc(var(--container) + var(--container-pad) * 2);
+  margin: 0 auto;
+  min-height: calc(100vh - 60px);
+  box-sizing: border-box;
+}
+.sidebar-backdrop {
+  display: none;
+}
+.sidebar-mobile-header {
+  display: none;
+}
+.sidebar {
+  position: sticky;
+  top: 60px;
+  max-height: calc(100vh - 60px);
+  overflow-y: auto;
+  padding: 20px 14px 28px 16px;
+  border-inline-end: 1px solid var(--border);
+  background: var(--background);
+  box-sizing: border-box;
+}
+.group { margin: 20px 10px 6px; font-family: var(--font); font-size: 12px; font-weight: 600; color: var(--foreground); letter-spacing: -0.01em; }
+.group:first-child { margin-top: 0; }
+.sidebar a { display: block; padding: 6px 10px; font-family: var(--font); font-size: 13.5px; font-weight: 500; color: var(--muted); text-decoration: none; border-radius: 6px; transition: background 0.12s ease, color 0.12s ease; }
+.sidebar a:hover { color: var(--foreground); background: var(--accent); }
+.sidebar a.kreft-link-exact { color: var(--foreground); font-weight: 600; background: var(--accent); }
+.version { margin: 24px 10px 0; font-family: var(--mono); font-size: 11.5px; font-weight: 500; color: var(--muted); }
+main { width: 100%; max-width: 860px; padding: 32px 40px 64px; box-sizing: border-box; }
+@media (max-width: 760px) {
+  .frame {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .sidebar-backdrop {
+    display: block;
+    position: fixed;
+    inset: 0;
+    background: rgba(0, 0, 0, 0.45);
+    backdrop-filter: blur(2px);
+    -webkit-backdrop-filter: blur(2px);
+    z-index: 55;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.25s ease;
+  }
+  .sidebar-backdrop.open {
+    opacity: 1;
+    pointer-events: auto;
+  }
+  .sidebar {
+    display: block;
+    position: fixed;
+    top: 0;
+    bottom: 0;
+    inset-inline-start: 0;
+    width: 280px;
+    max-width: 82vw;
+    height: 100%;
+    z-index: 60;
+    max-height: none;
+    border-inline-end: 1px solid var(--border);
+    background: var(--background);
+    padding: 16px 14px 48px;
+    box-shadow: 4px 0 24px rgba(0, 0, 0, 0.15);
+    transform: translateX(-100%);
+    transition: transform 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+  }
+  [dir="rtl"] .sidebar {
+    box-shadow: -4px 0 24px rgba(0, 0, 0, 0.15);
+    transform: translateX(100%);
+  }
+  .sidebar.open {
+    transform: none;
+  }
+  .sidebar-mobile-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 4px 6px 12px;
+    margin-bottom: 10px;
+    border-bottom: 1px solid var(--border);
+  }
+  .sidebar-mobile-title {
+    font-size: 14px;
+    font-weight: 600;
+    color: var(--foreground);
+  }
+  .sidebar-close-btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 32px;
+    height: 32px;
+    padding: 0;
+    border: none;
+    background: transparent;
+    color: var(--muted);
+    border-radius: 6px;
+    cursor: pointer;
+  }
+  .sidebar-close-btn:hover {
+    color: var(--foreground);
+    background: var(--accent);
+  }
+  main {
+    padding: 20px 16px 48px;
+  }
+}
+</style>

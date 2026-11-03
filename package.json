@@ -1,23 +1,24 @@
 {
-  "name": "kreft",
+  "name": "kreftjs",
   "version": "3.0.0",
-  "description": "A tiny reactive framework with its own component language (.kreft files): router with nested routes, stores, saved data, animations, an API client, hot reload, DevTools and a template engine.",
-  "main": "kreft.js",
-  "browser": "kreft.js",
+  "description": "A tiny reactive framework with its own component language (.kreftjs files): router with nested routes, stores, saved data, animations, an API client, hot reload, DevTools and a template engine.",
+  "main": "kreftjs.js",
+  "browser": "kreftjs.js",
   "bin": {
-    "kreft": "bin/kreft.js",
-    "som": "bin/kreft.js"
+    "kreftjs": "bin/kreftjs.js",
+    "kreft": "bin/kreftjs.js",
+    "som": "bin/kreftjs.js"
   },
   "scripts": {
-    "dev": "node bin/kreft.js dev --api demo/db.json --db sqlite:demo/database/demo.db --migrations demo/database/migrations --server demo/server --backend demo --seed",
-    "start": "node bin/kreft.js dev --api demo/db.json --db sqlite:demo/database/demo.db --migrations demo/database/migrations --server demo/server --backend demo --seed",
-    "build": "node bin/kreft.js build demo --out dist/demo --include docs",
-    "preview": "node bin/kreft.js dev dist --api demo/db.json --db sqlite:demo/database/demo.db --migrations demo/database/migrations --server demo/server --backend demo --seed",
+    "dev": "node bin/kreftjs.js dev --api demo/db.json --db sqlite:demo/database/demo.db --migrations demo/database/migrations --server demo/server --backend demo --seed",
+    "start": "node bin/kreftjs.js dev --api demo/db.json --db sqlite:demo/database/demo.db --migrations demo/database/migrations --server demo/server --backend demo --seed",
+    "build": "node bin/kreftjs.js build demo --out dist/demo --include docs",
+    "preview": "node bin/kreftjs.js dev dist --api demo/db.json --db sqlite:demo/database/demo.db --migrations demo/database/migrations --server demo/server --backend demo --seed",
     "test": "node --test test/security.test.js test/prerender.test.js test/seo.test.js test/rebrand.test.js"
   },
   "files": [
-    "kreft.js",
-    "kreft.d.ts",
+    "kreftjs.js",
+    "kreftjs.d.ts",
     "bin/",
     "server.js",
     "server.d.ts",
@@ -32,21 +33,22 @@
     "reactive",
     "components",
     "router",
-    "kreft"
+    "kreft",
+    "kreftjs"
   ],
-  "types": "kreft.d.ts",
+  "types": "kreftjs.d.ts",
   "exports": {
     ".": {
-      "types": "./kreft.d.ts",
-      "default": "./kreft.js"
+      "types": "./kreftjs.d.ts",
+      "default": "./kreftjs.js"
     },
     "./server": {
       "types": "./server.d.ts",
       "default": "./server.js"
     },
     "./vite": {
-      "types": "./tools/vite-plugin-kreft.d.ts",
-      "default": "./tools/vite-plugin-kreft.js"
+      "types": "./tools/vite-plugin-kreftjs.d.ts",
+      "default": "./tools/vite-plugin-kreftjs.js"
     },
     "./package.json": "./package.json"
   },

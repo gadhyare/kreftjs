@@ -1,4 +1,4 @@
-const { TOTP, ValidationError, abort, same } = require('kreft/server')
+const { TOTP, ValidationError, abort, same } = require('kreftjs/server')
 const User = require('../../../Models/User')
 const Throttle = require('../../../Auth/Throttle')
 const MAX_FAILURES = Number(process.env.TWO_FACTOR_MAX_FAILURES || 8)

@@ -1,5 +1,5 @@
 // 'admin' in the routes (after 'auth'): only users with is_admin get through.
-const { abort } = require('kreft/server')
+const { abort } = require('kreftjs/server')
 
 class EnsureIsAdmin {
   async handle(req, next) {

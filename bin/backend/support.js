@@ -1,7 +1,7 @@
 /*
  * Small helpers for server code: Hash, Str, Mail and signed URLs.
  *
- *   const { Hash, Str, Mail, Url } = require('kreft/server')
+ *   const { Hash, Str, Mail, Url } = require('kreftjs/server')
  *
  *   const hashed = Hash.make('secret')        // store this, never the password
  *   Hash.check('secret', hashed)              // true
@@ -98,11 +98,11 @@ function appKey() {
   if (k) {
     const buf = k.startsWith('base64:') ? Buffer.from(k.slice(7), 'base64') : Buffer.from(k);
     if (buf.length >= 16) return buf;
-    if (production) throw new Error('APP_KEY is shorter than 16 bytes. Run `kreft key:generate` and put the new key in .env.');
-    console.warn('  APP_KEY in .env is shorter than 16 bytes; run `kreft key:generate` for a 256-bit key.');
+    if (production) throw new Error('APP_KEY is shorter than 16 bytes. Run `kreftjs key:generate` and put the new key in .env.');
+    console.warn('  APP_KEY in .env is shorter than 16 bytes; run `kreftjs key:generate` for a 256-bit key.');
     return buf;
   }
-  if (production) throw new Error('APP_KEY is not set. Run `kreft key:generate` and put the key in .env (production needs one that every process shares).');
+  if (production) throw new Error('APP_KEY is not set. Run `kreftjs key:generate` and put the key in .env (production needs one that every process shares).');
   if (!fallbackKey) {
     fallbackKey = crypto.randomBytes(32);
     console.warn('  No APP_KEY in .env: signed links stop working when the server restarts.');
@@ -170,7 +170,7 @@ const Mail = {
       if (!transport) {
         let nodemailer;
         try { nodemailer = require(require.resolve('nodemailer', { paths: [process.cwd()] })); } catch (_) {
-          throw new Error('MAIL_URL is set: install the mailer with  kreft add nodemailer');
+          throw new Error('MAIL_URL is set: install the mailer with  kreftjs add nodemailer');
         }
         transport = nodemailer.createTransport(process.env.MAIL_URL);
       }

@@ -1,0 +1,11 @@
+<!-- errors/429.kreftjs: shown after abort(429). Change the words as you like. -->
+layout 'errors/minimal.kreftjs'
+prop status = 429
+prop title = ''
+prop message = ''
+
+<view>
+  <kreft-section name="code">429</kreft-section>
+  <kreft-section name="title">Too Many Requests</kreft-section>
+  <kreft-section name="message">{message || 'Too many requests. Wait a moment, then try again.'}</kreft-section>
+</view>

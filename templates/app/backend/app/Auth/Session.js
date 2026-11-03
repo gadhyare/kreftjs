@@ -2,11 +2,11 @@
 //
 // A browser gets its login in an HttpOnly cookie (kreft_session): page scripts can't read it, so a
 // script injected into a page can't steal it. Changes (POST, PUT, DELETE…) also need the X-XSRF-TOKEN
-// header to match the XSRF-TOKEN cookie, which only your own pages can read (Kreft.api sends it by itself).
+// header to match the XSRF-TOKEN cookie, which only your own pages can read (Kreftjs.api sends it by itself).
 //
 // An app or script that sends `device_name` when it logs in gets an API token in the answer instead:
 // Authorization: Bearer 5|k3J9…
-const { response, Str, Crypt, cookieSecure } = require('kreft/server')
+const { response, Str, Crypt, cookieSecure } = require('kreftjs/server')
 const PersonalAccessToken = require('../Models/PersonalAccessToken')
 
 const SESSION = 'kreft_session'

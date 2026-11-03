@@ -33,7 +33,7 @@ function parseUrl(url) {
 function driver(name, root) {
   const paths = [root || process.cwd(), process.cwd(), __dirname];
   try { return require(require.resolve(name, { paths })); }
-  catch (_) { throw new Error(`To use this database, install its driver in your project:\n\n    kreft add ${name}\n`); }
+  catch (_) { throw new Error(`To use this database, install its driver in your project:\n\n    kreftjs add ${name}\n`); }
 }
 
 const TEXT = /char|text|clob|string|uuid|enum|json/i;

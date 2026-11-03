@@ -1,5 +1,5 @@
 /*
- * Custom console commands (app/Console/Commands, kreft make:command SendReport).
+ * Custom console commands (app/Console/Commands, kreftjs make:command SendReport).
  *
  *   class SendReport extends Command {
  *     static signature = 'send:report {user} {--queue}'

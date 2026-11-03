@@ -1,0 +1,24 @@
+<!-- The plain layout: the bar and a wide page, no menu. The start page asks for it (`layout plain`),
+     and so does the /docs route ({ layout: 'plain' }). -->
+<view>
+  <site-header></site-header>
+  <main>
+    <slot></slot>
+  </main>
+  <footer>
+    <span>Kreft {Kreftjs.version}</span>
+    <kreft-link to="/basics">Examples</kreft-link>
+    <kreft-link to="/docs">Docs</kreft-link>
+  </footer>
+</view>
+
+<style scoped>
+main { width: 100%; max-width: calc(var(--container) + var(--container-pad) * 2); margin: 0 auto; padding: 0 var(--container-pad) 48px; box-sizing: border-box; }
+footer { display: flex; align-items: center; gap: 20px; width: 100%; max-width: calc(var(--container) + var(--container-pad) * 2); margin: 0 auto; padding: 20px var(--container-pad) 36px; border-top: 1px solid var(--border); color: var(--muted); font-size: 13px; box-sizing: border-box; }
+footer a { color: var(--muted); text-decoration: none; font-weight: 500; }
+footer a:hover { color: var(--foreground); }
+@media (max-width: 640px) {
+  main { padding: 0 16px 36px; }
+  footer { padding: 20px 16px 36px; flex-wrap: wrap; gap: 14px; }
+}
+</style>

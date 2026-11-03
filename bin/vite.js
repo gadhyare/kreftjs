@@ -2,13 +2,13 @@
  * Vite.js Bundler & Dev Server Integration for Kreft
  *
  * Commands:
- *   kreft vite:init       Add Vite configuration and dependencies to an existing project (alias: kreft make:vite)
- *   kreft vite:dev        Start ultra-fast Vite dev server with instant HMR and backend proxy (alias: kreft vite)
- *   kreft vite:build      Build optimized static frontend with Rollup and code-splitting
- *   kreft vite:preview    Preview production bundle locally using Vite
+ *   kreftjs vite:init       Add Vite configuration and dependencies to an existing project (alias: kreftjs make:vite)
+ *   kreftjs vite:dev        Start ultra-fast Vite dev server with instant HMR and backend proxy (alias: kreftjs vite)
+ *   kreftjs vite:build      Build optimized static frontend with Rollup and code-splitting
+ *   kreftjs vite:preview    Preview production bundle locally using Vite
  *
  * CLI flag:
- *   kreft new my-app --vite
+ *   kreftjs new my-app --vite
  */
 const fs = require('fs');
 const path = require('path');
@@ -33,11 +33,11 @@ function generateViteConfig({ isSplit, isTs, frontRel = 'frontend', outRel = 'di
   const outDir = isSplit ? `'../${outRel}'` : `'${outRel}'`;
 
   return `import { defineConfig } from 'vite';
-import kreft from 'kreft/vite';
+import kreftjs from 'kreftjs/vite';
 
 // https://vitejs.dev/config/
 export default defineConfig({
-  plugins: [kreft()],
+  plugins: [kreftjs()],
   root: ${rootDir.trim()},
   build: {
     outDir: ${outDir},
@@ -80,10 +80,10 @@ function init(args = [], opts = {}) {
   // Update package.json
   const pkg = JSON.parse(fs.readFileSync(pkgFile, 'utf8'));
   pkg.scripts = pkg.scripts || {};
-  pkg.scripts['vite'] = 'kreft vite';
-  pkg.scripts['vite:dev'] = 'kreft vite:dev';
-  pkg.scripts['vite:build'] = 'kreft vite:build';
-  pkg.scripts['vite:preview'] = 'kreft vite:preview';
+  pkg.scripts['vite'] = 'kreftjs vite';
+  pkg.scripts['vite:dev'] = 'kreftjs vite:dev';
+  pkg.scripts['vite:build'] = 'kreftjs vite:build';
+  pkg.scripts['vite:preview'] = 'kreftjs vite:preview';
 
   pkg.devDependencies = pkg.devDependencies || {};
   if (!pkg.devDependencies['vite']) {
@@ -99,8 +99,8 @@ function init(args = [], opts = {}) {
 
   Next:
     npm install            (install vite)
-    kreft vite:dev           (start ultra-fast Vite dev server with instant HMR)
-    kreft vite:build         (build production bundle with Rollup)
+    kreftjs vite:dev           (start ultra-fast Vite dev server with instant HMR)
+    kreftjs vite:build         (build production bundle with Rollup)
 `);
 }
 
@@ -136,7 +136,7 @@ function dev(args = []) {
 
   if (hasBackend) {
     console.log('  Starting Kreft backend on port 8001 (proxied by Vite) & Vite frontend…');
-    const kreftCli = path.join(__dirname, 'kreft.js');
+    const kreftCli = path.join(__dirname, 'kreftjs.js');
     const backendArgs = ['dev', '--port', '8001', '--no-hot'];
 
     // Forward relevant database / backend flags if present in args

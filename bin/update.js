@@ -1,14 +1,14 @@
 /*
- * kreft update [packages...]
+ * kreftjs update [packages...]
  *
  * Updates npm dependencies and/or Kreft runtime files in the current project:
  *
- *   kreft update                 Update all packages (npm update) and refresh kreft.js / kreft.d.ts
- *   kreft update <package...>    Update specific npm package(s)
- *   kreft update --latest        Upgrade dependencies to their latest versions
- *   kreft update --check         Check for outdated packages without installing (npm outdated)
- *   kreft update --core          Update only Kreft runtime files (kreft.js, kreft.d.ts, server.d.ts)
- *   kreft update --npm           Update only npm packages
+ *   kreftjs update                 Update all packages (npm update) and refresh kreftjs.js / kreftjs.d.ts
+ *   kreftjs update <package...>    Update specific npm package(s)
+ *   kreftjs update --latest        Upgrade dependencies to their latest versions
+ *   kreftjs update --check         Check for outdated packages without installing (npm outdated)
+ *   kreftjs update --core          Update only Kreft runtime files (kreftjs.js, kreftjs.d.ts, server.d.ts)
+ *   kreftjs update --npm           Update only npm packages
  */
 const fs = require('fs');
 const path = require('path');
@@ -52,7 +52,7 @@ module.exports = function update(args = []) {
 
   console.log(`\n  ${bold('Kreft ' + pkg.version)} ${dim('— updating packages and runtime')}\n`);
 
-  // 1. Update Kreft runtime files (kreft.js, kreft.d.ts, server.d.ts) unless --npm was requested
+  // 1. Update Kreft runtime files (kreftjs.js, kreftjs.d.ts, server.d.ts) unless --npm was requested
   if (!onlyNpm) {
     updateRuntimeFiles(lay, project);
   }
@@ -67,23 +67,23 @@ module.exports = function update(args = []) {
 
 function updateRuntimeFiles(lay, project) {
   const rootPkgDir = path.join(__dirname, '..');
-  const sourceKreftJs = path.join(rootPkgDir, 'kreft.js');
-  const sourceKreftDts = path.join(rootPkgDir, 'kreft.d.ts');
+  const sourceKreftJs = path.join(rootPkgDir, 'kreftjs.js');
+  const sourceKreftDts = path.join(rootPkgDir, 'kreftjs.d.ts');
   const sourceServerDts = path.join(rootPkgDir, 'server.d.ts');
 
   const targets = [];
 
-  // Check frontend / local kreft.js
-  // a project made with Som.js has som.js / som.d.ts: those files keep their names (index.html loads them) but get the new code
-  const named = (dir, name, legacy) => (!fs.existsSync(path.join(dir, name)) && fs.existsSync(path.join(dir, legacy)) ? legacy : name);
-  const frontKreftJs = path.join(lay.frontend, named(lay.frontend, 'kreft.js', 'som.js'));
-  const rootKreftJs = path.join(project, named(project, 'kreft.js', 'som.js'));
+  // Check frontend / local kreftjs.js
+  // an older project has kreft.js / som.js (and the .d.ts): those files keep their names (index.html loads them) but get the new code
+  const named = (dir, name, ...legacy) => (!fs.existsSync(path.join(dir, name)) ? legacy.find((l) => fs.existsSync(path.join(dir, l))) || name : name);
+  const frontKreftJs = path.join(lay.frontend, named(lay.frontend, 'kreftjs.js', 'kreft.js', 'som.js'));
+  const rootKreftJs = path.join(project, named(project, 'kreftjs.js', 'kreft.js', 'som.js'));
   if (fs.existsSync(frontKreftJs) && frontKreftJs !== sourceKreftJs) targets.push({ src: sourceKreftJs, dest: frontKreftJs, label: 'frontend/' + path.basename(frontKreftJs) });
   else if (fs.existsSync(rootKreftJs) && rootKreftJs !== sourceKreftJs) targets.push({ src: sourceKreftJs, dest: rootKreftJs, label: path.basename(rootKreftJs) });
 
-  // Check frontend / local kreft.d.ts
-  const frontKreftDts = path.join(lay.frontend, named(lay.frontend, 'kreft.d.ts', 'som.d.ts'));
-  const rootKreftDts = path.join(project, named(project, 'kreft.d.ts', 'som.d.ts'));
+  // Check frontend / local kreftjs.d.ts
+  const frontKreftDts = path.join(lay.frontend, named(lay.frontend, 'kreftjs.d.ts', 'kreft.d.ts', 'som.d.ts'));
+  const rootKreftDts = path.join(project, named(project, 'kreftjs.d.ts', 'kreft.d.ts', 'som.d.ts'));
   if (fs.existsSync(frontKreftDts) && frontKreftDts !== sourceKreftDts) targets.push({ src: sourceKreftDts, dest: frontKreftDts, label: 'frontend/' + path.basename(frontKreftDts) });
   else if (fs.existsSync(rootKreftDts) && rootKreftDts !== sourceKreftDts) targets.push({ src: sourceKreftDts, dest: rootKreftDts, label: path.basename(rootKreftDts) });
 
@@ -93,17 +93,17 @@ function updateRuntimeFiles(lay, project) {
   if (fs.existsSync(backServerDts) && backServerDts !== sourceServerDts) targets.push({ src: sourceServerDts, dest: backServerDts, label: 'backend/server.d.ts' });
   else if (fs.existsSync(rootServerDts) && rootServerDts !== sourceServerDts) targets.push({ src: sourceServerDts, dest: rootServerDts, label: 'server.d.ts' });
 
-  // Check tools/vite-plugin-kreft.js
-  const localVitePlugin = path.join(project, 'tools', 'vite-plugin-kreft.js');
-  const sourceVitePlugin = path.join(rootPkgDir, 'tools', 'vite-plugin-kreft.js');
+  // Check tools/vite-plugin-kreftjs.js
+  const localVitePlugin = path.join(project, 'tools', 'vite-plugin-kreftjs.js');
+  const sourceVitePlugin = path.join(rootPkgDir, 'tools', 'vite-plugin-kreftjs.js');
   if (fs.existsSync(localVitePlugin) && localVitePlugin !== sourceVitePlugin) {
-    targets.push({ src: sourceVitePlugin, dest: localVitePlugin, label: 'tools/vite-plugin-kreft.js' });
+    targets.push({ src: sourceVitePlugin, dest: localVitePlugin, label: 'tools/vite-plugin-kreftjs.js' });
   }
 
-  const localViteDts = path.join(project, 'tools', 'vite-plugin-kreft.d.ts');
-  const sourceViteDts = path.join(rootPkgDir, 'tools', 'vite-plugin-kreft.d.ts');
+  const localViteDts = path.join(project, 'tools', 'vite-plugin-kreftjs.d.ts');
+  const sourceViteDts = path.join(rootPkgDir, 'tools', 'vite-plugin-kreftjs.d.ts');
   if (fs.existsSync(localViteDts) && localViteDts !== sourceViteDts) {
-    targets.push({ src: sourceViteDts, dest: localViteDts, label: 'tools/vite-plugin-kreft.d.ts' });
+    targets.push({ src: sourceViteDts, dest: localViteDts, label: 'tools/vite-plugin-kreftjs.d.ts' });
   }
 
   if (targets.length) {
@@ -134,8 +134,8 @@ function updateRuntimeFiles(lay, project) {
 }
 
 function upgradeAppLayout(lay) {
-  let layoutFile = path.join(lay.frontend, 'layouts', 'app.kreft');
-  if (!fs.existsSync(layoutFile)) layoutFile = path.join(lay.frontend, 'layouts', 'app.som'); // Som.js project
+  let layoutFile = path.join(lay.frontend, 'layouts', 'app.kreftjs');
+  if (!fs.existsSync(layoutFile)) layoutFile = ['app.kreft', 'app.som'].map((n) => path.join(lay.frontend, 'layouts', n)).find((p) => fs.existsSync(p)) || layoutFile; // older projects
   if (!fs.existsSync(layoutFile)) return;
   let text = fs.readFileSync(layoutFile, 'utf8');
   let changed = false;
@@ -162,9 +162,9 @@ function upgradeAppLayout(lay) {
   if (changed) {
     try {
       fs.writeFileSync(layoutFile, text);
-      console.log(`    ${green('DONE')}  frontend/layouts/app.kreft ${dim('(upgraded sidebar navigation to route names)')}`);
+      console.log(`    ${green('DONE')}  frontend/layouts/app.kreftjs ${dim('(upgraded sidebar navigation to route names)')}`);
     } catch (err) {
-      console.error(`    ${red('FAIL')}  frontend/layouts/app.kreft: ${err.message}`);
+      console.error(`    ${red('FAIL')}  frontend/layouts/app.kreftjs: ${err.message}`);
     }
   }
 }
@@ -226,12 +226,12 @@ function updateNpmPackages(project, pkgs, flags) {
 function printHelp() {
   console.log(`
   Usage:
-    kreft update [package...]     Update project packages and Kreft runtime files
-    kreft update                  Update all packages in package.json and refresh kreft.js
-    kreft update <name>           Update a specific package (e.g. kreft update esbuild)
-    kreft update --latest         Upgrade packages to their latest versions
-    kreft update --check          Check for outdated packages (npm outdated)
-    kreft update --core           Update only Kreft runtime files (kreft.js, kreft.d.ts, server.d.ts)
-    kreft update --npm            Update only npm dependencies
+    kreftjs update [package...]     Update project packages and Kreft runtime files
+    kreftjs update                  Update all packages in package.json and refresh kreftjs.js
+    kreftjs update <name>           Update a specific package (e.g. kreftjs update esbuild)
+    kreftjs update --latest         Upgrade packages to their latest versions
+    kreftjs update --check          Check for outdated packages (npm outdated)
+    kreftjs update --core           Update only Kreft runtime files (kreftjs.js, kreftjs.d.ts, server.d.ts)
+    kreftjs update --npm            Update only npm dependencies
 `);
 }

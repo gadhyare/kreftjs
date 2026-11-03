@@ -1,11 +1,11 @@
-const { abort, noContent } = require('kreft/server')
+const { abort, noContent } = require('kreftjs/server')
 const User = require('../../../Models/User')
 const PersonalAccessToken = require('../../../Models/PersonalAccessToken')
 
 // the roles a user can have ('role:editor' in the routes); add your own
 const ROLES = ['user', 'editor']
 
-// /api/admin/users   (frontend/pages/Users.kreft)
+// /api/admin/users   (frontend/pages/Users.kreftjs)
 class UserController {
   // GET /api/admin/users?q=ali&page=2
   async index(req) {

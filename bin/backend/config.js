@@ -6,12 +6,12 @@
  *   config/database.js    -> config('database.default')
  *   config/redis.js       -> config('redis.host')
  *   config/auth.js        -> config('auth.guards')
- *   kreft.config.json       -> config('tables.notes.rules')
+ *   kreftjs.config.json       -> config('tables.notes.rules')
  *
  * Supports dot notation, default fallbacks, runtime setters, and hot reloading.
  *
  * Usage:
- *   const { config } = require('kreft/server')
+ *   const { config } = require('kreftjs/server')
  *   const appName = config('app.name', 'Kreft App')
  *   const dbHost = config('database.connections.mysql.host', '127.0.0.1')
  *   config.set('app.env', 'production')
@@ -101,7 +101,7 @@ class ConfigRepository {
     return this.items;
   }
 
-  // Discover and load all files in config/ and kreft.config.json
+  // Discover and load all files in config/ and kreftjs.config.json
   load(projectRoot = process.cwd()) {
     const root = path.resolve(projectRoot);
     const candidateDirs = [
@@ -144,8 +144,9 @@ class ConfigRepository {
       } catch (_) {}
     }
 
-    // 2. Load and merge kreft.config.json if present
-    const kreftConfigPath = path.join(root, 'kreft.config.json');
+    // 2. Load and merge kreftjs.config.json if present
+    // (kreft.config.json and som.config.json are the earlier names, read when there is no kreftjs.config.json)
+    const kreftConfigPath = ['kreftjs.config.json', 'kreft.config.json', 'som.config.json'].map((n) => path.join(root, n)).find((p) => fs.existsSync(p)) || path.join(root, 'kreftjs.config.json');
     if (fs.existsSync(kreftConfigPath)) {
       try {
         delete require.cache[require.resolve(kreftConfigPath)];

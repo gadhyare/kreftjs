@@ -1,7 +1,7 @@
-const { Hash, ValidationError, noContent, abort } = require('kreft/server')
+const { Hash, ValidationError, noContent, abort } = require('kreftjs/server')
 const PersonalAccessToken = require('../../Models/PersonalAccessToken')
 
-// pages/Profile.kreft
+// pages/Profile.kreftjs
 class ProfileController {
   // GET /api/user: who is signed in
   async show(req) {

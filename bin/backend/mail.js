@@ -2,7 +2,7 @@
  * Mail and mailable classes.
  *
  *   // app/Mail/WelcomeMail.js
- *   const { Mailable } = require('kreft/server')
+ *   const { Mailable } = require('kreftjs/server')
  *   class WelcomeMail extends Mailable {
  *     constructor(user) { super(); this.user = user }
  *     build() {

@@ -1,4 +1,4 @@
-// kreft electron:init (and kreft new --electron): Google Fonts links are removed, nothing else is touched.   Run: npm test
+// kreftjs electron:init (and kreftjs new --electron): Google Fonts links are removed, nothing else is touched.   Run: npm test
 const test = require('node:test');
 const assert = require('node:assert');
 const fs = require('node:fs');

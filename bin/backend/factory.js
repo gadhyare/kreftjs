@@ -2,7 +2,7 @@
  * Model factories: rows for tests and seeders.
  *
  *   // database/factories/UserFactory.js
- *   const { Factory, Hash } = require('kreft/server')
+ *   const { Factory, Hash } = require('kreftjs/server')
  *   const User = require('../../app/Models/User')
  *   module.exports = Factory.define(User, (fake) => ({
  *     name: fake.name(),
@@ -144,7 +144,7 @@ class Factory {
         }
       }
     }
-    if (!def) throw new Error(`No factory for ${Model && Model.name ? Model.name : 'Model'}. Make one: kreft make:factory ${(Model && Model.name) || 'Model'}Factory`);
+    if (!def) throw new Error(`No factory for ${Model && Model.name ? Model.name : 'Model'}. Make one: kreftjs make:factory ${(Model && Model.name) || 'Model'}Factory`);
     return new Factory(def);
   }
   constructor(def) {

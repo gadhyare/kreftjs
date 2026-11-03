@@ -22,12 +22,12 @@ Your project cleanly isolates client-side UI (`frontend/`) from server-side busi
 ```text
 ├── frontend/                  # Public client application (the only folder served to browsers)
 │   ├── index.html             # HTML entry, auth store, router & app bootstrap
-│   ├── App.kreft              # Root reactive shell
-│   ├── routes/web.kreft       # Client-side routes (Dashboard, Users, Profile, Auth)
-│   ├── layouts/               # app.kreft (authenticated shell) & guest.kreft (auth pages)
+│   ├── App.kreftjs              # Root reactive shell
+│   ├── routes/web.kreftjs       # Client-side routes (Dashboard, Users, Profile, Auth)
+│   ├── layouts/               # app.kreftjs (authenticated shell) & guest.kreftjs (auth pages)
 │   ├── pages/                 # Route views (Home, Dashboard, Users, Profile, auth/*)
-│   ├── components/            # Reusable widgets (Field.kreft, StatCard.kreft, profile/*)
-│   ├── errors/                # Custom HTTP error views (404.kreft, 500.kreft, ErrorMonitor.kreft)
+│   ├── components/            # Reusable widgets (Field.kreftjs, StatCard.kreftjs, profile/*)
+│   ├── errors/                # Custom HTTP error views (404.kreftjs, 500.kreftjs, ErrorMonitor.kreftjs)
 │   ├── docs/                  # Built-in documentation (accessible at /docs)
 │   └── ui.css                 # Design system tokens & component styles
 │
@@ -50,39 +50,39 @@ Your project cleanly isolates client-side UI (`frontend/`) from server-side busi
 Generate full-stack features from the terminal:
 
 ```bash
-# Generate Model + Migration + Factory + Seeder + Controller + .kreft Page + Route:
-kreft make:model Post --all
+# Generate Model + Migration + Factory + Seeder + Controller + .kreftjs Page + Route:
+kreftjs make:model Post --all
 
 # Or pick specific layers (-m migration, -f factory, -s seeder, -c controller, -p page, -r route):
-kreft make:model Post -mfscpr --route=api --auth
+kreftjs make:model Post -mfscpr --route=api --auth
 
 # Individual generators:
-kreft make:controller OrderController --api
-kreft make:request StorePostRequest --model Post
-kreft make:resource PostResource
-kreft make:rule StrongPassword
-kreft make:observer PostObserver --model Post
-kreft make:middleware EnsureSubscribed
-kreft make:job ProcessWebhook
-kreft make:mail InvoiceReady
-kreft make:routes billing        # Creates frontend/routes/billing.kreft & backend/routes/billing.js
+kreftjs make:controller OrderController --api
+kreftjs make:request StorePostRequest --model Post
+kreftjs make:resource PostResource
+kreftjs make:rule StrongPassword
+kreftjs make:observer PostObserver --model Post
+kreftjs make:middleware EnsureSubscribed
+kreftjs make:job ProcessWebhook
+kreftjs make:mail InvoiceReady
+kreftjs make:routes billing        # Creates frontend/routes/billing.kreftjs & backend/routes/billing.js
 
 # Database & inspection tools:
-kreft db:migrate                 # Run pending migrations
-kreft db:seed                    # Run database seeders
-kreft route:list                 # List all registered backend API routes
-kreft redis:ping                 # Verify Redis connectivity
-kreft tinker                     # Interactive REPL with your Models, DB, Cache & Redis preloaded
+kreftjs db:migrate                 # Run pending migrations
+kreftjs db:seed                    # Run database seeders
+kreftjs route:list                 # List all registered backend API routes
+kreftjs redis:ping                 # Verify Redis connectivity
+kreftjs tinker                     # Interactive REPL with your Models, DB, Cache & Redis preloaded
 ```
 
 ---
 
-## Writing `.kreft` Components
+## Writing `.kreftjs` Components
 
-Every `.kreft` file combines reactive state, actions, `<view>`, and optional `<style scoped>`:
+Every `.kreftjs` file combines reactive state, actions, `<view>`, and optional `<style scoped>`:
 
 ```html
-<!-- frontend/pages/Posts.kreft -->
+<!-- frontend/pages/Posts.kreftjs -->
 state title = ''
 load posts = api.get('/api/posts')
 
@@ -111,17 +111,17 @@ action create() {
 
 ## Installing & Updating Packages
 
-Use `kreft add` to install npm packages safely (blocks untrusted lifecycle scripts, checks for typosquatting, and skips redundant packages already built into Kreft):
+Use `kreftjs add` to install npm packages safely (blocks untrusted lifecycle scripts, checks for typosquatting, and skips redundant packages already built into Kreft):
 
 ```bash
-kreft add dayjs nanoid
-kreft add -D esbuild             # Bundles browser packages into import-mapped modules
+kreftjs add dayjs nanoid
+kreftjs add -D esbuild             # Bundles browser packages into import-mapped modules
 ```
 
 Keep dependencies and your embedded Kreft runtime up to date:
 
 ```bash
-kreft update                     # Update npm dependencies & refresh kreft.js / kreft.d.ts
-kreft update --check             # Check for outdated packages without modifying files
-kreft update --core              # Refresh only Kreft runtime & TypeScript definitions
+kreftjs update                     # Update npm dependencies & refresh kreftjs.js / kreftjs.d.ts
+kreftjs update --check             # Check for outdated packages without modifying files
+kreftjs update --core              # Refresh only Kreft runtime & TypeScript definitions
 ```

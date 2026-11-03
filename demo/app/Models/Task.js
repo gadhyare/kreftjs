@@ -1,4 +1,4 @@
-const { Model } = require('kreft/server')
+const { Model } = require('kreftjs/server')
 
 // The tasks table (database/migrations/…_create_tasks_table.js)
 class Task extends Model {

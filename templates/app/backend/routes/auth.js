@@ -1,5 +1,5 @@
 // Authentication routes (sign in, register, password reset, 2FA). routes/api.js loads this file.
-const { Route } = require('kreft/server')
+const { Route } = require('kreftjs/server')
 const RegisteredUserController = require('../app/Http/Controllers/Auth/RegisteredUserController')
 const AuthenticatedSessionController = require('../app/Http/Controllers/Auth/AuthenticatedSessionController')
 const PasswordResetLinkController = require('../app/Http/Controllers/Auth/PasswordResetLinkController')

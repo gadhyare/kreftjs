@@ -1,13 +1,13 @@
 /*
  * Task scheduling: backend/routes/console.js says what runs when.
  *
- *   const { Schedule } = require('kreft/server')
+ *   const { Schedule } = require('kreftjs/server')
  *   Schedule.call(async () => { await Post.onlyTrashed().forceDelete() }).daily().name('clean-trash')
  *   Schedule.job(new SendDailyReport()).weekdays().at('08:00')
  *   Schedule.command('cache:clear').hourly()
  *   Schedule.call(fn).cron('* /15 * * * *')     (no space: every 15 minutes)
  *
- * kreft dev runs them while it is on; for a real server: kreft schedule:work (or `kreft schedule:run` from cron each minute).
+ * kreftjs dev runs them while it is on; for a real server: kreftjs schedule:work (or `kreftjs schedule:run` from cron each minute).
  */
 const tasks = [];
 
@@ -96,7 +96,7 @@ function loadSchedule(baseDir) {
   require(file);
   return file;
 }
-// kreft dev / kreft schedule:work: check every minute, on the minute
+// kreftjs dev / kreftjs schedule:work: check every minute, on the minute
 function startScheduler(baseDir, log = console.log) {
   let timer = null;
   const tick = async () => {

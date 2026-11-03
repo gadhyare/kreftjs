@@ -1,7 +1,7 @@
 /*
  * PHP-style namespace loader and resolver for Kreft backend:
  *
- *   const { use, namespace } = require('kreft/server')
+ *   const { use, namespace } = require('kreftjs/server')
  *
  *   // 1. Single class import:
  *   const User = use('App\\Models\\User')

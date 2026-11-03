@@ -1,10 +1,10 @@
 /*
- * Kreft dev client — `kreft dev` adds this to every page while you work.
- *   • hot reload: a changed .kreft file is swapped in place and keeps its state;
+ * Kreft dev client — `kreftjs dev` adds this to every page while you work.
+ *   • hot reload: a changed .kreftjs file is swapped in place and keeps its state;
  *     a changed .css file is reloaded; anything else reloads the page
- *   • error overlay: .kreft mistakes and runtime errors show on the page
+ *   • error overlay: .kreftjs mistakes and runtime errors show on the page
  *   • DevTools: the "K" button (or Alt+Shift+D) opens the Kreft DevTools panel
- * Not part of your app: `kreft build` never includes it.
+ * Not part of your app: `kreftjs build` never includes it.
  */
 (function () {
   'use strict';
@@ -42,10 +42,10 @@
   /* ---------------- hot reload ---------------- */
   const reload = () => location.reload();
   async function onChange(msg) {
-    if (msg.type === 'kreft' && window.Kreft && window.Kreft.__hot) {
+    if (msg.type === 'kreft' && window.Kreftjs && window.Kreftjs.__hot) {
       try {
-        const res = await fetch(msg.path, { cache: 'no-store', headers: window.Kreft.__fileHeaders ? window.Kreft.__fileHeaders(msg.path) : {} });
-        const ok = await window.Kreft.__hot(new URL(msg.path, location.origin).href, await res.text());
+        const res = await fetch(msg.path, { cache: 'no-store', headers: window.Kreftjs.__fileHeaders ? window.Kreftjs.__fileHeaders(msg.path) : {} });
+        const ok = await window.Kreftjs.__hot(new URL(msg.path, location.origin).href, await res.text());
         if (!ok) return reload();
         hideError();
         console.log('[Kreft] updated ' + msg.path);
