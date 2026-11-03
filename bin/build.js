@@ -229,6 +229,7 @@ ${indent(components.join('\n\n'))}
       : html.replace(/<head>/i, `<head>\n  <base href="${b}">`);
   }
   write(dist, 'index.html', html);
+  addCacheBusters(dist);
   if (htaccess) writeHtaccess(dist, html);
 
   const report = () => {
@@ -252,6 +253,22 @@ ${indent(components.join('\n\n'))}
   report();
 };
 
+// A host keeps .js and .css for days (Hostinger: 7), and a new build keeps the same file names, so visitors would run the old
+// runtime and old pages after an upgrade (the welcome page still saying "Kreft 0.0.6-beta"). A short hash of each file goes into its
+// address (kreftjs.js?v=3f2a9c1b): a changed file is a new address, an unchanged one stays cached.
+function addCacheBusters(dist) {
+  const file = path.join(dist, 'index.html');
+  const html = fs.readFileSync(file, 'utf8');
+  const out = html.replace(/(<(?:script|link)\b[^>]*?\b(?:src|href)=)(["'])([^"']+)\2/gi, (m, pre, q, url) => {
+    if (/^(?:[a-z][a-z0-9+.-]*:|\/\/|#)/i.test(url) || /[?#]/.test(url) || !/\.(?:m?js|css)$/i.test(url)) return m;
+    const target = path.join(dist, url.replace(/^\//, ''));
+    if (!target.startsWith(dist + path.sep) || !fs.existsSync(target) || !fs.statSync(target).isFile()) return m;
+    const hash = require('crypto').createHash('sha1').update(fs.readFileSync(target)).digest('hex').slice(0, 8);
+    return pre + q + url + '?v=' + hash + q;
+  });
+  if (out !== html) fs.writeFileSync(file, out);
+}
+
 // Apache (Hostinger, cPanel …) answers /docs with a 404, because only index.html exists on disk. These rules send every page address
 // (no file extension, not under /api/) that is not a real file, or a folder with its own index.html (a prerendered page), to index.html,
 // so reloading a page works even when a folder has the page's name (the docs/ folder next to the /docs page). A missing file such as
@@ -272,6 +289,13 @@ function writeHtaccess(dist, html) {
   RewriteCond %{REQUEST_URI} !^${base}api/
   RewriteCond %{REQUEST_URI} !\\.[A-Za-z0-9]+$
   RewriteRule . ${base}index.html [L]
+</IfModule>
+
+# index.html names the other files with their hashes, so it must always be asked for again
+<IfModule mod_headers.c>
+  <FilesMatch "^index\\.html$">
+    Header set Cache-Control "no-cache"
+  </FilesMatch>
 </IfModule>
 `);
 }

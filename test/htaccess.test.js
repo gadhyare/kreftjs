@@ -45,3 +45,22 @@ test('build --base /app/: the rules follow the folder; --no-htaccess writes noth
   try { assert.ok(!fs.existsSync(path.join(b.out, '.htaccess'))); }
   finally { fs.rmSync(b.dir, { recursive: true, force: true }); }
 });
+
+test('build: scripts and style sheets get a hash in their address, so a host cache cannot keep an old runtime', () => {
+  const a = site();
+  try {
+    const html = fs.readFileSync(path.join(a.out, 'index.html'), 'utf8');
+    const hashes = Object.fromEntries([...html.matchAll(/(?:src|href)="([^"?]+\.(?:js|css))\?v=([0-9a-f]{8})"/g)].map((m) => [m[1], m[2]]));
+    assert.ok(hashes['kreftjs.js'] && hashes['app.js'], 'kreftjs.js and app.js carry ?v=hash: ' + html);
+    const rules = fs.readFileSync(path.join(a.out, '.htaccess'), 'utf8');
+    assert.match(rules, /FilesMatch "\^index\\\.html\$"[\s\S]*Cache-Control "no-cache"/);
+    // the same site again: the same hashes; a changed page: only app.js moves
+    fs.writeFileSync(path.join(a.dir, 'App.kreft'), '<view><p>changed</p></view>\n');
+    const r = spawnSync(process.execPath, [CLI, 'build', a.dir, '--out', path.join(a.dir, 'out2')], { encoding: 'utf8' });
+    assert.strictEqual(r.status, 0, r.stdout + r.stderr);
+    const html2 = fs.readFileSync(path.join(a.dir, 'out2', 'index.html'), 'utf8');
+    const hashes2 = Object.fromEntries([...html2.matchAll(/(?:src|href)="([^"?]+\.(?:js|css))\?v=([0-9a-f]{8})"/g)].map((m) => [m[1], m[2]]));
+    assert.strictEqual(hashes2['kreftjs.js'], hashes['kreftjs.js'], 'an unchanged file keeps its hash');
+    assert.notStrictEqual(hashes2['app.js'], hashes['app.js'], 'a changed page gets a new app.js address');
+  } finally { fs.rmSync(a.dir, { recursive: true, force: true }); }
+});
