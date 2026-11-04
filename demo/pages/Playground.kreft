@@ -1,0 +1,88 @@
+<!-- Playground: edit a .kreft component and see it run. The preview is a sandboxed iframe, so a mistake cannot break this page. -->
+// every tag below is written with \x3c for the opening bracket, so this page's own compiler does not mistake it for its own
+state source = [
+  'state count = 0',
+  '',
+  'action add() { count++ }',
+  '',
+  '\x3cview>',
+  '  \x3ch1>Hello Kreft\x3c/h1>',
+  '  \x3cbutton k-on:click="add()">Clicked {count} times\x3c/button>',
+  '\x3c/view>',
+  '',
+  '\x3cstyle scoped>',
+  'button { padding: 8px 14px; border-radius: 6px; }',
+  '\x3c/style>',
+].join('\n')
+state srcdoc = ''
+state shared = false
+
+// the runtime this page runs on is also put inside the preview (as text, so the sandboxed frame needs no network)
+let runtimeText = ''
+const loadRuntime = async () => {
+  if (!runtimeText) {
+    const url = document.querySelector('script[src*="kreftjs"]').src
+    runtimeText = (await (await fetch(url)).text()).replace(/\x3c\/script/gi, '\\x3c/script')
+  }
+  return runtimeText
+}
+
+// build the page the iframe shows: the runtime, then the component compiled from the text
+action run() {
+  loadRuntime().then((runtime) => {
+    const code = JSON.stringify(source).replace(/\x3c/g, '\\u003c')
+    srcdoc = '\x3c!doctype html>\x3cmeta charset="utf-8">\x3cbody style="font:15px system-ui;margin:12px;background:#fff;color:#111">'
+      + '\x3cdiv id="app">\x3c/div>\x3cpre id="err" style="color:#b91c1c;white-space:pre-wrap">\x3c/pre>'
+      + '\x3cscript>' + runtime + '\x3c/script>'
+      + '\x3cscript>Kreftjs.compile(' + code + ', "playground.kreft")'
+      + '.then(function (def) { Kreftjs.app(def).mount("#app") })'
+      + '.catch(function (e) { document.getElementById("err").textContent = e.message })\x3c/script>'
+    const frame = document.getElementById('playground-frame')
+    if (frame) frame.srcdoc = srcdoc
+  })
+}
+
+// run a moment after the last key press
+let timer
+watch source {
+  clearTimeout(timer)
+  timer = setTimeout(run, 400)
+}
+
+// a link that holds the code (it lives in the address after #, never sent to a server)
+action share() {
+  const link = location.href.split('#')[0] + '#code=' + encodeURIComponent(btoa(unescape(encodeURIComponent(source))))
+  navigator.clipboard && navigator.clipboard.writeText(link)
+  history.replaceState(null, '', link)
+  shared = true
+  setTimeout(() => { shared = false }, 1500)
+}
+
+on ready {
+  const m = location.hash.match(/code=([^&]+)/)
+  if (m) { try { source = decodeURIComponent(escape(atob(decodeURIComponent(m[1])))) } catch (_) {} }
+  run()
+}
+
+<view>
+  <section class="card">
+    <h1>Playground</h1>
+    <p class="lead">Edit a <code>.kreft</code> component and see it run.</p>
+    <div class="bar">
+      <button k-on:click="run()">Run</button>
+      <button k-on:click="share()">{shared ? 'Link copied' : 'Share link'}</button>
+    </div>
+    <div class="grid">
+      <textarea k-model="source" spellcheck="false" aria-label="Component code"></textarea>
+      <iframe id="playground-frame" sandbox="allow-scripts" title="Preview"></iframe>
+    </div>
+    <p class="muted">The preview compiles in the browser, so it does not work under a strict Content-Security-Policy.</p>
+  </section>
+</view>
+
+<style scoped>
+.bar { display: flex; gap: 8px; margin: 12px 0; }
+.grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 12px; }
+textarea { font: 13px/1.5 ui-monospace, monospace; padding: 10px; border: 1px solid var(--input); min-height: 420px; tab-size: 2; }
+iframe { width: 100%; min-height: 420px; border: 1px dashed var(--input); background: #fff; }
+</style>

@@ -42,6 +42,7 @@ state menu = [
   { title: 'Tools', links: [
     { to: '/security', label: 'HTML Security', hint: 'cleanHtml · k-html · idle timer' },
     { to: '/error-monitor', label: 'Error Monitor', hint: 'stack trace · smart solutions' },
+    { to: '/playground', label: 'Playground', hint: 'edit and run .kreft' },
     { to: '/render', label: 'Template engine', hint: 'Kreftjs.render' },
     { to: '/tools', label: 'Dev tools', hint: 'hot reload · kreft add · Electron' },
   ] },
