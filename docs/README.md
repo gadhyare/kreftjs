@@ -82,7 +82,7 @@ npx kreftjs dev
 ### Check that it works
 
 ```bash
-kreft --version     # for example 0.0.15-beta
+kreft --version     # for example 0.0.16-beta
 kreft about         # Kreft and Node.js versions, this project's settings and drivers
 kreft list          # every command your version has
 ```
@@ -1891,7 +1891,7 @@ Kreft can package your app as a desktop application for Windows, macOS and Linux
 ```bash
 kreft new my-app --electron   # a new app with desktop support
 cd my-app && npm install
-kreft electron:dev            # dev server plus a desktop window, with hot reload
+kreft electron:dev            # a desktop window only (the server is hidden), with hot reload
 kreft electron:build          # an installer in dist-electron/
 ```
 
@@ -1906,8 +1906,8 @@ npm install                     # installs electron and electron-builder
 
 | Command | What it does |
 |---|---|
-| `kreft electron:init` | Writes `electron/main.js` and `electron/preload.js` and adds the scripts, the `electron` and `electron-builder` dev dependencies and a `build` block to `package.json`. Files that already exist are never overwritten. It also removes the Google Fonts links from `index.html`, so the app starts without a network. |
-| `kreft electron:dev` | Starts `kreft dev` and opens a window on it. Closing the window stops the server. Flags after the command go to the dev server. |
+| `kreft electron:init` | Writes `electron/main.js`, `electron/preload.js` and the app icon `build/icon.png`, and adds the scripts (including `electron:build:mac`, `:win`, `:linux` and `:all`), the `electron` and `electron-builder` dev dependencies and a `build` block to `package.json`. Files that already exist are never overwritten. It also removes the Google Fonts links from `index.html`, so the app starts without a network. |
+| `kreft electron:dev` | Opens the app in a desktop window only: no browser opens and no URL is printed. The dev server runs hidden on a private port of your computer that only the window uses (hot reload works). Closing the window stops the server. Flags after the command go to the dev server. |
 | `kreft electron:build` | Runs `kreft build --base ./`, then `electron-builder`. |
 
 `kreft electron` is the same as `kreft electron:dev`. If the `electron/` folder is missing, both commands create it first.
@@ -1994,17 +1994,49 @@ ELECTRON_DEVTOOLS=bottom kreft electron:dev
 
 In development, F12 or Ctrl+Shift+I toggles them.
 
+### The window menu
+
+Set the menu bar when you start the app:
+
+```bash
+ELECTRON_MENU=show kreft electron   # default: the menu bar is visible
+ELECTRON_MENU=auto kreft electron   # hidden, press Alt to show it (Windows and Linux)
+ELECTRON_MENU=hide kreft electron   # no menu at all
+```
+
+Or change it while the app runs, from a page:
+
+```js
+window.kreftDesktop.setMenu('hide')   // 'show' | 'auto' | 'hide'
+window.kreftDesktop.getMenu()         // the current mode
+```
+
+On macOS the menu lives in the top bar of the screen, so `show` and `auto` look the same. For your own menu (File, Edit…), call `Menu.buildFromTemplate([...])` and `Menu.setApplicationMenu(...)` in `electron/main.js`.
+
+### The app icon
+
+`kreft electron:init` copies the Kreft logo to `build/icon.png`. Replace it with your own square PNG, 512×512 or bigger. The window uses it, and electron-builder makes the `.icns` (macOS) and `.ico` (Windows) files from it. Set the app name with `build.productName` and `build.appId` in `package.json`, and add `description` and `author` there too (electron-builder warns without them).
+
 ### Packaging and installers
 
-`electron:build` writes to `dist-electron/`. The defaults in the `build` block of `package.json` are:
+```bash
+npm run electron:build:mac     # .dmg and .zip
+npm run electron:build:win     # NSIS installer and portable .exe
+npm run electron:build:linux   # AppImage, .deb and .rpm
+npm run electron:build:all     # all three
+```
+
+`electron:build` writes to `dist-electron/`. Flags go to electron-builder, for example `kreft electron:build --mac --arm64`. The defaults in the `build` block of `package.json` are:
 
 | System | Targets |
 |---|---|
-| Windows | `nsis` installer, `portable` |
+| Windows | `nsis` installer (choose the folder), `portable` |
 | macOS | `dmg`, `zip` |
-| Linux | `AppImage`, `deb` |
+| Linux | `AppImage`, `deb`, `rpm` |
 
-Edit `appId`, `productName` and the targets there. Add an `icon` per system (see the electron-builder documentation). Build for each system on that system: a macOS installer needs a Mac. Code signing and notarisation (macOS) or a signing certificate (Windows) are set up through electron-builder and are needed before you give the app to other people.
+Edit `appId`, `productName` and the targets there. Build for each system on that system: a macOS installer needs a Mac (Windows installers from a Mac need Wine; `.rpm` needs `rpm` installed). Code signing and notarisation (macOS) or a signing certificate (Windows) are set up through electron-builder (electron.build/code-signing) and are needed before you give the app to other people; unsigned macOS apps show a Gatekeeper warning.
+
+The packaged app loads the built `dist/index.html` and does not start a backend. A frontend-only app works as is; a full-stack app (login, database) does not work once installed.
 
 ### Security
 
@@ -2026,7 +2058,7 @@ Do not turn these off to make something work. Add a bridge function instead.
 | A white window in the packaged app | Run `electron:build` again; the build must use `--base ./`. Check that `dist/index.html` exists. |
 | API calls fail in the packaged app | The backend is not bundled. Set an absolute `base` for the API client (see above). |
 | The window opens before the server is ready | It waits up to 15 seconds. Check the terminal for a dev server error. |
-| Port 8000 is taken | Run with `PORT=3000 kreft electron:dev`. |
+| Port 8000 is taken | Nothing to do: the hidden server picks the next free port. |
 
 ## Packages
 

@@ -3,7 +3,7 @@
  *
  * Commands:
  *   kreft electron:init     Add Electron files to an existing project (alias: kreft make:electron)
- *   kreft electron:dev      Run the app in an Electron desktop window with hot reload (alias: kreft electron)
+ *   kreft electron:dev      Run the app in an Electron desktop window only (hidden server, no browser, no URL)
  *   kreft electron:build    Build static bundle (kreft build) and package desktop installer (electron-builder)
  *
  * CLI flag:
@@ -19,10 +19,11 @@ function getProjectRoot(start = process.cwd()) {
 }
 
 const TEMPLATES = {
-  main: () => `const { app, BrowserWindow, ipcMain, dialog, shell } = require('electron');
+  main: () => `const { app, BrowserWindow, Menu, ipcMain, dialog, shell } = require('electron');
 const path = require('path');
 const http = require('http');
 
+// Dev: the app's own server runs hidden on a private port of this computer, only this window uses it.
 const isDev = !app.isPackaged || process.env.NODE_ENV === 'development';
 const DEV_PORT = process.env.PORT || 8000;
 const DEV_URL = \`http://localhost:\${DEV_PORT}\`;
@@ -46,6 +47,25 @@ function getDevToolsConfig() {
   const mode = ['bottom', 'left', 'detach', 'undocked'].includes(val) ? (val === 'undocked' ? 'detach' : val) : 'right';
   return { show: true, mode };
 }
+
+// Window menu (File, Edit, View…):
+//   ELECTRON_MENU=show   (default) menu bar visible
+//   ELECTRON_MENU=auto   hidden, press Alt to show it (Windows / Linux)
+//   ELECTRON_MENU=hide   no menu at all
+// Change it while running from the page:  window.kreftDesktop.setMenu('show' | 'auto' | 'hide')
+let menuMode = String(process.env.ELECTRON_MENU || 'show').toLowerCase();
+const defaultMenu = Menu.getApplicationMenu();
+function applyMenu(mode) {
+  menuMode = ['show', 'auto', 'hide'].includes(mode) ? mode : 'show';
+  Menu.setApplicationMenu(menuMode === 'hide' ? null : (Menu.getApplicationMenu() || defaultMenu));
+  if (mainWindow && process.platform !== 'darwin') {
+    mainWindow.setAutoHideMenuBar(menuMode === 'auto');
+    mainWindow.setMenuBarVisibility(menuMode === 'show');
+  }
+}
+
+// App icon: build/icon.png (512x512 or bigger). electron-builder makes .icns / .ico from it.
+const ICON = path.join(__dirname, '..', 'build', 'icon.png');
 
 let mainWindow = null;
 
@@ -76,6 +96,8 @@ async function createWindow() {
     frame: true,
     backgroundColor: '#ffffff',
     show: false,
+    icon: require('fs').existsSync(ICON) ? ICON : undefined,
+    autoHideMenuBar: menuMode === 'auto',
     webPreferences: {
       preload: path.join(__dirname, 'preload.js'),
       contextIsolation: true,
@@ -86,6 +108,7 @@ async function createWindow() {
   });
 
   mainWindow.once('ready-to-show', () => {
+    applyMenu(menuMode);
     mainWindow.show();
   });
 
@@ -122,12 +145,8 @@ async function createWindow() {
   const devTools = getDevToolsConfig();
 
   if (isDev) {
-    const ready = await waitForServer(DEV_URL);
-    if (ready) {
-      await mainWindow.loadURL(DEV_URL);
-    } else {
-      await mainWindow.loadURL(DEV_URL); // attempt anyway
-    }
+    await waitForServer(DEV_URL);
+    await mainWindow.loadURL(DEV_URL);
     if (devTools.show) {
       mainWindow.webContents.openDevTools({ mode: devTools.mode });
     }
@@ -172,6 +191,11 @@ ipcMain.handle('kreft:maximize', () => {
 
 ipcMain.handle('kreft:close', () => {
   if (mainWindow) mainWindow.close();
+});
+
+ipcMain.handle('kreft:menu', (_, mode) => {
+  if (mode !== undefined) applyMenu(String(mode));
+  return menuMode;
 });
 
 ipcMain.handle('kreft:devtools:open', (_, mode) => {
@@ -232,6 +256,8 @@ const desktop = {
   minimize: () => ipcRenderer.invoke('kreft:minimize'),
   maximize: () => ipcRenderer.invoke('kreft:maximize'),
   close: () => ipcRenderer.invoke('kreft:close'),
+  getMenu: () => ipcRenderer.invoke('kreft:menu'),
+  setMenu: (mode) => ipcRenderer.invoke('kreft:menu', mode),
   openDevTools: (mode) => ipcRenderer.invoke('kreft:devtools:open', mode),
   closeDevTools: () => ipcRenderer.invoke('kreft:devtools:close'),
   toggleDevTools: () => ipcRenderer.invoke('kreft:devtools:toggle'),
@@ -287,6 +313,10 @@ function init(args = []) {
   pkg.scripts['electron'] = 'kreft electron';
   pkg.scripts['electron:dev'] = 'kreft electron:dev';
   pkg.scripts['electron:build'] = 'kreft electron:build';
+  pkg.scripts['electron:build:mac'] = 'kreft electron:build --mac';
+  pkg.scripts['electron:build:win'] = 'kreft electron:build --win';
+  pkg.scripts['electron:build:linux'] = 'kreft electron:build --linux';
+  pkg.scripts['electron:build:all'] = 'kreft electron:build --mac --win --linux';
 
   pkg.devDependencies = pkg.devDependencies || {};
   if (!pkg.devDependencies['electron']) pkg.devDependencies['electron'] = '^34.2.0';
@@ -295,12 +325,25 @@ function init(args = []) {
   pkg.build = pkg.build || {
     appId: `com.kreftjs.${(pkg.name || 'app').toLowerCase().replace(/[^a-z0-9]/g, '')}`,
     productName: pkg.name ? pkg.name.replace(/-/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase()) : 'Kreft Desktop',
-    directories: { output: 'dist-electron' },
-    files: ['dist/**/*', 'electron/**/*', 'package.json'],
-    mac: { target: ['dmg', 'zip'], category: 'public.app-category.developer-tools' },
-    win: { target: ['nsis', 'portable'] },
-    linux: { target: ['AppImage', 'deb'] },
+    directories: { output: 'dist-electron', buildResources: 'build' },
+    files: ['dist/**/*', 'electron/**/*', 'build/icon.png', 'package.json'],
+    mac: { target: ['dmg', 'zip'], category: 'public.app-category.developer-tools', icon: 'build/icon.png' },
+    win: { target: ['nsis', 'portable'], icon: 'build/icon.png' },
+    nsis: { oneClick: false, allowToChangeInstallationDirectory: true },
+    linux: { target: ['AppImage', 'deb', 'rpm'], category: 'Utility', icon: 'build/icon.png' },
   };
+
+  // The app icon: replace build/icon.png with your own (square PNG, 512x512 or bigger)
+  const iconFile = path.join(root, 'build', 'icon.png');
+  let wroteIcon = false;
+  if (!fs.existsSync(iconFile)) {
+    const logo = path.join(__dirname, '..', 'assets', 'logo-mark.png');
+    if (fs.existsSync(logo)) {
+      fs.mkdirSync(path.dirname(iconFile), { recursive: true });
+      fs.copyFileSync(logo, iconFile);
+      wroteIcon = true;
+    }
+  }
 
   fs.writeFileSync(pkgFile, JSON.stringify(pkg, null, 2) + '\n');
 
@@ -309,7 +352,8 @@ function init(args = []) {
   console.log(`
   Electron configured for Kreft:
     CREATED  electron/main.js
-    CREATED  electron/preload.js
+    CREATED  electron/preload.js${wroteIcon ? `
+    CREATED  build/icon.png  (the app icon: replace it with your own, square PNG 512x512 or bigger)` : ''}
     UPDATED  package.json  (scripts: electron, electron:dev, electron:build)${droppedFonts ? `
     UPDATED  ${droppedFonts}  (removed the Google Fonts links: a desktop app should start without the network; the system fonts are used)` : ''}
 
@@ -398,12 +442,12 @@ function startDev(args, port) {
   if (!serverArgs.some((a) => a === '--port' || a === '-p')) serverArgs.push('--port', String(port));
 
   // 1. Start dev server child process
-  console.log(`  Starting Kreft dev server & Electron desktop window on port ${port}…`);
+  console.log('  Starting the Kreft desktop window…');
   const kreftCli = path.join(__dirname, 'kreftjs.js');
   const server = spawn(process.execPath, [kreftCli, 'dev', ...serverArgs], {
     cwd: root,
-    stdio: 'inherit',
-    env: { ...process.env, PORT: String(port), KREFT_ELECTRON: 'true' },
+    stdio: ['ignore', 'ignore', 'inherit'],
+    env: { ...process.env, PORT: String(port), KREFT_ELECTRON: 'true', BROWSER: 'none' },
   });
 
   // 2. Launch Electron after small pause
@@ -466,7 +510,7 @@ function build(args = []) {
   // 1. Build Kreft frontend for desktop with relative base
   console.log('\n  Step 1: Building Kreft static bundle with relative base (./)…');
   const kreftCli = path.join(__dirname, 'kreftjs.js');
-  const buildProc = spawn(process.execPath, [kreftCli, 'build', '--base', './', ...args], {
+  const buildProc = spawn(process.execPath, [kreftCli, 'build', '--base', './', ...args.filter((a) => !/^--(mac|win|linux|dir|x64|arm64|ia32|armv7l|universal|publish.*)$/.test(a))], {
     cwd: root,
     stdio: 'inherit',
   });

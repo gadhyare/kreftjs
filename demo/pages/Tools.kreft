@@ -42,6 +42,9 @@ AUTO_GC=1 kreft serve dist          # enable in production (default threshold: 2
     <h2>Desktop Apps (Electron) &amp; Vite Bundling</h2>
     <pre>kreft electron:init &amp;&amp; kreft electron:dev   # run your .kreft app as a native desktop window
 kreft electron:build                      # package .dmg, .exe, and .AppImage installers
+npm run electron:build:mac | :win | :linux | :all   # one system, or all
+ELECTRON_MENU=hide kreft electron         # show | auto | hide the window menu
+# app icon: build/icon.png (square PNG, 512x512 or bigger)
 kreft vite:init &amp;&amp; kreft vite:dev           # optional Vite HMR + Rollup build pipeline</pre>
   </section>
 
