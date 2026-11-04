@@ -521,6 +521,8 @@ function startDev(args, port) {
 }
 
 function build(args = []) {
+  // --all is a Kreft shortcut for --mac --win --linux (electron-builder has no such flag)
+  if (args.includes('--all')) args = [...args.filter((a) => a !== '--all'), ...['--mac', '--win', '--linux'].filter((p) => !args.includes(p))];
   const root = getProjectRoot();
   const electronMain = path.join(root, 'electron', 'main.js');
   if (!fs.existsSync(electronMain)) {

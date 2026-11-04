@@ -56,7 +56,7 @@ Make installers (build each system on that system; `.deb` and `.rpm` need Linux)
 npm run electron:build:mac     # .dmg and .zip
 npm run electron:build:win     # NSIS installer and portable .exe
 npm run electron:build:linux   # AppImage, .deb and .rpm
-npm run electron:build:all     # all three
+npm run electron:build:all     # all three (same as: kreft electron:build --all)
 ```
 
 The app icon is `build/icon.png`, and `ELECTRON_MENU=show|auto|hide` controls the window menu. Details: [Desktop apps with Electron](docs/README.md#desktop-apps-with-electron).

@@ -1908,11 +1908,15 @@ npm install                     # installs electron and electron-builder
 |---|---|
 | `kreft electron:init` | Writes `electron/main.js`, `electron/preload.js` and the app icon `build/icon.png`, and adds the scripts (including `electron:build:mac`, `:win`, `:linux` and `:all`), the `electron` and `electron-builder` dev dependencies and a `build` block to `package.json`. Files that already exist are never overwritten. It also removes the Google Fonts links from `index.html`, so the app starts without a network. |
 | `kreft electron:dev` | Opens the app in a desktop window only: no browser opens and no URL is printed. The dev server runs hidden on a private port of your computer that only the window uses (hot reload works). Closing the window stops the server. Flags after the command go to the dev server. |
-| `kreft electron:build` | Runs `kreft build --base ./`, then `electron-builder`. |
-| `npm run electron:build:mac` | `.dmg` and `.zip` (same as `kreft electron:build --mac`). |
-| `npm run electron:build:win` | NSIS installer and portable `.exe` (`--win`). |
-| `npm run electron:build:linux` | AppImage, `.deb` and `.rpm` (`--linux`). |
-| `npm run electron:build:all` | All three (`--mac --win --linux`). |
+| `kreft electron:build` | Runs `kreft build --base ./`, then `electron-builder`. With no flag it builds for the system you are on. |
+| `kreft electron:build --mac` | `.dmg` and `.zip` for macOS. |
+| `kreft electron:build --win` | NSIS installer and portable `.exe` for Windows. |
+| `kreft electron:build --linux` | AppImage, `.deb` and `.rpm` for Linux. |
+| `kreft electron:build --mac --win --linux` | All three systems in one run. |
+| `kreft electron:build --all` | The same as `--mac --win --linux`. |
+| `npm run electron:build:mac`, `:win`, `:linux`, `:all` | Shortcuts for the four commands above. |
+
+Other flags go straight to electron-builder: `--x64`, `--arm64`, `--ia32`, `--armv7l`, `--universal` (macOS) and `--dir` (an unpacked app folder only, no installer: fast for testing).
 
 `kreft electron` is the same as `kreft electron:dev`. If the `electron/` folder is missing, both commands create it first.
 
@@ -2024,11 +2028,14 @@ On macOS the menu lives in the top bar of the screen, so `show` and `auto` look 
 ### Packaging and installers
 
 ```bash
-npm run electron:build:mac     # .dmg and .zip
-npm run electron:build:win     # NSIS installer and portable .exe
-npm run electron:build:linux   # AppImage, .deb and .rpm
-npm run electron:build:all     # all three
+kreft electron:build --mac                 # .dmg and .zip
+kreft electron:build --win                 # NSIS installer and portable .exe
+kreft electron:build --linux               # AppImage, .deb and .rpm
+kreft electron:build --mac --win --linux   # all three
+kreft electron:build --all                 # the same as the line above
 ```
+
+The `package.json` scripts do the same: `npm run electron:build:mac`, `:win`, `:linux` and `:all`.
 
 `electron:build` writes to `dist-electron/`. Flags go to electron-builder, for example `kreft electron:build --mac --arm64`. The defaults in the `build` block of `package.json` are:
 
