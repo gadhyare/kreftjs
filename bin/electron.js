@@ -286,6 +286,26 @@ function dropWebFonts(root) {
   return path.relative(root, file);
 }
 
+// electron-builder needs a description, a homepage, an author with an e-mail and a Linux maintainer (.deb / .rpm).
+// Missing ones are filled from git config (name, e-mail); edit them in package.json.
+function ensureMeta(pkg) {
+  const git = (k) => { try { return require('child_process').execSync('git config ' + k, { stdio: ['ignore', 'pipe', 'ignore'] }).toString().trim(); } catch (_) { return ''; } };
+  let changed = false;
+  if (!pkg.description) { pkg.description = (pkg.build && pkg.build.productName) || pkg.name || 'Kreft desktop app'; changed = true; }
+  if (!pkg.homepage) { pkg.homepage = 'https://kreftjs.com'; changed = true; }
+  const hasMail = pkg.author && (typeof pkg.author === 'object' ? pkg.author.email : /<[^>]+@[^>]+>/.test(pkg.author));
+  if (!hasMail) {
+    const name = (pkg.author && (typeof pkg.author === 'object' ? pkg.author.name : String(pkg.author).replace(/<.*>/, '').trim())) || git('user.name') || pkg.name || 'App';
+    pkg.author = { name, email: git('user.email') || 'you@example.com' };
+    changed = true;
+  }
+  if (pkg.build) {
+    pkg.build.linux = pkg.build.linux || {};
+    if (!pkg.build.linux.maintainer) { pkg.build.linux.maintainer = `${pkg.author.name} <${pkg.author.email}>`; changed = true; }
+  }
+  return changed;
+}
+
 function init(args = []) {
   const target = typeof args === 'string' ? args : (args[0] && !args[0].startsWith('-') ? args[0] : process.cwd());
   const root = getProjectRoot(target);
@@ -345,6 +365,7 @@ function init(args = []) {
     }
   }
 
+  ensureMeta(pkg);
   fs.writeFileSync(pkgFile, JSON.stringify(pkg, null, 2) + '\n');
 
   const droppedFonts = dropWebFonts(root);
@@ -506,6 +527,15 @@ function build(args = []) {
     console.log('  Electron files not found. Initializing…');
     init();
   }
+
+  try {
+    const f = path.join(root, 'package.json');
+    const pkg = JSON.parse(fs.readFileSync(f, 'utf8'));
+    if (ensureMeta(pkg)) {
+      fs.writeFileSync(f, JSON.stringify(pkg, null, 2) + '\n');
+      console.log('  Added description / author / Linux maintainer to package.json (needed for installers). Please check them.');
+    }
+  } catch (_) {}
 
   // 1. Build Kreft frontend for desktop with relative base
   console.log('\n  Step 1: Building Kreft static bundle with relative base (./)…');

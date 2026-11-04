@@ -2015,7 +2015,7 @@ On macOS the menu lives in the top bar of the screen, so `show` and `auto` look 
 
 ### The app icon
 
-`kreft electron:init` copies the Kreft logo to `build/icon.png`. Replace it with your own square PNG, 512×512 or bigger. The window uses it, and electron-builder makes the `.icns` (macOS) and `.ico` (Windows) files from it. Set the app name with `build.productName` and `build.appId` in `package.json`, and add `description` and `author` there too (electron-builder warns without them).
+`kreft electron:init` copies the Kreft logo to `build/icon.png`. Replace it with your own square PNG, 512×512 or bigger. The window uses it, and electron-builder makes the `.icns` (macOS) and `.ico` (Windows) files from it. Set the app name with `build.productName` and `build.appId` in `package.json`, electron-builder also needs `description`, `homepage`, an `author` with an e-mail and `build.linux.maintainer` (for `.deb` and `.rpm`). `kreft electron:init` and `kreft electron:build` fill in the missing ones (from your git name and e-mail); check them before you release.
 
 ### Packaging and installers
 
@@ -2034,7 +2034,7 @@ npm run electron:build:all     # all three
 | macOS | `dmg`, `zip` |
 | Linux | `AppImage`, `deb`, `rpm` |
 
-Edit `appId`, `productName` and the targets there. Build for each system on that system: a macOS installer needs a Mac (Windows installers from a Mac need Wine; `.rpm` needs `rpm` installed). Code signing and notarisation (macOS) or a signing certificate (Windows) are set up through electron-builder (electron.build/code-signing) and are needed before you give the app to other people; unsigned macOS apps show a Gatekeeper warning.
+Edit `appId`, `productName` and the targets there. Build for each system on that system: a macOS installer needs a Mac (on a Mac, the Linux `AppImage` and the Windows installers build, but `.deb` and `.rpm` fail: build those on Linux, or remove them from `build.linux.target`). Code signing and notarisation (macOS) or a signing certificate (Windows) are set up through electron-builder (electron.build/code-signing) and are needed before you give the app to other people; unsigned macOS apps show a Gatekeeper warning.
 
 The packaged app loads the built `dist/index.html` and does not start a backend. A frontend-only app works as is; a full-stack app (login, database) does not work once installed.
 
