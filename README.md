@@ -42,6 +42,25 @@ Open the address in the terminal (normally `http://localhost:8000`). A new proje
 | **Authentication** | Cookie sessions with CSRF protection, API tokens with permissions, device list, two-factor codes, email verification, account lockout. |
 | **Tooling** | `kreft dev` with hot reload, DevTools, an error monitor, `kreft build` (CSP-safe), prerendering, TypeScript, Vite and Electron support, a safer `kreft add`, an MCP server for AI agents. |
 
+## Desktop apps (Electron)
+
+```bash
+kreft new my-app --electron      # or: kreft electron:init in an existing app
+npm install
+kreft electron                   # opens the app in its own window (no browser, no URL)
+```
+
+Make installers (build each system on that system; `.deb` and `.rpm` need Linux):
+
+```bash
+npm run electron:build:mac     # .dmg and .zip
+npm run electron:build:win     # NSIS installer and portable .exe
+npm run electron:build:linux   # AppImage, .deb and .rpm
+npm run electron:build:all     # all three
+```
+
+The app icon is `build/icon.png`, and `ELECTRON_MENU=show|auto|hide` controls the window menu. Details: [Desktop apps with Electron](docs/README.md#desktop-apps-with-electron).
+
 ## Learn more
 
 | I want to… | Read |

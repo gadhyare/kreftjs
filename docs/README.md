@@ -1909,6 +1909,10 @@ npm install                     # installs electron and electron-builder
 | `kreft electron:init` | Writes `electron/main.js`, `electron/preload.js` and the app icon `build/icon.png`, and adds the scripts (including `electron:build:mac`, `:win`, `:linux` and `:all`), the `electron` and `electron-builder` dev dependencies and a `build` block to `package.json`. Files that already exist are never overwritten. It also removes the Google Fonts links from `index.html`, so the app starts without a network. |
 | `kreft electron:dev` | Opens the app in a desktop window only: no browser opens and no URL is printed. The dev server runs hidden on a private port of your computer that only the window uses (hot reload works). Closing the window stops the server. Flags after the command go to the dev server. |
 | `kreft electron:build` | Runs `kreft build --base ./`, then `electron-builder`. |
+| `npm run electron:build:mac` | `.dmg` and `.zip` (same as `kreft electron:build --mac`). |
+| `npm run electron:build:win` | NSIS installer and portable `.exe` (`--win`). |
+| `npm run electron:build:linux` | AppImage, `.deb` and `.rpm` (`--linux`). |
+| `npm run electron:build:all` | All three (`--mac --win --linux`). |
 
 `kreft electron` is the same as `kreft electron:dev`. If the `electron/` folder is missing, both commands create it first.
 
@@ -2037,6 +2041,17 @@ npm run electron:build:all     # all three
 Edit `appId`, `productName` and the targets there. Build for each system on that system: a macOS installer needs a Mac (on a Mac, the Linux `AppImage` and the Windows installers build, but `.deb` and `.rpm` fail: build those on Linux, or remove them from `build.linux.target`). Code signing and notarisation (macOS) or a signing certificate (Windows) are set up through electron-builder (electron.build/code-signing) and are needed before you give the app to other people; unsigned macOS apps show a Gatekeeper warning.
 
 The packaged app loads the built `dist/index.html` and does not start a backend. A frontend-only app works as is; a full-stack app (login, database) does not work once installed.
+
+### `npm run build` or `electron:build`?
+
+Adding Electron does not change `npm run build`. The two commands make different things:
+
+| Command | What it makes | Use it for |
+|---|---|---|
+| `npm run build` | The website in `dist/`, with paths that start at `/` (the `docs/` folder is included). | Putting the app on a web server. |
+| `npm run electron:build` | The same site built with `--base ./` so it opens from a file, then an installer in `dist-electron/`. | Giving the app to people as a desktop program. |
+
+A `dist/` made by `npm run build` shows a white window if you open it in Electron, because its paths start at `/`. Run `electron:build` (or `kreft build --base ./`) first. Doing both is fine: `electron:build` rewrites `dist/`, so run `npm run build` again before you deploy the website.
 
 ### Security
 
