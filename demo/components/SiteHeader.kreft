@@ -10,7 +10,7 @@ event toggle
       <button k-if="menu" class="ghost menu-button" @click="send('toggle')" aria-label="Menu" aria-expanded={open ? 'true' : 'false'}>
         <svg width="18" height="18" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h16M4 12h16M4 17h16" stroke="currentColor" stroke-width="2"/></svg>
       </button>
-      <kreft-link to="/" class="brand"><span class="mark" aria-hidden="true"></span>kreft</kreft-link>
+      <kreft-link to="/" class="brand"><img class="mark" src="logo-mark.svg" alt="" width="22" height="22">kreft</kreft-link>
       <nav class="top {menu ? 'hide-small' : ''}" aria-label="Main">
         <kreft-link to="/docs">Docs</kreft-link>
         <kreft-link to="/playground">Playground</kreft-link>
@@ -62,10 +62,8 @@ event toggle
   margin-right: 48px;
 }
 .mark {
-  width: 14px;
-  height: 14px;
-  border-radius: 3px;
-  background: var(--foreground);
+  width: 22px;
+  height: 22px;
 }
 .top {
   display: flex;

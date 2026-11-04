@@ -1,3 +1,5 @@
+<p align="center"><img src="assets/logo.svg" alt="Kreft" width="260"></p>
+
 # Kreft
 
 **A small reactive framework with its own component language, and a full Node.js backend to go with it.**

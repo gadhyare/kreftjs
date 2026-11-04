@@ -79,7 +79,7 @@ state docs = (Kreftjs.env.PUBLIC_DOCS_URL || 'http://kreftjs.com').replace(/\\/+
 
 <view>
   <header>
-    <kreft-link to="/" class="brand"><span class="mark" aria-hidden="true"></span>{env.PUBLIC_APP_NAME || 'My app'}</kreft-link>
+    <kreft-link to="/" class="brand"><img class="mark" src="logo-mark.svg" alt="" width="22" height="22">{env.PUBLIC_APP_NAME || 'My app'}</kreft-link>
     <nav>
       <kreft-link to="/" exact-class="here">Home</kreft-link>${todos ? `
       <kreft-link to="/todos" exact-class="here">Todos</kreft-link>` : ''}
@@ -99,7 +99,7 @@ state docs = (Kreftjs.env.PUBLIC_DOCS_URL || 'http://kreftjs.com').replace(/\\/+
 <style scoped>
 header { position: sticky; top: 0; z-index: 50; display: flex; align-items: center; gap: 14px; height: 60px; padding: 0 var(--container-pad, 28px); background: var(--background); border-bottom: 1px solid var(--border); box-sizing: border-box; }
 .brand { display: inline-flex; align-items: center; gap: 8px; font-weight: 700; font-size: 16px; letter-spacing: -0.02em; color: var(--foreground); text-decoration: none; }
-.mark { width: 16px; height: 16px; background: var(--primary); }
+.mark { width: 22px; height: 22px; }
 nav { display: flex; align-items: center; gap: 4px; margin-inline-start: auto; }
 nav a { padding: 6px 10px; font-size: 14px; color: var(--muted); text-decoration: none; border-radius: var(--radius); }
 nav a:hover, nav a.here { color: var(--foreground); background: var(--accent); }

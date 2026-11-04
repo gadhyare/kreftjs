@@ -29,6 +29,8 @@
     "editors/",
     "templates/",
     "docs/",
+    "assets/logo.svg",
+    "assets/logo-mark.svg",
     "README.md"
   ],
   "keywords": [

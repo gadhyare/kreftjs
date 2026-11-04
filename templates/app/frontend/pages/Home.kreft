@@ -64,7 +64,7 @@ action copy() {
 
     <!-- Top bar -->
     <header class="site-bar">
-      <kreft-link to="/" class="site-brand"><span class="site-mark" aria-hidden="true"></span>{env.PUBLIC_APP_NAME || 'Kreft'}</kreft-link>
+      <kreft-link to="/" class="site-brand"><img class="site-mark" src="logo-mark.svg" alt="" width="22" height="22">{env.PUBLIC_APP_NAME || 'Kreft'}</kreft-link>
       <nav class="site-nav">
         <a href={docs + '/docs'} target="_blank" rel="noopener">Documentation</a>
         <kreft-link k-if="$store.auth.user" to="/dashboard">Dashboard</kreft-link>
@@ -242,7 +242,7 @@ action copy() {
 /* Top bar and footer (this page has no layout) */
 .site-bar { position: relative; z-index: 2; display: flex; align-items: center; gap: 14px; height: 64px; }
 .site-brand { display: inline-flex; align-items: center; gap: 8px; font-weight: 700; font-size: 16px; letter-spacing: -0.02em; color: var(--foreground); text-decoration: none; }
-.site-mark { width: 16px; height: 16px; background: var(--primary); }
+.site-mark { width: 22px; height: 22px; }
 .site-nav { display: flex; align-items: center; gap: 6px; margin-inline-start: auto; }
 .site-nav a { padding: 6px 12px; font-size: 14px; color: var(--muted); text-decoration: none; border-radius: var(--radius); }
 .site-nav a:hover { color: var(--foreground); background: var(--accent); }
