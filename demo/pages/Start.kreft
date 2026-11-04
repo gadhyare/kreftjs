@@ -65,7 +65,10 @@ action copy() {
     <section class="hero-grid">
       <!-- Left Column: Copy, Headlines & CTA Badges -->
       <div class="hero-copy">
-        <p class="version-pill"><span class="version-dot" aria-hidden="true"></span>Kreft v{Kreftjs.version}</p>
+        <div class="hero-meta">
+          <p class="version-pill"><span class="version-dot" aria-hidden="true"></span>Kreft v{Kreftjs.version}</p>
+          <p class="hero-kicker">JavaScript framework · Laravel-friendly</p>
+        </div>
         <h1 class="hero-headline" aria-label="Build full-stack apps in plain words.">
           <span aria-hidden="true">{for w in rotWord key w}<span class="rotator">{w}</span>{/for}</span>
         </h1>
@@ -73,7 +76,7 @@ action copy() {
         <p class="hero-tagline">Built for scale, speed, and safety.</p>
 
         <p class="hero-summary">
-          Kreft is a zero-dependency, full-stack JavaScript framework featuring its own component language, built-in SQL ORM, state management, migrations, auth, queues, and desktop packaging—all self-contained with no build steps required.
+          Kreft is a zero-dependency, full-stack JavaScript framework featuring its own component language, built-in SQL ORM, state management, migrations, auth, queues, and desktop packaging—all self-contained with no build steps required. Routes, controllers, models, migrations and commands will feel familiar if you know Laravel.
         </p>
 
         <!-- CTA Buttons -->
@@ -88,6 +91,7 @@ action copy() {
           <span class="badge highlight">✓ 0 Dependencies</span>
           <span class="badge">✓ Built-in SQL ORM</span>
           <span class="badge">✓ Authentication &amp; Gates</span>
+          <span class="badge">✓ Laravel-friendly</span>
           <span class="badge">✓ TypeScript &amp; JS Choice</span>
         </div>
       </div>
@@ -205,7 +209,7 @@ action copy() {
 <style scoped>
 .welcome-container {
   position: relative;
-  overflow: visible;
+  overflow-x: clip; /* the glow circles may reach past the screen edge without making the page scroll sideways */
   padding: 40px 0 72px;
 }
 
@@ -252,7 +256,7 @@ action copy() {
   display: inline-flex;
   align-items: center;
   gap: 8px;
-  margin: 0 0 20px;
+  margin: 0;
   padding: 5px 12px;
   font-family: var(--font-mono, ui-monospace, monospace);
   font-size: 12.5px;
@@ -263,6 +267,8 @@ action copy() {
   border-radius: 9999px;
 }
 .version-dot { width: 7px; height: 7px; border-radius: 50%; background: #10b981; }
+.hero-meta { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; margin: 0 0 20px; }
+.hero-kicker { margin: 0; padding: 5px 12px; font-size: 12.5px; font-weight: 600; letter-spacing: 0.01em; color: var(--muted); border: 1px dashed var(--border); border-radius: 9999px; }
 
 /* the changing headline: each line slides in from the right (a marquee) with a flash of red light, then settles */
 .rotator { display: block; animation: rotator-flash 0.9s ease-out; }
@@ -371,6 +377,7 @@ action copy() {
 
 /* Code Terminal Window */
 .terminal-card {
+  min-width: 0;
   background: #0f172a;
   border-radius: 18px;
   box-shadow: 0 25px 60px -15px rgba(0, 0, 0, 0.4), 0 0 1px 1px rgba(255, 255, 255, 0.08);
@@ -594,24 +601,45 @@ dd { margin: 0; color: var(--muted); }
 .term button { background: var(--primary); color: var(--primary-foreground); border: none; padding: 6px 12px; border-radius: 4px; font-size: 12px; cursor: pointer; }
 .begin p { color: var(--muted); max-width: 40em; }
 
+@media (max-width: 1100px) {
+  .hero-grid { gap: 32px; }
+  .floating-preview { width: 290px; }
+}
 @media (max-width: 960px) {
-  .hero-grid { grid-template-columns: 1fr; gap: 40px; }
-  .hero-copy { max-width: 100%; }
-  .hero-visual { justify-content: center; width: 100%; padding: 0; }
-  .terminal-card { max-width: 100%; }
-  .floating-preview { position: static; width: 100%; max-width: 100%; margin-top: 20px; right: 0; bottom: 0; }
+  /* minmax(0, 1fr): the code window may scroll inside itself, it must not make the whole page wider than the screen */
+  .hero-grid { grid-template-columns: minmax(0, 1fr); gap: 40px; }
+  .hero-copy, .hero-visual, .terminal-card { min-width: 0; max-width: 100%; }
+  /* the live card goes under the code window (a column), not beside it: two 100% wide boxes in one row squeezed both to nothing */
+  .hero-visual { flex-direction: column; align-items: center; gap: 20px; width: 100%; padding: 0; }
+  .terminal-card, .floating-preview { width: 100%; max-width: 560px; }
+  .floating-preview { position: static; margin: 0; right: 0; bottom: 0; }
   .inside ul { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 }
 @media (max-width: 640px) {
-  .welcome-container { padding: 24px 0 48px; }
-  .hero-headline { font-size: 32px; }
+  .welcome-container { padding: 0 max(16px, env(safe-area-inset-right)) 40px max(16px, env(safe-area-inset-left)); }
+  .site-bar { height: 56px; }
+  .site-nav a { padding: 10px 12px; }
+  .hero-headline { font-size: 32px; min-height: 4.4em; }
   .hero-tagline { font-size: 20px; }
-  .cta-actions { flex-direction: column; width: 100%; }
-  .pill-btn { width: 100%; text-align: center; }
+  .hero-summary { font-size: 15px; }
+  .cta-actions { flex-direction: column; align-items: stretch; width: 100%; }
+  .pill-btn { width: 100%; min-height: 46px; text-align: center; }
   .feature-badges { gap: 6px; }
   .badge { font-size: 11.5px; padding: 5px 10px; }
+  .terminal-code { font-size: 12.5px; padding: 18px 16px 44px; }
+  .floating-preview { padding: 18px; }
+  .language, .inside, .begin { padding: 40px 0; }
   .inside ul { grid-template-columns: 1fr; }
   dl { grid-template-columns: 1fr; }
   dl div { grid-template-columns: 1fr; gap: 4px; }
+  .term { max-width: 100%; }
+  .term code { min-width: 0; overflow-x: auto; white-space: nowrap; }
+  .site-foot { flex-wrap: wrap; gap: 8px 16px; }
+}
+@media (max-width: 380px) {
+  .hero-headline { font-size: 28px; }
+  .version-pill, .hero-kicker { font-size: 11.5px; }
+  .terminal-code { font-size: 11.5px; }
+  .preview-badges { flex-wrap: wrap; }
 }
 </style>
