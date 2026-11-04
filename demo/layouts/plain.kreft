@@ -8,6 +8,7 @@
   <footer>
     <span>Kreft {Kreftjs.version}</span>
     <kreft-link to="/basics">Examples</kreft-link>
+    <kreft-link to="/playground">Playground</kreft-link>
     <kreft-link to="/docs">Docs</kreft-link>
   </footer>
 </view>

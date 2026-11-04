@@ -13,7 +13,8 @@ event toggle
       <kreft-link to="/" class="brand"><span class="mark" aria-hidden="true"></span>kreft</kreft-link>
       <nav class="top {menu ? 'hide-small' : ''}" aria-label="Main">
         <kreft-link to="/docs">Docs</kreft-link>
-        <kreft-link to="/basics">Examples</kreft-link>
+        <kreft-link to="/playground">Playground</kreft-link>
+        <kreft-link to="/basics" class="nav-extra">Examples</kreft-link>
       </nav>
       <div class="end">
         <kreft-yield name="actions"></kreft-yield>
@@ -150,5 +151,22 @@ event toggle
   .menu-button { display: inline-flex; }
   .top.hide-small { display: none; }
   .top { gap: 18px; }
+}
+/* three links and the buttons must fit a small phone: tighter, and Examples leaves the bar (it is in the footer and the menu) */
+@media (max-width: 560px) {
+  .brand { margin-right: 12px; }
+  .top { gap: 12px; font-size: 13px; }
+}
+@media (max-width: 440px) {
+  .top .nav-extra { display: none; }
+}
+@media (max-width: 360px) {
+  .bar-inner { padding: 0 10px; }
+  .brand { margin-right: 6px; gap: 6px; font-size: 15px; }
+  .top { gap: 8px; }
+  .top a { font-size: 12.5px; }
+  .end { gap: 2px; }
+  .icon-btn { width: 32px; }
+  .cart-btn { padding: 7px 10px; gap: 4px; font-size: 13px; }
 }
 </style>
