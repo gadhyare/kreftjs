@@ -41,11 +41,23 @@ const TEXT = /char|text|clob|string|uuid|enum|json/i;
 const dateOut = (d) => d.toISOString().slice(0, 19).replace('T', ' ');
 const BOOL = /^bool/i;
 
+// a missing table nearly always means a migration has not been run yet, so say so
+const MISSING_TABLE = /no such table|doesn't exist|does not exist|ER_NO_SUCH_TABLE/i;
+function hintMissingTable(e) {
+  if (e && typeof e.message === 'string' && MISSING_TABLE.test(e.message) && /table|relation/i.test(e.message) && !e.message.includes('kreft migrate')) {
+    e.message += '\n  Hint: the table is missing. Run `kreft migrate` to create it.';
+  }
+  return e;
+}
+
 async function connect(url, { root } = {}) {
   const cfg = parseUrl(url);
-  if (cfg.kind === 'sqlite') return sqlite(cfg, root);
-  if (cfg.kind === 'mysql') return mysql(cfg, root);
-  return postgres(cfg, root);
+  const db = cfg.kind === 'sqlite' ? await sqlite(cfg, root) : cfg.kind === 'mysql' ? await mysql(cfg, root) : await postgres(cfg, root);
+  for (const m of ['query', 'run']) {
+    const fn = db[m];
+    if (typeof fn === 'function') db[m] = async (...a) => { try { return await fn.apply(db, a); } catch (e) { throw hintMissingTable(e); } };
+  }
+  return db;
 }
 
 /* ---------------------------------------------------------------- SQLite (node:sqlite) */
