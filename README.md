@@ -1,4 +1,4 @@
-<p align="center"><img src="assets/logo.svg" alt="Kreft" width="260"></p>
+<p align="center"><img src="assets/logo.png" alt="Kreft" width="320"></p>
 
 # Kreft
 
