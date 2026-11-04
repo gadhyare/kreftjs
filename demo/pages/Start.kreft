@@ -4,6 +4,22 @@ layout plain
 state name = 'Enterprise User'
 state count = 0
 state copied = false
+
+// the headline changes every few seconds: each line slides in from the right with a flash of red light (not for people who asked for less motion)
+state rotating = [
+  'Build full-stack apps in plain words.',
+  'The JavaScript framework that reads like English.',
+  'Components, backend and database in one small framework.',
+  'A small framework for the whole stack.',
+]
+state rotIndex = 0
+derive rotWord = [rotating[rotIndex]]
+let rotTimer
+on ready {
+  const calm = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches
+  if (!calm) rotTimer = setInterval(() => { rotIndex = (rotIndex + 1) % rotating.length }, 3800)
+}
+on destroy { clearInterval(rotTimer) }
 derive double = count * 2
 
 state words = [
@@ -50,10 +66,8 @@ action copy() {
       <!-- Left Column: Copy, Headlines & CTA Badges -->
       <div class="hero-copy">
         <p class="version-pill"><span class="version-dot" aria-hidden="true"></span>Kreft v{Kreftjs.version}</p>
-        <h1 class="hero-headline">
-          The Enterprise<br>
-          JavaScript<br>
-          Framework.
+        <h1 class="hero-headline" aria-label="Build full-stack apps in plain words.">
+          <span aria-hidden="true">{for w in rotWord key w}<span class="rotator">{w}</span>{/for}</span>
         </h1>
 
         <p class="hero-tagline">Built for scale, speed, and safety.</p>
@@ -249,8 +263,19 @@ action copy() {
   border-radius: 9999px;
 }
 .version-dot { width: 7px; height: 7px; border-radius: 50%; background: #10b981; }
+
+/* the changing headline: each line slides in from the right (a marquee) with a flash of red light, then settles */
+.rotator { display: block; animation: rotator-flash 0.9s ease-out; }
+@keyframes rotator-flash {
+  0% { opacity: 0; transform: translateX(1.4em); filter: blur(6px); color: #ef4444; text-shadow: 0 0 0.7em rgba(239, 68, 68, 0.95); }
+  35% { opacity: 1; filter: blur(0); color: #ef4444; text-shadow: 0 0 0.55em rgba(239, 68, 68, 0.85); }
+  100% { opacity: 1; transform: none; filter: none; color: var(--foreground); text-shadow: none; }
+}
+@media (prefers-reduced-motion: reduce) { .rotator { animation: none; } }
 .hero-headline {
-  font-size: clamp(38px, 5.2vw, 66px);
+  font-size: clamp(30px, 3.9vw, 48px);
+  min-height: 3.3em; /* three lines for the longest headline, so the page below does not jump */
+  overflow: hidden;
   line-height: 1.05;
   letter-spacing: -0.04em;
   font-weight: 800;
@@ -579,7 +604,7 @@ dd { margin: 0; color: var(--muted); }
 }
 @media (max-width: 640px) {
   .welcome-container { padding: 24px 0 48px; }
-  .hero-headline { font-size: 36px; }
+  .hero-headline { font-size: 32px; }
   .hero-tagline { font-size: 20px; }
   .cta-actions { flex-direction: column; width: 100%; }
   .pill-btn { width: 100%; text-align: center; }
