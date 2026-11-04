@@ -4,7 +4,30 @@
   "description": "Colors, brackets, formatting and snippets for Kreft .kreft component files (and .kreftjs files from the 0.0.x betas).",
   "version": "2.3.0",
   "publisher": "kreft",
-  "license": "MIT",
+  "icon": "icon.png",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/gadhyare/somjs.git"
+  },
+  "homepage": "https://github.com/gadhyare/somjs#readme",
+  "bugs": {
+    "url": "https://github.com/gadhyare/somjs/issues"
+  },
+  "galleryBanner": {
+    "color": "#1e1b4b",
+    "theme": "dark"
+  },
+  "keywords": [
+    "kreft",
+    "kreftjs",
+    ".kreft",
+    "syntax highlighting",
+    "snippets",
+    "formatter",
+    "framework",
+    "laravel"
+  ],
+  "license": "SEE LICENSE IN LICENSE",
   "engines": {
     "vscode": "^1.60.0"
   },
