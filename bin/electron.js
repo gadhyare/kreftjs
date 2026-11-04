@@ -442,7 +442,52 @@ function freePort(start) {
   });
 }
 
+function help() {
+  console.log(`
+  Kreft + Electron: your app as a desktop program (Windows, macOS, Linux)
+
+  Commands
+    kreft new <name> --electron   A new app with desktop support
+    kreft electron:init           Add desktop support to an existing app (alias: kreft make:electron)
+                                  Writes electron/main.js, electron/preload.js, build/icon.png and the build block
+                                  in package.json. Files that exist are never overwritten.
+    kreft electron                Open the app in its own window: no browser, no URL (alias: kreft electron:dev)
+        --devtools[=right|bottom|left|detach]   Open DevTools     --no-devtools   Do not
+        --port <number>           Private port for the hidden dev server (default: the next free one)
+    kreft electron:build          Build the app (kreft build --base ./) and make installers in dist-electron/
+        --mac --win --linux       Choose the systems (more electron-builder flags work: --arm64, --x64, --dir)
+    npm run electron:build:mac    .dmg and .zip
+    npm run electron:build:win    NSIS installer and portable .exe
+    npm run electron:build:linux  AppImage, .deb and .rpm
+    npm run electron:build:all    All three
+    kreft electron:help           This text
+
+  Window menu     ELECTRON_MENU=show (default) | auto (Alt shows it) | hide
+                  From a page: kreftDesktop.setMenu('hide'), kreftDesktop.getMenu()
+                  (macOS always keeps one app menu with Quit)
+  DevTools        ELECTRON_DEVTOOLS=right|bottom|left|detach|false, or F12 / Ctrl+Shift+I
+  App icon        build/icon.png, a square PNG of 512x512 or more (.icns and .ico are made from it)
+  App name        build.productName and build.appId in package.json
+  Installer info  description, homepage, author (with e-mail) and build.linux.maintainer in package.json
+                  (missing ones are filled in from git when you build; check them)
+  From a page     if (Kreftjs.isElectron) kreftDesktop.getInfo(), minimize(), maximize(), close(),
+                  showMessageBox(), showOpenDialog(), showSaveDialog(), openDevTools()
+
+  Good to know
+    - Build each system on that system. On a Mac, .deb and .rpm fail: build them on Linux.
+    - npm run build makes the website (paths start at /). electron:build makes the desktop build (--base ./).
+    - The packaged app has no backend: frontend-only apps work, full-stack ones (login, database) need a server.
+    - Unsigned apps show a warning on macOS and Windows: https://www.electron.build/code-signing
+    - Errors: "Electron is not installed locally" -> kreft add -D electron
+              "electron-builder is not installed" -> kreft add -D electron-builder
+              White window in the app -> run electron:build again (it needs --base ./)
+
+  Full guide: docs/README.md, "Desktop apps with Electron"
+`);
+}
+
 function dev(args = []) {
+  if (['help', '--help', '-h'].includes(args[0])) return help();
   const asked = args.findIndex((a) => a === '--port' || a === '-p');
   if (asked >= 0 && Number(args[asked + 1])) return startDev(args, Number(args[asked + 1]));
   return freePort(Number(process.env.PORT) || 8000).then((port) => startDev(args, port));
@@ -587,6 +632,7 @@ function build(args = []) {
 
 module.exports = {
   init,
+  help,
   dev,
   run: dev,
   build,

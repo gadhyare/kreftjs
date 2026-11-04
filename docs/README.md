@@ -82,7 +82,7 @@ npx kreftjs dev
 ### Check that it works
 
 ```bash
-kreft --version     # for example 0.0.18-beta
+kreft --version     # for example 0.0.19-beta
 kreft about         # Kreft and Node.js versions, this project's settings and drivers
 kreft list          # every command your version has
 ```
@@ -1919,6 +1919,19 @@ npm install                     # installs electron and electron-builder
 Other flags go straight to electron-builder: `--x64`, `--arm64`, `--ia32`, `--armv7l`, `--universal` (macOS) and `--dir` (an unpacked app folder only, no installer: fast for testing).
 
 `kreft electron` is the same as `kreft electron:dev`. If the `electron/` folder is missing, both commands create it first.
+
+### Quick reference
+
+| I want to… | Do this |
+|---|---|
+| Add desktop support | `kreft new my-app --electron`, or `kreft electron:init` in an existing app, then `npm install` |
+| Open the app in its window | `kreft electron` (no browser, no URL) |
+| Open DevTools | `kreft electron --devtools=bottom`, `ELECTRON_DEVTOOLS=right`, or F12 |
+| Show, auto-hide or hide the menu | `ELECTRON_MENU=show`, `auto` or `hide`; `kreftDesktop.setMenu('hide')` |
+| Change the icon | Replace `build/icon.png` (square PNG, 512×512 or bigger) |
+| Change the app name | `build.productName` and `build.appId` in `package.json` |
+| Make an installer | `npm run electron:build:mac`, `:win`, `:linux` or `:all` |
+| Get help in the terminal | `kreft electron:help` |
 
 ### Project layout
 

@@ -46,6 +46,7 @@ const commands = {
   'electron:dev': (a) => require('./electron.js').dev(a),
   'electron:build': (a) => require('./electron.js').build(a),
   'electron:init': (a) => require('./electron.js').init(a),
+  'electron:help': () => require('./electron.js').help(),
   'make:electron': (a) => require('./electron.js').init(a),
   vite: (a) => require('./vite.js').dev(a),
   'vite:dev': (a) => require('./vite.js').dev(a),
@@ -117,10 +118,10 @@ function help() {
     kreft vite:init         Add Vite configuration to an existing project (alias: kreft make:vite)
 
   Desktop (Electron.js):
-    kreft electron          Start dev server and launch desktop window (alias: kreft electron:dev)
-    kreft electron:dev      Start dev server and launch desktop window
-    kreft electron:build    Build static bundle and package desktop app with electron-builder
+    kreft electron          Open the app in a desktop window only: no browser, no URL (alias: kreft electron:dev)
+    kreft electron:build    Build and make installers (--mac, --win, --linux; or npm run electron:build:all)
     kreft electron:init     Add Electron support to an existing project (alias: kreft make:electron)
+    kreft electron:help     Everything about desktop apps: menu, icon, installers, errors
 
   The backend (kreft list shows every command, yours too):
     kreft key:generate      Set the application encryption key in .env (--show: print only)
