@@ -118,7 +118,7 @@ state docs = (Kreftjs.env.PUBLIC_DOCS_URL || 'http://kreftjs.com').replace(/\/+$
         <div class="hero-badges">
           <span class="badge-exception">{currentTitle}</span>
           <span class="badge-env">Node.js {typeof process !== 'undefined' ? process.version : 'v22.0.0'}</span>
-          <span class="badge-env">Kreft v0.0.17-beta</span>
+          <span class="badge-env">Kreft v0.0.18-beta</span>
         </div>
         <h1 class="hero-error-message">{currentMessage}</h1>
       </div>
