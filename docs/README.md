@@ -2019,7 +2019,7 @@ window.kreftDesktop.setMenu('hide')   // 'show' | 'auto' | 'hide'
 window.kreftDesktop.getMenu()         // the current mode
 ```
 
-On macOS the menu lives in the top bar of the screen, so `show` and `auto` look the same. For your own menu (File, Edit…), call `Menu.buildFromTemplate([...])` and `Menu.setApplicationMenu(...)` in `electron/main.js`.
+On macOS the menu lives in the top bar of the screen, so `show` and `auto` look the same, and `hide` keeps only the app-name menu (with Quit) because macOS needs one. Apps created before 0.0.18 have the old `electron/main.js` without this: delete it and run `kreft electron:init` (copy your own changes back first). For your own menu (File, Edit…), call `Menu.buildFromTemplate([...])` and `Menu.setApplicationMenu(...)` in `electron/main.js`.
 
 ### The app icon
 

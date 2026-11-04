@@ -54,11 +54,21 @@ function getDevToolsConfig() {
 //   ELECTRON_MENU=hide   no menu at all
 // Change it while running from the page:  window.kreftDesktop.setMenu('show' | 'auto' | 'hide')
 let menuMode = String(process.env.ELECTRON_MENU || 'show').toLowerCase();
-const defaultMenu = Menu.getApplicationMenu();
+let defaultMenu = null; // Electron's own menu, read once the app is ready
 function applyMenu(mode) {
   menuMode = ['show', 'auto', 'hide'].includes(mode) ? mode : 'show';
-  Menu.setApplicationMenu(menuMode === 'hide' ? null : (Menu.getApplicationMenu() || defaultMenu));
+  if (!defaultMenu) defaultMenu = Menu.getApplicationMenu();
+  if (menuMode === 'hide') {
+    // macOS keeps one app menu (with Quit) because the system needs it; Windows and Linux lose the bar
+    Menu.setApplicationMenu(process.platform === 'darwin'
+      ? Menu.buildFromTemplate([{ role: 'appMenu' }])
+      : null);
+  } else {
+    Menu.setApplicationMenu(defaultMenu);
+  }
   if (mainWindow && process.platform !== 'darwin') {
+    if (menuMode === 'hide') mainWindow.removeMenu();
+    else mainWindow.setMenu(defaultMenu);
     mainWindow.setAutoHideMenuBar(menuMode === 'auto');
     mainWindow.setMenuBarVisibility(menuMode === 'show');
   }
@@ -235,6 +245,7 @@ ipcMain.handle('kreft:dialog:save', async (_, options) => {
 });
 
 app.whenReady().then(() => {
+  applyMenu(menuMode);
   createWindow();
 
   app.on('activate', () => {
