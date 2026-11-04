@@ -92,7 +92,7 @@ state docs = (Kreftjs.env.PUBLIC_DOCS_URL || 'http://kreftjs.com').replace(/\/+$
         <div class="badges">
           <span class="badge danger-badge">HTTP {status}</span>
           <span class="badge solid">{currentTitle}</span>
-          <span class="badge">Kreft {Kreftjs.version || '0.0.13-beta'}</span>
+          <span class="badge">Kreft {Kreftjs.version || '0.0.14-beta'}</span>
         </div>
         <div class="actions">
           <button class="sm" @click={copyReport}>{copied ? 'Copied Markdown' : 'Copy Report'}</button>
@@ -189,7 +189,7 @@ state docs = (Kreftjs.env.PUBLIC_DOCS_URL || 'http://kreftjs.com').replace(/\/+$
         <h3>Kreft Runtime</h3>
         <table>
           <tbody>
-            <tr><th>Engine</th><td><code>Kreft v{Kreftjs.version || '0.0.13-beta'}</code></td></tr>
+            <tr><th>Engine</th><td><code>Kreft v{Kreftjs.version || '0.0.14-beta'}</code></td></tr>
             <tr><th>Sanitizer</th><td><code>Active (cleanHtml / SafeHtml)</code></td></tr>
             <tr><th>Environment</th><td><code>development (APP_DEBUG=true)</code></td></tr>
           </tbody>

@@ -37,3 +37,21 @@ for (const page of PAGES) {
     assert.match(src, /env\(safe-area-inset-left\)/, 'phones with a notch');
   });
 }
+
+// the phone layout is compact: smaller type, the main button on its own line and the other two side by side, two-column lists
+for (const page of PAGES) {
+  test(`${page}: a compact layout for phones`, () => {
+    const src = fs.readFileSync(path.join(__dirname, '..', page), 'utf8');
+    const phone = src.slice(src.indexOf('@media (max-width: 640px) {\n  .welcome-container'));
+    assert.match(phone, /\.hero-headline \{ font-size: 26px/);
+    assert.match(phone, /\.pill-btn\.primary \{ grid-column: 1 \/ -1/);
+    assert.match(phone, /dl \{ grid-template-columns: 1fr 1fr/, 'the 12 words in two columns');
+    assert.match(phone, /\.inside ul \{ grid-template-columns: 1fr 1fr/, 'the parts in two columns');
+    assert.match(phone, /@media \(max-width: 340px\)/, 'one column only on the narrowest phones');
+    // the rest of the page's styles must still be there (a wrong edit once cut them away)
+    for (const rule of ['.hero-grid {', '.terminal-card {', '.floating-preview {', '.pill-btn {', '.rotator {', '.version-pill {']) {
+      assert.ok(src.includes('\n' + rule) || src.includes(rule), `${page} lost ${rule}`);
+    }
+    assert.ok(src.split('\n').length > 600, 'the page is still whole');
+  });
+}

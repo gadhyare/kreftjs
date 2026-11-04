@@ -616,30 +616,49 @@ dd { margin: 0; color: var(--muted); }
   .inside ul { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 }
 @media (max-width: 640px) {
-  .welcome-container { padding: 0 max(16px, env(safe-area-inset-right)) 40px max(16px, env(safe-area-inset-left)); }
-  .site-bar { height: 56px; }
-  .site-nav a { padding: 10px 12px; }
-  .hero-headline { font-size: 32px; min-height: 4.4em; }
-  .hero-tagline { font-size: 20px; }
-  .hero-summary { font-size: 15px; }
-  .cta-actions { flex-direction: column; align-items: stretch; width: 100%; }
-  .pill-btn { width: 100%; min-height: 46px; text-align: center; }
-  .feature-badges { gap: 6px; }
-  .badge { font-size: 11.5px; padding: 5px 10px; }
-  .terminal-code { font-size: 12.5px; padding: 18px 16px 44px; }
-  .floating-preview { padding: 18px; }
-  .language, .inside, .begin { padding: 40px 0; }
-  .inside ul { grid-template-columns: 1fr; }
-  dl { grid-template-columns: 1fr; }
-  dl div { grid-template-columns: 1fr; gap: 4px; }
+  .welcome-container { padding: 0 max(14px, env(safe-area-inset-right)) 28px max(14px, env(safe-area-inset-left)); }
+  .site-bar { height: 52px; }
+  .site-nav a { padding: 8px 10px; font-size: 13px; }
+  .site-theme { height: 32px; width: 32px; }
+  .hero-meta { gap: 6px; margin-bottom: 14px; }
+  .hero-grid { gap: 28px; padding-bottom: 36px; }
+  .hero-headline { font-size: 26px; min-height: 3.3em; letter-spacing: -0.03em; }
+  .hero-tagline { font-size: 17px; margin: 10px 0 10px; }
+  .hero-summary { font-size: 14px; line-height: 1.55; margin-bottom: 20px; }
+  /* the main button on its own line, the other two side by side */
+  .cta-actions { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; width: 100%; margin-bottom: 18px; }
+  .pill-btn.primary { grid-column: 1 / -1; }
+  .pill-btn { width: 100%; min-height: 42px; padding: 8px 14px; font-size: 14px; text-align: center; }
+  .feature-badges { gap: 5px; }
+  .badge { font-size: 11px; padding: 4px 9px; }
+  .hero-visual { gap: 14px; }
+  .terminal-card { border-radius: 14px; }
+  .terminal-code { font-size: 11.5px; line-height: 1.6; padding: 14px 14px 30px; }
+  .floating-preview { padding: 14px; border-radius: 14px; }
+  .preview-name { font-size: 17px; }
+  .preview-metrics { display: none; }
+  .language, .inside, .begin { padding: 28px 0; }
+  .language h2, .inside h2, .begin h2 { font-size: 19px; margin-bottom: 14px; }
+  /* the 12 words and the 9 parts in two columns, not one long list */
+  dl { grid-template-columns: 1fr 1fr; column-gap: 16px; font-size: 13px; }
+  dl div { grid-template-columns: 1fr; gap: 1px; padding: 8px 0; }
+  dl dd { font-size: 12px; line-height: 1.35; }
+  .inside ul { grid-template-columns: 1fr 1fr; }
+  .inside a { padding: 12px; gap: 3px; }
+  .inside a strong { font-size: 13px; }
+  .inside a span { font-size: 12px; line-height: 1.35; }
   .term { max-width: 100%; }
-  .term code { min-width: 0; overflow-x: auto; white-space: nowrap; }
-  .site-foot { flex-wrap: wrap; gap: 8px 16px; }
+  .term code { min-width: 0; overflow-x: auto; white-space: nowrap; font-size: 12.5px; }
+  .begin p { font-size: 13px; }
+  .site-foot { flex-wrap: wrap; gap: 6px 14px; padding-top: 16px; font-size: 12px; }
 }
 @media (max-width: 380px) {
-  .hero-headline { font-size: 28px; }
-  .version-pill, .hero-kicker { font-size: 11.5px; }
-  .terminal-code { font-size: 11.5px; }
+  .hero-headline { font-size: 24px; min-height: 4.3em; }
+  .version-pill, .hero-kicker { font-size: 11px; padding: 4px 10px; }
+  .terminal-code { font-size: 10.5px; }
   .preview-badges { flex-wrap: wrap; }
+}
+@media (max-width: 340px) {
+  .inside ul { grid-template-columns: 1fr; }
 }
 </style>
