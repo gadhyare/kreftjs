@@ -700,26 +700,42 @@
     return fn;
   }
   const simpleIdentifierPathRE = /^[A-Za-z_$][\w$]*(?:\.[A-Za-z_$][\w$]*)*$/;
+  // expression text -> what we learned about it once: its dotted path (user.name -> ['user', 'name']) or the compiled function
+  const exprCache = new Map();
+  function exprInfo(expr) {
+    let r = exprCache.get(expr);
+    if (r === undefined) {
+      const trimmed = String(expr).trim();
+      r = simpleIdentifierPathRE.test(trimmed) ? { trimmed, parts: trimmed.split('.'), fn: null } : { trimmed, parts: null, fn: null };
+      if (exprCache.size > 5000) exprCache.clear();
+      exprCache.set(expr, r);
+    }
+    return r;
+  }
+  const exprPath = (expr) => { const i = exprInfo(expr); return i.parts ? i : null; };
+  function walkPath(start, parts) {
+    let cur = start;
+    for (let i = 0; i < parts.length; i++) {
+      const p = parts[i];
+      if (p === 'constructor' || p === '__proto__' || p === 'prototype') return undefined;
+      if (cur == null) return undefined;
+      cur = isRef(cur[p]) ? cur[p].value : cur[p];
+    }
+    return cur;
+  }
   function evaluate(scope, expr, el) {
     if (!expr) return undefined;
-    const trimmed = String(expr).trim();
     // Fast path: Zero-eval, strictly CSP-safe AST path lookup (e.g. user.name, title, count)
-    if (simpleIdentifierPathRE.test(trimmed)) {
+    const info = exprInfo(expr);
+    if (info.parts) {
+      const trimmed = info.trimmed;
       if (trimmed === 'true') return true;
       if (trimmed === 'false') return false;
       if (trimmed === 'null') return null;
       if (trimmed === 'undefined') return undefined;
-      const parts = trimmed.split('.');
-      let cur = scope;
-      for (let i = 0; i < parts.length; i++) {
-        const p = parts[i];
-        if (p === 'constructor' || p === '__proto__' || p === 'prototype') return undefined;
-        if (cur == null) return undefined;
-        cur = isRef(cur[p]) ? cur[p].value : cur[p];
-      }
-      return cur;
+      return walkPath(scope, info.parts);
     }
-    try { return compileFn(`with($s){return(${expr})}`, '$s')(scope); }
+    try { return (info.fn || (info.fn = compileFn(`with($s){return(${expr})}`, '$s')))(scope); }
     catch (e) { warn(`Error evaluating "${expr}":`, e.message, el || ''); }
   }
   const simplePathRE = /^[A-Za-z_$][\w$]*(?:\s*\.\s*[A-Za-z_$][\w$]*|\[[^\[\]]+\])*$/;
@@ -949,24 +965,57 @@
     for (let n = el.firstChild; n; n = n.nextSibling) out.push(n);
     return out;
   }
-  function compileNodes(parent, nodes, scope, inst) {
-    for (const n of nodes) if (n.parentNode === parent) compile(n, scope, inst);
+  function compileNodes(parent, nodes, scope, inst, infos) {
+    if (infos && infos.length !== nodes.length) infos = null; // not the shape we analysed: look at the nodes themselves
+    for (let i = 0; i < nodes.length; i++) {
+      const n = nodes[i];
+      if (n.parentNode === parent) compile(n, scope, inst, infos ? infos[i] : null);
+    }
   }
 
-  function compile(node, scope, inst) {
-    if (node.nodeType === 3) return compileText(node, scope);
-    if (node.nodeType !== 1) return;
-    const el = node;
-    // one pass over the attributes: most elements are plain (class="x"), and then none of the checks below can match
+  // What a template node looks like, found out once. A list row is the same template thousands of times, and every question
+  // asked of a real DOM node (its attributes, its tag, its text) is a call into the browser; asking the copy of an answer is not.
+  // t: node type · hasK: has a k- attribute · needAttrs: has an attribute compileElement must look at · hasAnim: has k-animate
+  function analyzeNode(n) {
+    const t = n.nodeType;
+    if (t === 3) return { t, brace: n.data.includes('{') };
+    if (t !== 1) return { t };
     let hasK = false, needAttrs = false, hasAnim = false;
-    if (el.hasAttributes()) {
-      const at = el.attributes;
+    if (n.hasAttributes()) {
+      const at = n.attributes;
       for (let i = 0; i < at.length; i++) {
         const a = at[i], nm = a.name, c0 = nm.charCodeAt(0);
         if (c0 === 107) {
           needAttrs = true;
           if (nm.charCodeAt(1) === 45) { hasK = true; if (nm.startsWith('k-animate')) hasAnim = true; }
         } else if (c0 === 58 || c0 === 64 || (!needAttrs && a.value.includes('{') && !nm.startsWith('on'))) needAttrs = true;
+      }
+    }
+    const kids = [];
+    for (let c = n.firstChild; c; c = c.nextSibling) kids.push(analyzeNode(c));
+    return { t, hasK, needAttrs, hasAnim, tag: n.tagName.toLowerCase(), kids };
+  }
+
+  function compile(node, scope, inst, info) {
+    const type = node.nodeType;
+    if (info && info.t !== type) info = null;
+    if (type === 3) return info && !info.brace ? undefined : compileText(node, scope);
+    if (type !== 1) return;
+    const el = node;
+    // one pass over the attributes: most elements are plain (class="x"), and then none of the checks below can match
+    let hasK, needAttrs, hasAnim;
+    if (info) ({ hasK, needAttrs, hasAnim } = info);
+    else {
+      hasK = needAttrs = hasAnim = false;
+      if (el.hasAttributes()) {
+        const at = el.attributes;
+        for (let i = 0; i < at.length; i++) {
+          const a = at[i], nm = a.name, c0 = nm.charCodeAt(0);
+          if (c0 === 107) {
+            needAttrs = true;
+            if (nm.charCodeAt(1) === 45) { hasK = true; if (nm.startsWith('k-animate')) hasAnim = true; }
+          } else if (c0 === 58 || c0 === 64 || (!needAttrs && a.value.includes('{') && !nm.startsWith('on'))) needAttrs = true;
+        }
       }
     }
     if (hasK) {
@@ -994,7 +1043,7 @@
       }
       if (el.hasAttribute('k-memo')) return compileMemo(el, scope, inst); // after k-each, so each item has its own
     }
-    const tag = el.tagName.toLowerCase();
+    const tag = info ? info.tag : el.tagName.toLowerCase();
     if (tag === 'slot') return compileSlot(el, scope, inst);
     if (tag === 'kreft-component') return compileDynamic(el, scope, inst);
     if (tag === 'kreft-view') return compileView(el, scope, inst);
@@ -1007,12 +1056,21 @@
     }
     const def = resolveComponent(tag, inst);
     if (def) return mountComponent(el, def, scope, inst);
-    compileElement(el, scope, inst, needAttrs, hasAnim);
+    compileElement(el, scope, inst, needAttrs, hasAnim, info);
   }
 
   /* ---------- { expr } interpolation ---------- */
   // "Hi {name}!" → [{ text: 'Hi ' }, { expr: 'name' }, { text: '!' }]; write \{ for a literal brace
+  const interpCache = new Map();
   function splitInterp(str) {
+    let hit = interpCache.get(str);
+    if (hit) return hit;
+    hit = splitInterpRaw(str);
+    if (interpCache.size > 5000) interpCache.clear();
+    interpCache.set(str, hit);
+    return hit;
+  }
+  function splitInterpRaw(str) {
     const parts = [];
     let buf = '', i = 0;
     while (i < str.length) {
@@ -1039,14 +1097,27 @@
     return parts;
   }
   // "{ expr }" → "expr"; anything else → null
+  const braceCache = new Map();
   function exactBrace(v) {
+    if (typeof v !== 'string') return exactBraceRaw(v);
+    let r = braceCache.get(v);
+    if (r === undefined) { r = exactBraceRaw(v); if (braceCache.size > 5000) braceCache.clear(); braceCache.set(v, r); }
+    return r;
+  }
+  function exactBraceRaw(v) {
     const t = (v || '').trim();
     if (t[0] !== '{') return null;
     try { return matchBrace(t, 0) === t.length ? t.slice(1, -1).trim() : null; } catch (_) { return null; }
   }
   const stripBrace = (v) => { const e = exactBrace(v); return e != null ? e : v; };
   // "btn {active ? 'on' : ''}" → "`btn ${…}`"; null when there is nothing to interpolate
+  const interpExprCache = new Map();
   function interpToExpr(str) {
+    let r = interpExprCache.get(str);
+    if (r === undefined) { r = interpToExprRaw(str); if (interpExprCache.size > 5000) interpExprCache.clear(); interpExprCache.set(str, r); }
+    return r;
+  }
+  function interpToExprRaw(str) {
     const parts = splitInterp(str);
     if (!parts.some((p) => p.expr != null)) return null;
     return '`' + parts.map((p) => (p.expr != null
@@ -1054,18 +1125,31 @@
       : p.text.replace(/[`\\]/g, '\\$&').replace(/\$\{/g, '\\${'))).join('') + '`';
   }
 
-  function compileText(node, scope) {
-    const tpl = node.textContent;
-    if (!tpl.includes('{')) return;
+  const textCache = new Map();
+  function textPlan(tpl) {
+    let r = textCache.get(tpl);
+    if (r) return r;
     const parts = splitInterp(tpl);
     if (!parts.some((p) => p.expr != null)) {
       const plain = parts.map((p) => p.text).join('');
-      if (plain !== tpl) node.textContent = plain;
+      r = { plain: plain !== tpl ? plain : null, code: null, fn: null };
+    } else {
+      r = { plain: null, code: `with($s){return ${parts.map((p) => (p.expr != null ? `$d(${p.expr})` : JSON.stringify(p.text))).join('+')}}`, fn: null };
+    }
+    if (textCache.size > 5000) textCache.clear();
+    textCache.set(tpl, r);
+    return r;
+  }
+  function compileText(node, scope) {
+    const tpl = node.textContent;
+    if (!tpl.includes('{')) return;
+    const plan = textPlan(tpl);
+    if (!plan.code) {
+      if (plan.plain != null) node.textContent = plan.plain;
       return;
     }
-    const code = `with($s){return ${parts.map((p) => (p.expr != null ? `$d(${p.expr})` : JSON.stringify(p.text))).join('+')}}`;
     renderEffect(() => {
-      try { node.textContent = compileFn(code, '$s,$d')(scope, toDisplayString); }
+      try { node.textContent = (plan.fn || (plan.fn = compileFn(plan.code, '$s,$d')))(scope, toDisplayString); }
       catch (e) { warn(`Error in "${tpl.trim()}":`, e.message); }
     });
   }
@@ -1154,7 +1238,7 @@
   }
 
   const EMPTY_ATTRS = [];
-  function compileElement(el, scope, inst, needAttrs = true, hasAnim = true) {
+  function compileElement(el, scope, inst, needAttrs = true, hasAnim = true, info = null) {
     let model = null, textExpr = null, htmlExpr = null, shown = false;
     const anim = hasAnim ? readAnimate(el) : null;
     let attrList = EMPTY_ATTRS;
@@ -1198,7 +1282,7 @@
     }
     if (textExpr != null) renderEffect(() => { el.textContent = toDisplayString(evaluate(scope, textExpr, el)); });
     else if (htmlExpr != null) renderEffect(() => { const h = evaluate(scope, htmlExpr, el); el.innerHTML = h == null ? '' : cleanHtml(h); });
-    else if (el.firstChild && el.tagName !== 'SCRIPT' && el.tagName !== 'STYLE') compileNodes(el, childList(el), scope, inst);
+    else if (el.firstChild && el.tagName !== 'SCRIPT' && el.tagName !== 'STYLE') compileNodes(el, childList(el), scope, inst, info && info.kids);
     if (model) bindModel(el, model.expr, model.mods, scope); // after children, so <option>s exist
     if (anim && !shown) queuePostJob(() => animate(el, anim.name, 'in'), el); // plays when the element appears
   }
@@ -1500,22 +1584,42 @@
       n = next;
     }
   }
-  function mountBlock(parent, before, raw, scope, inst, custom) {
-    const start = text(), end = text();
+  const tplInfo = new WeakMap(); // template node -> { infos } once it has been mounted twice (a list row, a repeated slot)
+  // compact: a block that is one plain element needs no marker nodes around it (list rows): the element is its own start and end
+  function mountBlock(parent, before, raw, scope, inst, custom, compact) {
+    let infos = null;
+    if (!custom) {
+      const rec = tplInfo.get(raw);
+      if (!rec) tplInfo.set(raw, { infos: null });
+      else {
+        if (!rec.infos) rec.infos = (raw.nodeType === 11 ? childList(raw) : raw.tagName === 'TEMPLATE' ? childList(raw.content) : [raw]).map(analyzeNode);
+        infos = rec.infos;
+      }
+    }
+    let start = compact ? null : text(), end = compact ? null : text();
     const frag = document.createDocumentFragment();
     const content = raw.nodeType === 11 ? raw.cloneNode(true) : raw.tagName === 'TEMPLATE' ? raw.content.cloneNode(true) : raw.cloneNode(true);
     const nodes = content.nodeType === 11 ? childList(content) : [content];
-    frag.appendChild(start);
+    if (start) frag.appendChild(start);
     nodes.forEach((n) => frag.appendChild(n));
-    frag.appendChild(end);
+    if (end) frag.appendChild(end);
     const blockScope = new EffectScope();
     blockScope.run(() => {
       pauseTracking();
       const prevOwner = renderOwner;
       renderOwner = inst || null;
-      try { custom ? custom(nodes[0]) : compileNodes(frag, nodes, scope, inst); }
+      try { custom ? custom(nodes[0]) : compileNodes(frag, nodes, scope, inst, infos); }
       finally { resetTracking(); renderOwner = prevOwner; }
     });
+    if (compact) {
+      // still one element, in place? then it marks its own range; otherwise (k-if, a component …) the usual markers
+      if (nodes.length === 1 && nodes[0].nodeType === 1 && frag.firstChild === nodes[0] && frag.lastChild === nodes[0]) start = end = nodes[0];
+      else {
+        start = text(); end = text();
+        frag.insertBefore(start, frag.firstChild);
+        frag.appendChild(end);
+      }
+    }
     parent.insertBefore(frag, before);
     if (start.isConnected) flushPostJobs();
     return {
@@ -1643,10 +1747,20 @@
     }
 
     const anchor = text();
+    const hostTag = el.parentNode.tagName;
     el.parentNode.insertBefore(anchor, el);
     el.remove();
+    // rows of a table or list: blank text before and after a row means nothing, and without it a row is one element (no markers needed)
+    if (el.tagName === 'TEMPLATE' && BLANK_OK.has(hostTag)) {
+      const c = el.content;
+      while (c.firstChild && c.firstChild.nodeType === 3 && !c.firstChild.data.trim()) c.firstChild.remove();
+      while (c.lastChild && c.lastChild.nodeType === 3 && !c.lastChild.data.trim()) c.lastChild.remove();
+    }
     const anim = readAnimate(el);
 
+    // k-key="row.id": read it straight from the loop variables (no scope object per row on every update)
+    const keyPath = keyExpr ? exprPath(keyExpr) : null;
+    const keyDirect = keyPath && aliases.includes(keyPath.parts[0]) && !['true', 'false', 'null', 'undefined'].includes(keyPath.trimmed) ? keyPath.parts : null;
     let blocks = [];
     let emptyBlock = null, first = true;
     renderEffect(() => {
@@ -1668,7 +1782,7 @@
         const locals = { [aliases[0]]: en.value };
         if (aliases[1]) locals[aliases[1]] = en.isObj ? en.key : i;
         if (aliases[2]) locals[aliases[2]] = i;
-        let key = keyExpr ? evaluate(createChildScope(scope, locals), keyExpr, el) : i;
+        let key = keyDirect ? walkPath(locals, keyDirect) : keyExpr ? evaluate(createChildScope(scope, locals), keyExpr, el) : i;
         if (seen.has(key)) { warn(`Duplicate k-key values in k-each: ${String(key)}`); key = { dup: i }; }
         seen.add(key);
         let b = old.get(key);
@@ -1710,7 +1824,7 @@
             if (playIn) animateRange(b.block.start, b.block.end, anim, 'in');
           } else {
             if (!batch) { batch = document.createDocumentFragment(); batchAt = before; }
-            b.block = mountBlock(batch, batch.firstChild, el, createChildScope(scope, b.locals), inst);
+            b.block = mountBlock(batch, batch.firstChild, el, createChildScope(scope, b.locals), inst, undefined, true);
           }
         } else {
           flushBatch();
@@ -2197,9 +2311,14 @@
   let currentInstance = null;
   const getCurrentInstance = () => currentInstance;
 
+  let compVersion = 0; // bumped when app.component() registers something
   function resolveComponent(name, inst) {
     if (!inst) return null;
-    return resolveFrom(inst.def.components, name) || inst.appContext.components[normKey(name)] || null;
+    let memo = inst.compMemo;
+    if (!memo || inst.compMemoVersion !== compVersion) { memo = inst.compMemo = new Map(); inst.compMemoVersion = compVersion; }
+    let r = memo.get(name);
+    if (r === undefined) { r = resolveFrom(inst.def.components, name) || inst.appContext.components[normKey(name)] || null; memo.set(name, r); }
+    return r;
   }
   function normalizePropsOptions(raw) {
     const out = {};
@@ -2808,6 +2927,7 @@
         if (!def) return context.components[normKey(name)];
         if (isObject(def) && !def.__label && !def.__loader) def.__label = name; // shown in DevTools
         context.components[normKey(name)] = def;
+        compVersion++;
         return app;
       },
       directive(name, def) {
