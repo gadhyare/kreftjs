@@ -36,20 +36,26 @@ The results above were re-checked this way on 2026-11-05 (Chrome for Testing 153
 ### Result of the run on 2026-11-05
 
 Chrome 156 headless, Apple M5, the runner's CPU throttling, 8 iterations, median of the "total" time in ms (lower is better).
-Vue 3.5.39, Svelte 5, Preact 11, React 19. Kreft 0.0.19-beta, before and after the list-rendering work.
+Vue 3.5.39, Svelte 5, Preact 11, React 19. Kreft 0.0.19-beta: "before" is the runtime before the list-rendering work, "after" is the
+current one (row plans, batch insertion, minimal moves, minified runtime).
 
 | Benchmark | vanilla | Svelte | Vue | Preact | React | Kreft before | Kreft after |
 |---|---|---|---|---|---|---|---|
-| 01 create 1,000 rows | 32.9 | 36.0 | 39.6 | 41.6 | 41.4 | 76.0 | 53.1 |
-| 02 replace 1,000 rows | 37.8 | 40.4 | 47.1 | 48.5 | 49.0 | 84.3 | 57.0 |
-| 03 update every 10th row | 18.0 | 19.0 | 22.6 | 36.1 | 25.8 | 21.8 | 21.3 |
-| 04 select a row | 7.0 | 9.7 | 8.9 | 23.7 | 11.3 | 23.8 | 19.5 |
-| 05 swap two rows | 22.9 | 27.5 | 27.8 | 41.3 | 186.8 | 202.3 | 32.3 |
-| 06 remove a row | 18.9 | 20.4 | 23.0 | 27.4 | 20.8 | 26.9 | 24.5 |
-| 07 create 10,000 rows | 359.6 | 386.7 | 406.6 | 464.4 | 607.5 | 797.9 | 590.2 |
-| 08 append 1,000 rows | 37.4 | 40.8 | 43.7 | 49.1 | 46.7 | 96.3 | 70.5 |
-| 09 clear | 16.1 | 20.7 | 24.0 | 24.1 | 32.4 | 35.0 | 21.9 |
-| **Geometric mean vs vanilla** | 1.00 | 1.15 | 1.24 | 1.61 | 1.74 | 2.46 | **1.58** |
+| 01 create 1,000 rows | 32.5 | 35.8 | 39.2 | 41.9 | 41.2 | 76.1 | 48.6 |
+| 02 replace 1,000 rows | 35.1 | 40.2 | 43.2 | 47.9 | 48.7 | 83.3 | 51.3 |
+| 03 update every 10th row | 17.8 | 20.6 | 22.6 | 33.7 | 26.6 | 20.9 | 19.6 |
+| 04 select a row | 7.6 | 8.4 | 7.7 | 24.4 | 9.9 | 23.9 | 19.4 |
+| 05 swap two rows | 21.1 | 23.2 | 24.0 | 41.0 | 173.7 | 180.1 | 29.6 |
+| 06 remove a row | 20.6 | 19.4 | 22.4 | 27.1 | 19.9 | 24.9 | 23.4 |
+| 07 create 10,000 rows | 344.2 | 377.0 | 407.6 | 446.1 | 595.9 | 799.9 | 523.0 |
+| 08 append 1,000 rows | 37.0 | 40.0 | 43.0 | 48.2 | 45.9 | 94.8 | 63.0 |
+| 09 clear | 14.4 | 18.6 | 26.0 | 19.5 | 27.5 | 32.1 | 19.8 |
+| **Geometric mean vs vanilla** | 1.00 | 1.11 | 1.22 | 1.58 | 1.69 | 2.42 | **1.48** |
+
+What is left: selecting a row (every row has its own effect that reads the selection) and creating or appending many rows are
+still clearly behind Vue and Svelte. Summed over the nine benchmarks, Kreft's time above vanilla fell from 806 ms to 267 ms.
+(An earlier run of the same suite, before the row plans, gave a geomean of 1.58 for Kreft; the re-check described above was of
+that earlier version.)
 
 Limits: one machine, one browser, 8 iterations (the project's default is 15), CPU benchmarks only (no memory, startup or size runs),
 and the Kreft app was written by the Kreft team, not reviewed upstream. These are local numbers, not published results.

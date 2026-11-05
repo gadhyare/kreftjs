@@ -1584,16 +1584,85 @@
       n = next;
     }
   }
+  /* ---------- row plans ----------
+   * A template that is mounted again and again (a list row) and has only plain elements, {text}, {attr}={…}, :attr and @event
+   * (no k- directive, component or slot) is turned once into a list of "do this to the node at this path".
+   * Mounting a row is then: clone, find those nodes, bind. No walk over every node, no question about every attribute.
+   * Anything else is compiled the general way, node by node. */
+  const PLAN_SKIP_TAGS = new Set(['slot', 'template', 'script', 'style']);
+  function buildPlan(root, inst) {
+    const ops = [];
+    const visit = (n, path) => {
+      const type = n.nodeType;
+      if (type === 3) {
+        if (n.data.includes('{')) {
+          const plan = textPlan(n.data);
+          if (plan.code) ops.push({ k: 0, path, plan, tpl: n.data });
+          else if (plan.plain != null) ops.push({ k: 1, path, plain: plan.plain });
+        }
+        return true;
+      }
+      if (type !== 1) return true; // a comment: the compiler ignores it too
+      const tag = n.tagName.toLowerCase();
+      if (PLAN_SKIP_TAGS.has(tag) || tag.includes('-') || resolveComponent(tag, inst)) return false;
+      const at = n.attributes;
+      for (let i = 0; i < at.length; i++) {
+        const name = at[i].name, value = at[i].value, c0 = name.charCodeAt(0);
+        if (c0 === 107 && name.charCodeAt(1) === 45) return false; // a k- attribute: the general path
+        if (c0 === 58) ops.push({ k: 2, path, name, arg: name.slice(1), expr: value });
+        else if (c0 === 64) ops.push({ k: 3, path, name, ev: name.slice(1), expr: stripBrace(value) });
+        else if (value.includes('{') && !name.startsWith('on')) {
+          const expr = exactBrace(value) ?? interpToExpr(value);
+          if (expr != null) ops.push({ k: 2, path, name, arg: name, expr });
+        }
+      }
+      let i = 0;
+      for (let c = n.firstChild; c; c = c.nextSibling, i++) if (!visit(c, path.concat(i))) return false;
+      return true;
+    };
+    return visit(root, []) ? ops : null;
+  }
+  function nodeAt(root, path) {
+    let n = root;
+    for (let i = 0; i < path.length; i++) {
+      n = n.firstChild;
+      for (let k = path[i]; k > 0; k--) n = n.nextSibling;
+    }
+    return n;
+  }
+  function runPlan(ops, root, scope) {
+    for (let i = 0; i < ops.length; i++) {
+      const op = ops[i], n = nodeAt(root, op.path);
+      if (op.k === 0) {
+        const plan = op.plan, tpl = op.tpl;
+        renderEffect(() => {
+          try { n.textContent = (plan.fn || (plan.fn = compileFn(plan.code, '$s,$d')))(scope, toDisplayString); }
+          catch (e) { warn(`Error in "${tpl.trim()}":`, e.message); }
+        });
+      } else if (op.k === 1) n.textContent = op.plain;
+      else if (op.k === 2) { n.removeAttribute(op.name); bindAttr(n, op.arg, op.expr, scope); }
+      else { n.removeAttribute(op.name); bindEvent(n, op.ev, op.expr, scope); }
+    }
+  }
+
   const tplInfo = new WeakMap(); // template node -> { infos } once it has been mounted twice (a list row, a repeated slot)
   // compact: a block that is one plain element needs no marker nodes around it (list rows): the element is its own start and end
   function mountBlock(parent, before, raw, scope, inst, custom, compact) {
-    let infos = null;
+    let infos = null, plan = null;
     if (!custom) {
       const rec = tplInfo.get(raw);
       if (!rec) tplInfo.set(raw, { infos: null });
       else {
         if (!rec.infos) rec.infos = (raw.nodeType === 11 ? childList(raw) : raw.tagName === 'TEMPLATE' ? childList(raw.content) : [raw]).map(analyzeNode);
         infos = rec.infos;
+        if (rec.plan === undefined || rec.planInst !== inst || rec.planVersion !== compVersion) {
+          // one element with nothing special in it: a plan (see buildPlan); anything else: null, the general path
+          rec.planInst = inst;
+          rec.planVersion = compVersion;
+          const roots = raw.nodeType === 11 ? null : raw.tagName === 'TEMPLATE' ? childList(raw.content) : [raw];
+          rec.plan = roots && roots.length === 1 && roots[0].nodeType === 1 ? buildPlan(roots[0], inst) : null;
+        }
+        plan = rec.plan;
       }
     }
     let start = compact ? null : text(), end = compact ? null : text();
@@ -1608,7 +1677,7 @@
       pauseTracking();
       const prevOwner = renderOwner;
       renderOwner = inst || null;
-      try { custom ? custom(nodes[0]) : compileNodes(frag, nodes, scope, inst, infos); }
+      try { custom ? custom(nodes[0]) : plan && nodes.length === 1 ? runPlan(plan, nodes[0], scope) : compileNodes(frag, nodes, scope, inst, infos); }
       finally { resetTracking(); renderOwner = prevOwner; }
     });
     if (compact) {
