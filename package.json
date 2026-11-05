@@ -12,7 +12,7 @@
   "scripts": {
     "dev": "node bin/kreftjs.js dev --api demo/db.json --db sqlite:demo/database/demo.db --migrations demo/database/migrations --server demo/server --backend demo --seed",
     "start": "node bin/kreftjs.js dev --api demo/db.json --db sqlite:demo/database/demo.db --migrations demo/database/migrations --server demo/server --backend demo --seed",
-    "build": "node bin/kreftjs.js build demo --out dist/demo --include docs",
+    "build": "node bin/kreftjs.js build demo --out dist/kreftjs-com --base / --include docs",
     "preview": "node bin/kreftjs.js dev dist --api demo/db.json --db sqlite:demo/database/demo.db --migrations demo/database/migrations --server demo/server --backend demo --seed",
     "test": "node --test test/security.test.js test/prerender.test.js test/seo.test.js test/rebrand.test.js test/noauth.test.js test/winspawn.test.js test/htaccess.test.js test/cookie-secure.test.js test/password-rule.test.js test/headline.test.js test/menu.test.js test/electron-all.test.js",
     "electron": "kreftjs electron",
@@ -29,6 +29,7 @@
     "editors/",
     "templates/",
     "docs/",
+    "book/",
     "assets/logo.png",
     "README.md"
   ],

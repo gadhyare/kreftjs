@@ -65,6 +65,7 @@ The app icon is `build/icon.png`, and `ELECTRON_MENU=show|auto|hide` controls th
 
 | I want to… | Read |
 |---|---|
+| Learn Kreft in Arabic, from basics to advanced tested examples | [كتاب Kreft بالعربية](book/ar/README.md) |
 | Build my first page | [Your first app](docs/README.md#your-first-app) and [Components](docs/README.md#components-and-the-kreft-file) |
 | Fetch data and handle forms | [Fetching data](docs/README.md#fetching-data), [Forms](docs/README.md#forms-and-validation) |
 | Add an API and a database | [Routing](docs/README.md#routing), [Models](docs/README.md#models-and-the-database), [Migrations](docs/README.md#migrations-seeders-and-factories) |
