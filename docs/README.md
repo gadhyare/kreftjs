@@ -82,7 +82,7 @@ npx kreftjs dev
 ### Check that it works
 
 ```bash
-kreft --version     # for example 0.0.19-beta
+kreft --version     # for example 0.0.20-beta
 kreft about         # Kreft and Node.js versions, this project's settings and drivers
 kreft list          # every command your version has
 ```
