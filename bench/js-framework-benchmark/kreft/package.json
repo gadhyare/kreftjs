@@ -1,0 +1,14 @@
+{
+  "name": "js-framework-benchmark-kreft",
+  "version": "0.0.19",
+  "private": true,
+  "js-framework-benchmark": {
+    "frameworkVersion": "0.0.19-beta",
+    "frameworkHomeURL": "https://kreftjs.com",
+    "customURL": "/dist",
+    "language": "JavaScript"
+  },
+  "scripts": {
+    "build-prod": "node build.cjs"
+  }
+}
