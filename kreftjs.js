@@ -932,10 +932,11 @@
   }
 
   // Scope for k-each / slot locals: local names first, then the parent scope
+  const LOCALS_KEY = Symbol('locals');
   function createChildScope(parent, locals) {
     return new Proxy(locals, {
       has: (t, k) => k in t || k in parent,
-      get: (t, k) => (typeof k === 'symbol' ? undefined : k in t ? t[k] : parent[k]),
+      get: (t, k) => (typeof k === 'symbol' ? (k === LOCALS_KEY ? t : undefined) : k in t ? t[k] : parent[k]),
       set: (t, k, v) => { if (k in t) t[k] = v; else parent[k] = v; return true; },
     });
   }
@@ -1590,6 +1591,16 @@
    * Mounting a row is then: clone, find those nodes, bind. No walk over every node, no question about every attribute.
    * Anything else is compiled the general way, node by node. */
   const PLAN_SKIP_TAGS = new Set(['slot', 'template', 'script', 'style']);
+  // class={selected === row.id ? 'danger' : ''}: one watcher for `selected`, and a row hears about it only when its own key is
+  // the old or the new value (instead of every row evaluating the expression whenever `selected` changes)
+  const PATH_SRC = '[A-Za-z_$][\\w$]*(?:\\.[A-Za-z_$][\\w$]*)*';
+  const STR_SRC = `(?:'([^'\\\\]*)'|"([^"\\\\]*)")`;
+  const SELECTOR_RE = new RegExp(`^\\s*(${PATH_SRC})\\s*===\\s*(${PATH_SRC})\\s*\\?\\s*${STR_SRC}\\s*:\\s*${STR_SRC}\\s*$`);
+  function parseSelector(expr) {
+    const m = SELECTOR_RE.exec(expr);
+    if (!m) return null;
+    return { x: m[1], y: m[2], yes: m[3] ?? m[4], no: m[5] ?? m[6] };
+  }
   function buildPlan(root, inst) {
     const ops = [];
     const visit = (n, path) => {
@@ -1613,7 +1624,7 @@
         else if (c0 === 64) ops.push({ k: 3, path, name, ev: name.slice(1), expr: stripBrace(value) });
         else if (value.includes('{') && !name.startsWith('on')) {
           const expr = exactBrace(value) ?? interpToExpr(value);
-          if (expr != null) ops.push({ k: 2, path, name, arg: name, expr });
+          if (expr != null) ops.push({ k: 2, path, name, arg: name, expr, sel: name === 'class' ? parseSelector(expr) : null });
         }
       }
       let i = 0;
@@ -1630,7 +1641,55 @@
     }
     return n;
   }
-  function runPlan(ops, root, scope) {
+  // the watcher of one `selected`-like expression, shared by the rows of a list
+  function makeSelector(scope, expr, owner) {
+    const S = { current: undefined, subs: new Map(), ready: false };
+    const poke = (v) => { const set = S.subs.get(v); if (set) set.forEach((st) => st.apply()); };
+    const watch = () => {
+      renderEffect(() => {
+        const next = evaluate(scope, expr);
+        const prev = S.current;
+        S.current = next;
+        if (S.ready && !Object.is(prev, next)) { poke(prev); poke(next); }
+        S.ready = true;
+      });
+    };
+    if (owner) owner.run(watch); else watch(); // it lives as long as the list does, not as long as the row that made it
+    return S;
+  }
+  function bindSelectorClass(el, scope, sel, ctx) {
+    const locals = scope[LOCALS_KEY];
+    if (!locals) return false;
+    const raw = toRaw(locals);
+    const xLocal = hasOwn(raw, sel.x.split('.')[0]), yLocal = hasOwn(raw, sel.y.split('.')[0]);
+    if (xLocal === yLocal) return false; // exactly one side must be the row's own value
+    const watched = xLocal ? sel.y : sel.x, own = xLocal ? sel.x : sel.y;
+    const sels = ctx.rec.selectors || (ctx.rec.selectors = new Map());
+    let S = sels.get(watched);
+    if (!S) sels.set(watched, (S = makeSelector(scope, watched, ctx.owner)));
+    const st = { key: undefined, subscribed: false, apply() { setClassPart(el, 'bind', S.current === this.key ? sel.yes : sel.no); } };
+    const unsubscribe = () => {
+      if (!st.subscribed) return;
+      const set = S.subs.get(st.key);
+      if (set) { set.delete(st); if (!set.size) S.subs.delete(st.key); }
+      st.subscribed = false;
+    };
+    renderEffect(() => {
+      const k = evaluate(scope, own); // the row's own value: read here, so a changed key re-subscribes
+      if (!st.subscribed || !Object.is(k, st.key)) {
+        unsubscribe();
+        st.key = k;
+        let set = S.subs.get(k);
+        if (!set) S.subs.set(k, (set = new Set()));
+        set.add(st);
+        st.subscribed = true;
+      }
+      st.apply();
+    });
+    onScopeDispose(unsubscribe);
+    return true;
+  }
+  function runPlan(ops, root, scope, ctx) {
     for (let i = 0; i < ops.length; i++) {
       const op = ops[i], n = nodeAt(root, op.path);
       if (op.k === 0) {
@@ -1640,17 +1699,21 @@
           catch (e) { warn(`Error in "${tpl.trim()}":`, e.message); }
         });
       } else if (op.k === 1) n.textContent = op.plain;
-      else if (op.k === 2) { n.removeAttribute(op.name); bindAttr(n, op.arg, op.expr, scope); }
-      else { n.removeAttribute(op.name); bindEvent(n, op.ev, op.expr, scope); }
+      else if (op.k === 2) {
+        n.removeAttribute(op.name);
+        if (op.sel && bindSelectorClass(n, scope, op.sel, ctx)) continue;
+        bindAttr(n, op.arg, op.expr, scope);
+      } else { n.removeAttribute(op.name); bindEvent(n, op.ev, op.expr, scope); }
     }
   }
 
   const tplInfo = new WeakMap(); // template node -> { infos } once it has been mounted twice (a list row, a repeated slot)
   // compact: a block that is one plain element needs no marker nodes around it (list rows): the element is its own start and end
   function mountBlock(parent, before, raw, scope, inst, custom, compact) {
-    let infos = null, plan = null;
+    let infos = null, plan = null, rec = null;
+    const owner = activeScope; // the scope that owns this list (a row's scope is a child of it)
     if (!custom) {
-      const rec = tplInfo.get(raw);
+      rec = tplInfo.get(raw);
       if (!rec) tplInfo.set(raw, { infos: null });
       else {
         if (!rec.infos) rec.infos = (raw.nodeType === 11 ? childList(raw) : raw.tagName === 'TEMPLATE' ? childList(raw.content) : [raw]).map(analyzeNode);
@@ -1677,7 +1740,7 @@
       pauseTracking();
       const prevOwner = renderOwner;
       renderOwner = inst || null;
-      try { custom ? custom(nodes[0]) : plan && nodes.length === 1 ? runPlan(plan, nodes[0], scope) : compileNodes(frag, nodes, scope, inst, infos); }
+      try { custom ? custom(nodes[0]) : plan && nodes.length === 1 ? runPlan(plan, nodes[0], scope, { rec, owner }) : compileNodes(frag, nodes, scope, inst, infos); }
       finally { resetTracking(); renderOwner = prevOwner; }
     });
     if (compact) {
