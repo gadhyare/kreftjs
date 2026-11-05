@@ -1443,10 +1443,25 @@
   const systemMods = ['ctrl', 'shift', 'alt', 'meta'];
   const flowMods = ['prevent', 'stop', 'self', 'once', 'capture', 'passive', 'exact'];
   const mouseButtons = { left: 0, middle: 1, right: 2 };
+  const eventConfigs = new Map();
+  function eventConfig(raw) {
+    let c = eventConfigs.get(raw);
+    if (!c) {
+      const [type, ...mods] = raw.split('.');
+      c = {
+        type, mods,
+        keyMods: mods.filter((m) => !flowMods.includes(m) && !systemMods.includes(m)),
+        plain: mods.length === 0, // no modifier at all: the handler has nothing to check
+        options: { capture: mods.includes('capture'), passive: mods.includes('passive'), once: mods.includes('once') },
+      };
+      if (eventConfigs.size > 500) eventConfigs.clear();
+      eventConfigs.set(raw, c);
+    }
+    return c;
+  }
   function bindEvent(el, raw, expr, scope) {
-    const [type, ...mods] = raw.split('.');
-    const keyMods = mods.filter((m) => !flowMods.includes(m) && !systemMods.includes(m));
-    const handler = (e) => {
+    const { type, mods, keyMods, plain, options } = eventConfig(raw);
+    const handler = plain ? (e) => { invokeHandler(scope, expr, [e]); } : (e) => {
       if (mods.includes('self') && e.target !== e.currentTarget) return;
       for (const m of systemMods) if (mods.includes(m) && !e[m + 'Key']) return;
       if (mods.includes('exact') && systemMods.some((m) => !mods.includes(m) && e[m + 'Key'])) return;
@@ -1463,9 +1478,7 @@
       if (mods.includes('stop')) e.stopPropagation();
       invokeHandler(scope, expr, [e]);
     };
-    el.addEventListener(type, handler, {
-      capture: mods.includes('capture'), passive: mods.includes('passive'), once: mods.includes('once'),
-    });
+    el.addEventListener(type, handler, options);
   }
 
   /* ---------- k-model on native elements ---------- */
@@ -1642,9 +1655,14 @@
     return n;
   }
   // the watcher of one `selected`-like expression, shared by the rows of a list
+  // subs: key -> the one row that has it (the usual case: keys are unique), or a Set when several rows share a key
   function makeSelector(scope, expr, owner) {
     const S = { current: undefined, subs: new Map(), ready: false };
-    const poke = (v) => { const set = S.subs.get(v); if (set) set.forEach((st) => st.apply()); };
+    const poke = (v) => {
+      const sub = S.subs.get(v);
+      if (sub === undefined) return;
+      if (sub instanceof Set) sub.forEach((st) => st.apply()); else sub.apply();
+    };
     const watch = () => {
       renderEffect(() => {
         const next = evaluate(scope, expr);
@@ -1670,8 +1688,9 @@
     const st = { key: undefined, subscribed: false, apply() { setClassPart(el, 'bind', S.current === this.key ? sel.yes : sel.no); } };
     const unsubscribe = () => {
       if (!st.subscribed) return;
-      const set = S.subs.get(st.key);
-      if (set) { set.delete(st); if (!set.size) S.subs.delete(st.key); }
+      const sub = S.subs.get(st.key);
+      if (sub === st) S.subs.delete(st.key);
+      else if (sub instanceof Set) { sub.delete(st); if (sub.size === 1) S.subs.set(st.key, sub.values().next().value); }
       st.subscribed = false;
     };
     renderEffect(() => {
@@ -1679,9 +1698,10 @@
       if (!st.subscribed || !Object.is(k, st.key)) {
         unsubscribe();
         st.key = k;
-        let set = S.subs.get(k);
-        if (!set) S.subs.set(k, (set = new Set()));
-        set.add(st);
+        const sub = S.subs.get(k);
+        if (sub === undefined) S.subs.set(k, st);
+        else if (sub instanceof Set) sub.add(st);
+        else S.subs.set(k, new Set([sub, st]));
         st.subscribed = true;
       }
       st.apply();

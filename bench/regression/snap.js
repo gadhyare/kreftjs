@@ -103,6 +103,33 @@ await scenario('nestedcompact', S16, '<table>{for g in groups key g.id}<tbody><t
 const S17 = Kreftjs.state({ items: mk(30), sel: 0 })
 await scenario('bigtable', S17, '<table><tbody>\n  {for it in items key it.id}\n    <tr class={sel === it.id ? "on" : ""}><td>{it.id}</td><td><a @click="sel = it.id">{it.t}</a></td></tr>\n  {/for}\n</tbody></table>', { fns: {}, list: [
   () => { S17.sel = 5 }, () => { document.querySelector('#h' + (n - 1) + ' a').click() }, () => { S17.items = S17.items.slice(3).reverse() }, () => { S17.items = [] }, () => { S17.items = mk(18, 200) }] })
+
+// Simple rows (the "row plan" path): bound attributes, escaped text, events with modifiers, SVG, comments, inputs
+const S18 = Kreftjs.state({ items: mk(4), sel: 'a', clicks: 0 })
+await scenario('plan-edge', S18,
+  '<ul>{for it in items key it.id}<li id="r{it.id}" class="row {sel}" :data-n="it.id * 2" @click="clicks++"><span :title="it.t" class="a {sel}">lit \\{x\\} {it.t} / {it.id}</span> <!-- c --><button @click.stop="sel = it.t">go</button><input :value="it.t"><svg width="10" height="10"><circle :r="it.id"/></svg><b>static</b></li>{/for}</ul><p>{clicks}</p>',
+  { fns: {}, list: [
+    () => { S18.sel = 'b' }, () => { S18.items[1].t = 'changed' }, () => S18.items.push(...mk(2, 4)),
+    () => { document.querySelector('#h' + (n - 1) + ' button').click() },
+    () => { document.querySelector('#h' + (n - 1) + ' li').click() },
+    () => { S18.items = S18.items.slice().reverse() }, () => { S18.items = [] }, () => { S18.items = mk(3, 20) }] })
+// A registered component inside a row: the row plan must not be used for it
+const S19 = Kreftjs.state({ items: mk(3) })
+await scenario('plan-component', S19, '<div>{for it in items key it.id}<p class="x {it.id}"><my-tag n={it.id}></my-tag></p>{/for}</div>', { fns: {}, components: { MyTag: { props: ['n'], template: '<em>tag {n}</em>' } }, list: [() => S19.items.push(...mk(1, 3)), () => S19.items.reverse()] })
+// Selector classes: class={sel === row.id ? 'on' : ''} in all its forms
+const S20 = Kreftjs.state({ items: mk(8), sel: 3, ui: { pick: 5 } })
+await scenario('selector', S20,
+  '<ul>{for it in items key it.id}<li class={sel === it.id ? "on" : ""}>{it.id}</li>{/for}</ul><ol>{for it in items key it.id}<li class={it.id === ui.pick ? "pick" : "no"}>{it.t}</li>{/for}</ol><table><tbody>{for it in items key it.id}<tr class={sel === it.id ? "on" : ""} @click="sel = it.id"><td>{it.id}</td></tr>{/for}</tbody></table>',
+  { fns: {}, list: [
+    () => { S20.sel = 5 }, () => { S20.sel = 99 }, () => { S20.sel = 1 }, () => { S20.ui.pick = 2 }, () => { S20.ui = { pick: 7 } },
+    () => { S20.items = S20.items.filter((x) => x.id !== 5) }, () => { S20.sel = 5 }, () => S20.items.push({ id: 5, t: 'back' }), () => { S20.sel = 6 },
+    () => { S20.items[0] = { id: 77, t: 'swapped' } }, () => { S20.sel = 77 }, () => { S20.items = S20.items.slice().reverse() },
+    () => { document.querySelector('#h' + (n - 1) + ' tr:nth-child(2)').click() }, () => { S20.sel = undefined }, () => { S20.sel = null }, () => { S20.sel = 3 },
+    () => { S20.items = [] }, () => { S20.sel = 8 }, () => { S20.items = mk(12, 5) }, () => { S20.sel = 10 }, () => { S20.sel = 11 },
+  ] })
+const S21 = Kreftjs.state({ rows: [{ k: 1, id: 'a' }, { k: 2, id: 'b' }, { k: 3, id: 'c' }], cur: 'b', obj: null })
+await scenario('selector2', S21, '<ul>{for r in rows key r.k}<li class={cur === r.id ? "hit" : "miss"}>{r.id}</li>{/for}</ul>', { fns: {}, list: [
+  () => { S21.rows[0] = { k: 1, id: 'b' } }, () => { S21.cur = 'a' }, () => { S21.rows[2] = { k: 3, id: 'a' } }, () => { S21.rows[1].id = 'z' }, () => { S21.cur = 'z' }, () => { S21.cur = 'b' }] })
 console.warn = ow
 return { out, warns }
 `
