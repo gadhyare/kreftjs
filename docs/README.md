@@ -1732,7 +1732,7 @@ What you get:
 - **A strict Content-Security-Policy works.** Every expression becomes a real function, so the built app never uses `eval` or `new Function`.
 - **Errors before you deploy.** A mistake in any `.kreft` file stops the build and names the file and line.
 
-Options: `kreft build ./site --out public` builds another folder, and `--base /` changes `<base href>`. `--no-htaccess` skips the `.htaccess` file described below.
+Options: `kreft build ./site --out public` builds another folder, and `--base /` changes `<base href>`. `--no-htaccess` skips the `.htaccess` file described below. If esbuild is installed (`kreft add -D esbuild`), `kreftjs.js` is minified in the output (about 44 kB gzipped instead of 69 kB); `--no-minify` copies it as it is.
 
 ### Upload to a host
 

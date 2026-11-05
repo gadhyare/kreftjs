@@ -34,12 +34,13 @@ const SERVER_DIRS = new Set();
 const SKIP = new Set(['node_modules', 'dist', 'dist-electron', '.git', '.vscode', '.idea', 'package.json', 'package-lock.json', '.DS_Store']);
 
 module.exports = function build(args) {
-  let folder = null, out = null, base = null, prerender = null, urlsFile = null, htaccess = true;
+  let folder = null, out = null, base = null, prerender = null, urlsFile = null, htaccess = true, minify = true;
   const include = [];
   for (let i = 0; i < args.length; i++) {
     if (args[i] === '--out' || args[i] === '-o') out = args[++i];
     else if (args[i] === '--base') base = args[++i];
     else if (args[i] === '--no-htaccess') htaccess = false;
+    else if (args[i] === '--no-minify') minify = false; // keep kreftjs.js readable (for debugging)
     else if (args[i] === '--include') include.push(args[++i]); // another folder to copy in, like the docs
     else if (args[i] === '--prerender') prerender = args[i + 1] && !args[i + 1].startsWith('-') && args[i + 1].includes('/') ? args[++i].split(',') : [];
     else if (args[i] === '--urls') urlsFile = args[++i]; // a file with more addresses to prerender (pages from your data)
@@ -154,7 +155,17 @@ ${indent(components.join('\n\n'))}
       }
     }
   }
-  fs.copyFileSync(path.join(__dirname, '..', 'kreftjs.js'), path.join(dist, 'kreftjs.js'));
+  // the framework file is minified when esbuild is installed (about 40% smaller); without it, it is copied as it is
+  const runtimeSrc = path.join(__dirname, '..', 'kreftjs.js'), runtimeOut = path.join(dist, 'kreftjs.js');
+  const esb = minify ? deps.loadEsbuild(root) : null;
+  let minified = false;
+  if (esb) {
+    try {
+      fs.writeFileSync(runtimeOut, esb.transformSync(fs.readFileSync(runtimeSrc, 'utf8'), { minify: true, target: 'es2020', legalComments: 'none' }).code);
+      minified = true;
+    } catch (_) { /* fall back to the plain copy */ }
+  }
+  if (!minified) fs.copyFileSync(runtimeSrc, runtimeOut);
   for (const dir of include) {
     const from = path.resolve(dir);
     if (!fs.existsSync(from)) fail(`--include: ${dir} does not exist.`);

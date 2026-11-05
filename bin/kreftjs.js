@@ -165,6 +165,7 @@ function help() {
         --prerender [paths] Also save every page as ready HTML (needs: npm i -D jsdom)
         --include <folder>  Also copy this folder into the output (for example docs)
         --no-htaccess       Do not write dist/.htaccess (page-address rules for Apache and Hostinger)
+        --no-minify         Copy kreftjs.js as it is (by default it is minified when esbuild is installed)
     kreft add <packages...>     Install npm packages with strict security gatekeeper (alias: kreft install, kreft i)
         -D, --dev           Install as devDependency
         -y, --yes           Auto-confirm unverified community packages in CI/CD

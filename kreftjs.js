@@ -77,6 +77,7 @@
     }
   }
   function cleanupEffect(e) {
+    if (!e.deps.length) return;
     e.deps.forEach((dep) => dep.delete(e));
     e.deps.length = 0;
   }
@@ -943,6 +944,11 @@
   /* ================================================================
    * Compiler — walks real DOM, binds each directive to an effect
    * ================================================================ */
+  function childList(el) {
+    const out = [];
+    for (let n = el.firstChild; n; n = n.nextSibling) out.push(n);
+    return out;
+  }
   function compileNodes(parent, nodes, scope, inst) {
     for (const n of nodes) if (n.parentNode === parent) compile(n, scope, inst);
   }
@@ -951,29 +957,43 @@
     if (node.nodeType === 3) return compileText(node, scope);
     if (node.nodeType !== 1) return;
     const el = node;
-    if (el.hasAttribute('k-skip')) return el.removeAttribute('k-skip');
-    if (el.hasAttribute('k-once')) {
-      el.removeAttribute('k-once');
-      onceDepth++;
-      try { return compile(el, scope, inst); } finally { onceDepth--; }
-    }
-    if (el.hasAttribute('k-if')) return compileIf(el, scope, inst); // k-if is checked before k-each
-    if (el.hasAttribute('k-elif') || el.hasAttribute('k-else')) {
-      warn('k-elif / k-else has no k-if right before it.', el);
-      return el.remove();
-    }
-    if (el.hasAttribute('k-each') || el.hasAttribute('k-for')) {
-      if (!el.hasAttribute('k-each')) {
-        el.setAttribute('k-each', el.getAttribute('k-for'));
-        el.removeAttribute('k-for');
+    // one pass over the attributes: most elements are plain (class="x"), and then none of the checks below can match
+    let hasK = false, needAttrs = false, hasAnim = false;
+    if (el.hasAttributes()) {
+      const at = el.attributes;
+      for (let i = 0; i < at.length; i++) {
+        const a = at[i], nm = a.name, c0 = nm.charCodeAt(0);
+        if (c0 === 107) {
+          needAttrs = true;
+          if (nm.charCodeAt(1) === 45) { hasK = true; if (nm.startsWith('k-animate')) hasAnim = true; }
+        } else if (c0 === 58 || c0 === 64 || (!needAttrs && a.value.includes('{') && !nm.startsWith('on'))) needAttrs = true;
       }
-      return compileFor(el, scope, inst);
     }
-    if (el.hasAttribute('k-empty')) {
-      warn('k-empty / {empty} needs an k-each / {for} right before it.', el);
-      return el.remove();
+    if (hasK) {
+      if (el.hasAttribute('k-skip')) return el.removeAttribute('k-skip');
+      if (el.hasAttribute('k-once')) {
+        el.removeAttribute('k-once');
+        onceDepth++;
+        try { return compile(el, scope, inst); } finally { onceDepth--; }
+      }
+      if (el.hasAttribute('k-if')) return compileIf(el, scope, inst); // k-if is checked before k-each
+      if (el.hasAttribute('k-elif') || el.hasAttribute('k-else')) {
+        warn('k-elif / k-else has no k-if right before it.', el);
+        return el.remove();
+      }
+      if (el.hasAttribute('k-each') || el.hasAttribute('k-for')) {
+        if (!el.hasAttribute('k-each')) {
+          el.setAttribute('k-each', el.getAttribute('k-for'));
+          el.removeAttribute('k-for');
+        }
+        return compileFor(el, scope, inst);
+      }
+      if (el.hasAttribute('k-empty')) {
+        warn('k-empty / {empty} needs an k-each / {for} right before it.', el);
+        return el.remove();
+      }
+      if (el.hasAttribute('k-memo')) return compileMemo(el, scope, inst); // after k-each, so each item has its own
     }
-    if (el.hasAttribute('k-memo')) return compileMemo(el, scope, inst); // after k-each, so each item has its own
     const tag = el.tagName.toLowerCase();
     if (tag === 'slot') return compileSlot(el, scope, inst);
     if (tag === 'kreft-component') return compileDynamic(el, scope, inst);
@@ -987,7 +1007,7 @@
     }
     const def = resolveComponent(tag, inst);
     if (def) return mountComponent(el, def, scope, inst);
-    compileElement(el, scope, inst);
+    compileElement(el, scope, inst, needAttrs, hasAnim);
   }
 
   /* ---------- { expr } interpolation ---------- */
@@ -1133,10 +1153,20 @@
       });
   }
 
-  function compileElement(el, scope, inst) {
+  const EMPTY_ATTRS = [];
+  function compileElement(el, scope, inst, needAttrs = true, hasAnim = true) {
     let model = null, textExpr = null, htmlExpr = null, shown = false;
-    const anim = readAnimate(el);
-    for (let { name, value } of [...el.attributes]) {
+    const anim = hasAnim ? readAnimate(el) : null;
+    let attrList = EMPTY_ATTRS;
+    if (needAttrs && el.hasAttributes()) {
+      const at = el.attributes;
+      attrList = new Array(at.length);
+      for (let i = 0; i < at.length; i++) attrList[i] = at[i];
+    }
+    for (let { name, value } of attrList) {
+      // a plain attribute such as class="x" matches none of the branches below
+      const c0 = name.charCodeAt(0);
+      if (c0 !== 58 && c0 !== 64 && c0 !== 107 && !(value.includes('{') && !name.startsWith('on'))) continue;
       if (name[0] === ':' || name === 'k-bind' || name.startsWith('k-bind:')) {
         el.removeAttribute(name);
         const arg = name[0] === ':' ? name.slice(1) : name.slice(7);
@@ -1168,7 +1198,7 @@
     }
     if (textExpr != null) renderEffect(() => { el.textContent = toDisplayString(evaluate(scope, textExpr, el)); });
     else if (htmlExpr != null) renderEffect(() => { const h = evaluate(scope, htmlExpr, el); el.innerHTML = h == null ? '' : cleanHtml(h); });
-    else if (el.tagName !== 'SCRIPT' && el.tagName !== 'STYLE') compileNodes(el, [...el.childNodes], scope, inst);
+    else if (el.firstChild && el.tagName !== 'SCRIPT' && el.tagName !== 'STYLE') compileNodes(el, childList(el), scope, inst);
     if (model) bindModel(el, model.expr, model.mods, scope); // after children, so <option>s exist
     if (anim && !shown) queuePostJob(() => animate(el, anim.name, 'in'), el); // plays when the element appears
   }
@@ -1474,7 +1504,7 @@
     const start = text(), end = text();
     const frag = document.createDocumentFragment();
     const content = raw.nodeType === 11 ? raw.cloneNode(true) : raw.tagName === 'TEMPLATE' ? raw.content.cloneNode(true) : raw.cloneNode(true);
-    const nodes = content.nodeType === 11 ? [...content.childNodes] : [content];
+    const nodes = content.nodeType === 11 ? childList(content) : [content];
     frag.appendChild(start);
     nodes.forEach((n) => frag.appendChild(n));
     frag.appendChild(end);
@@ -1490,6 +1520,7 @@
     if (start.isConnected) flushPostJobs();
     return {
       start, end,
+      stop() { blockScope.stop(); },
       remove() { blockScope.stop(); removeRange(start, end); },
       // stop now; with an animation, the nodes stay until their out-animation ends
       leave(anim, done) {
@@ -1564,6 +1595,31 @@
     if (src[Symbol.iterator]) return Array.from(src, (value) => ({ value }));
     return Object.keys(src).map((key) => ({ value: src[key], key, isObj: true }));
   }
+  // positions (in arr) that form a longest increasing run of the non-negative numbers; -1 entries are new blocks
+  function stayMask(arr) {
+    const n = arr.length, tails = [], prev = new Int32Array(n).fill(-1), mask = new Uint8Array(n);
+    for (let i = 0; i < n; i++) {
+      const v = arr[i];
+      if (v < 0) continue;
+      let lo = 0, hi = tails.length;
+      while (lo < hi) { const mid = (lo + hi) >> 1; if (arr[tails[mid]] < v) lo = mid + 1; else hi = mid; }
+      if (lo > 0) prev[i] = tails[lo - 1];
+      tails[lo] = i;
+    }
+    for (let k = tails.length ? tails[tails.length - 1] : -1; k >= 0; k = prev[k]) mask[k] = 1;
+    return mask;
+  }
+
+  // is the list (first..last block) all there is in its parent? Blank text around it counts as nothing in table-like parents.
+  const BLANK_OK = new Set(['TABLE', 'TBODY', 'THEAD', 'TFOOT', 'TR', 'UL', 'OL', 'SELECT', 'DATALIST', 'COLGROUP']);
+  function onlyThisList(parent, first, last, anchor) {
+    const blankOk = BLANK_OK.has(parent.tagName);
+    for (let n = parent.firstChild; n !== first; n = n.nextSibling) if (!n || !blankOk || n.nodeType !== 3 || n.data.trim()) return false;
+    if (last.nextSibling !== anchor) return false;
+    for (let n = anchor.nextSibling; n; n = n.nextSibling) if (!blankOk || n.nodeType !== 3 || n.data.trim()) return false;
+    return true;
+  }
+
   function compileFor(el, scope, inst) {
     const expr = stripBrace(el.getAttribute('k-each'));
     el.removeAttribute('k-each');
@@ -1604,7 +1660,7 @@
       }
       const parent = anchor.parentNode;
       const old = new Map();
-      blocks.forEach((b) => old.set(b.key, b));
+      blocks.forEach((b, i) => { b.at = i; old.set(b.key, b); });
       const next = [];
       const seen = new Set();
 
@@ -1621,17 +1677,48 @@
         next.push(b);
       });
 
-      old.forEach((b) => (anim ? b.block.leave(anim) : b.block.remove()));
+      if (!anim && old.size > 16 && old.size === blocks.length && !emptyBlock) {
+        // every block goes: stop their effects, then take all their nodes out in one DOM operation
+        old.forEach((b) => b.block.stop());
+        const first = blocks[0].block.start, last = blocks[blocks.length - 1].block.end;
+        if (onlyThisList(parent, first, last, anchor)) {
+          parent.textContent = ''; // the list is everything in its parent: clearing it is much cheaper than removing node by node
+          parent.appendChild(anchor);
+        } else {
+          const r = document.createRange();
+          r.setStartBefore(first);
+          r.setEndAfter(last);
+          r.deleteContents();
+        }
+      } else old.forEach((b) => (anim ? b.block.leave(anim) : b.block.remove()));
       // place blocks from the end; only move the ones that are out of order
+      const stay = anim ? null : stayMask(next.map((b) => (b.block ? b.at : -1)));
       let before = anchor;
+      // a run of new blocks is built in one fragment and inserted once (one DOM insertion instead of one per row)
+      let batch = null, batchAt = null;
+      const flushBatch = () => {
+        if (!batch) return;
+        parent.insertBefore(batch, batchAt);
+        batch = null;
+        flushPostJobs();
+      };
       for (let i = next.length - 1; i >= 0; i--) {
         const b = next[i];
         if (!b.block) {
-          b.block = mountBlock(parent, before, el, createChildScope(scope, b.locals), inst);
-          if (playIn) animateRange(b.block.start, b.block.end, anim, 'in');
-        } else if (b.block.end.nextSibling !== before) b.block.move(parent, before);
+          if (anim) {
+            b.block = mountBlock(parent, before, el, createChildScope(scope, b.locals), inst);
+            if (playIn) animateRange(b.block.start, b.block.end, anim, 'in');
+          } else {
+            if (!batch) { batch = document.createDocumentFragment(); batchAt = before; }
+            b.block = mountBlock(batch, batch.firstChild, el, createChildScope(scope, b.locals), inst);
+          }
+        } else {
+          flushBatch();
+          if (stay ? !stay[i] : b.block.end.nextSibling !== before) b.block.move(parent, before);
+        }
         before = b.block.start;
       }
+      flushBatch();
       blocks = next;
       if (before0 && before0.size) playMoves(before0, anim);
     });
@@ -1716,9 +1803,12 @@
     document.head.insertBefore(st, document.head.firstChild); // first, so your own CSS wins
   }
   function readAnimate(el) {
-    for (const { name, value } of [...el.attributes]) {
-      if (name !== 'k-animate' && !name.startsWith('k-animate.')) continue;
-      el.removeAttribute(name);
+    if (!el.hasAttributes()) return null;
+    const at = el.attributes;
+    for (let i = 0; i < at.length; i++) {
+      const { name, value } = at[i];
+      if (name.charCodeAt(0) !== 107 || (name !== 'k-animate' && !name.startsWith('k-animate.'))) continue;
+      el.removeAttribute(name); // we return right after, so the live list can change
       const mods = name.split('.').slice(1);
       addPresets();
       return { name: (stripBrace(value) || '').trim() || 'fade', first: mods.includes('first'), after: mods.includes('after') };
