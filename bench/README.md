@@ -13,7 +13,8 @@ cp -R bench/js-framework-benchmark/kreft js-framework-benchmark/frameworks/keyed
 cd js-framework-benchmark
 (cd server && npm ci --ignore-scripts)                    # scripts of third-party packages are not needed
 (cd webdriver-ts && npm ci --ignore-scripts && npx tsc)
-(cd frameworks/keyed/kreft && ESBUILD_DIR=/folder/with/node_modules/esbuild npm run build-prod)   # needs esbuild
+(cd frameworks/keyed/kreft && KREFT_CLI=/path/to/kreftjs/bin/kreftjs.js \
+  ESBUILD_DIR=/folder/with/node_modules/esbuild npm run build-prod)   # needs esbuild
 (cd server && npm start) &                                # http://localhost:8080
 cd webdriver-ts
 node dist/benchmarkRunner.js --headless true --runner puppeteer \
@@ -21,6 +22,13 @@ node dist/benchmarkRunner.js --headless true --runner puppeteer \
   --framework keyed/kreft keyed/vanillajs keyed/vue keyed/svelte \
   --benchmark 01_ 02_ 03_ 04_ 05_ 06_ 07_ 08_ 09_ --count 8
 ```
+
+If the puppeteer runner fails with `Requesting main frame too early` (this upstream runner launches Chrome with `headless: false`
+plus `--headless=new`, which trips a puppeteer target-attachment race), use `--runner playwright` and point `--chromeBinary` at
+Playwright's Chrome for Testing (e.g.
+`~/Library/Caches/ms-playwright/chromium-*/chrome-mac-arm64/Google Chrome for Testing.app/Contents/MacOS/Google Chrome for Testing`).
+The results above were re-checked this way on 2026-11-05 (Chrome for Testing 153, 8 iterations): Kreft's geomean was
+1.62x vanilla vs 1.58x in the table, and per-benchmark medians were within the usual run-to-run spread.
 
 `KREFT_RUNTIME=/path/to/old/kreftjs.js` builds the app with another runtime, to compare two versions of Kreft (copy the folder as
 `kreft-before`, change `name` in its `package.json`, and give it its own `package-lock.json`).

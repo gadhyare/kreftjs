@@ -4,6 +4,10 @@
 const { execFileSync } = require('child_process'), fs = require('fs'), path = require('path')
 const REPO = path.resolve(__dirname, '..', '..', '..')
 const CLI = process.env.KREFT_CLI || path.join(REPO, 'bin', 'kreftjs.js')
+if (!fs.existsSync(CLI)) {
+  console.error(`Kreft CLI not found at ${CLI}\nSet KREFT_CLI to the bin/kreftjs.js of a Kreft checkout, e.g.\n  KREFT_CLI=/path/to/kreftjs/bin/kreftjs.js npm run build-prod`)
+  process.exit(1)
+}
 fs.rmSync('dist', { recursive: true, force: true })
 execFileSync('node', [CLI, 'build', 'src', '--out', 'dist', '--base', './', '--no-minify'], { stdio: 'inherit' })
 const runtime = process.env.KREFT_RUNTIME || path.join(path.dirname(CLI), '..', 'kreftjs.js')
