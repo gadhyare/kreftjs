@@ -1,0 +1,39 @@
+%YAML 1.2
+---
+name: Kreft
+scope: text.html.kreft
+version: 2
+file_extensions:
+  - kreft
+  - kreftjs
+first_line_match: ^\s*<view\b
+
+contexts:
+  main:
+    # <view>, <script> and <style> blocks are HTML (with JS and CSS inside)
+    - match: (?i)(?=<view\b)
+      embed: scope:text.html.basic
+      embed_scope: text.html.embedded.kreft
+      escape: (?i)(?<=</view>)
+    - match: (?i)(?=<script\b)
+      embed: scope:text.html.basic
+      embed_scope: text.html.embedded.kreft
+      escape: (?i)(?<=</script>)
+    - match: (?i)(?=<style\b)
+      embed: scope:text.html.basic
+      embed_scope: text.html.embedded.kreft
+      escape: (?i)(?<=</style>)
+    - match: <!--
+      scope: punctuation.definition.comment.begin.html
+      push: html-comment
+    # everything else at the top level is the component's JavaScript
+    - match: '^\s*(layout|prop|state|saved|derive|action|load|watch|when|on|event|use|share|receive)\b'
+      captures:
+        1: keyword.control.kreft storage.type.kreft
+    - include: scope:source.js
+
+  html-comment:
+    - meta_scope: comment.block.html
+    - match: -->
+      scope: punctuation.definition.comment.end.html
+      pop: true

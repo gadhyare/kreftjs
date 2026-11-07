@@ -1,0 +1,12 @@
+<snippet>
+	<content><![CDATA[
+{for ${1:item} in ${2:items} key ${1:item}.id}
+  $0
+{empty}
+  <p>Nothing yet.</p>
+{/for}
+]]></content>
+	<tabTrigger>for</tabTrigger>
+	<scope>text.html.kreft</scope>
+	<description>Loop over a list</description>
+</snippet>

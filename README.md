@@ -24,7 +24,7 @@ action add() { count++ }
 You need [Node.js](https://nodejs.org) 22.5 or newer.
 
 ```bash
-npm i -g kreftjs          # once: makes the `kreft` command available everywhere
+npm install -g kreftjs@latest   # once: makes the `kreft` command available everywhere
 kreft new my-app        # asks: JavaScript or TypeScript?
 cd my-app
 npm run dev
@@ -41,6 +41,15 @@ Open the address in the terminal (normally `http://localhost:8000`). A new proje
 | **Backend** | `Route`, controllers, form requests, policies, models with relations, soft deletes and scopes, migrations, seeders, factories, jobs, mail, notifications, cache, Redis, file storage, scheduling. |
 | **Authentication** | Cookie sessions with CSRF protection, API tokens with permissions, device list, two-factor codes, email verification, account lockout. |
 | **Tooling** | `kreft dev` with hot reload, DevTools, an error monitor, `kreft build` (CSP-safe), prerendering, TypeScript, Vite and Electron support, a safer `kreft add`, an MCP server for AI agents. |
+
+## Put it online
+
+```bash
+npm install kreftjs@latest       # the newest version
+npm run build                    # the finished site, ready to upload
+```
+
+Upload what is inside the output folder (`dist/`; for this repository's own website, `dist/kreftjs-com`) to your host. The kreftjs.com steps, and releasing a new package version with `npm publish`, are in [Publish the website](docs/README.md#publish-the-website-kreftjscom).
 
 ## Desktop apps (Electron)
 

@@ -1,0 +1,8 @@
+<snippet>
+	<content><![CDATA[
+layout ${1:app}
+]]></content>
+	<tabTrigger>layout</tabTrigger>
+	<scope>text.html.kreft</scope>
+	<description>This page goes inside layouts/&lt;name&gt;.kreft (layout none: no layout)</description>
+</snippet>

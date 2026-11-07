@@ -273,6 +273,10 @@ const SECURITY_HEADERS = {
   });
   const send = (res, r) => {
     if (res.headersSent || res.writableEnded) return;
+    if (r.streamFile) { // response.stream(file): byte ranges for video and audio
+      const { file, ...o } = r.streamFile;
+      return require('./stream.js').sendFile(res.req, res, file, { ...o, headers: { 'Cache-Control': 'no-store', ...SECURITY_HEADERS, ...r.headers, ...(o.headers || {}) } });
+    }
     const status = r.statusCode || 200;
     const noBody = status === 204 || status === 304 || r.body === undefined;
     const isHtml = typeof r.body === 'string' && (r.headers && r.headers['Content-Type'] && r.headers['Content-Type'].includes('text/html'));

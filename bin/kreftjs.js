@@ -583,6 +583,30 @@ function copyFolder(from, to) {
 }
 
 /* ------------------------------------------------------------------ kreft vscode */
+/* VS Code only loads extensions listed in extensions.json, and after "Uninstall" it keeps the folder in .obsolete and
+   deletes it on the next start. Copying the folder is not enough after an uninstall: list it again and clear .obsolete. */
+function registerExtension(dir, folder, version) {
+  const id = 'kreft.kreftjs';
+  const location = path.join(dir, folder);
+  try {
+    const file = path.join(dir, 'extensions.json');
+    let list = [];
+    if (fs.existsSync(file)) { try { list = JSON.parse(fs.readFileSync(file, 'utf8')); } catch { list = []; } }
+    if (!Array.isArray(list)) list = [];
+    list = list.filter((e) => !(e && e.identifier && /^kreft\.kreft(js)?$/.test(e.identifier.id)));
+    list.push({ identifier: { id }, version, location: { $mid: 1, fsPath: location, external: 'file://' + location, path: location, scheme: 'file' }, relativeLocation: folder, metadata: { installedTimestamp: Date.now(), pinned: false, source: 'resource', isApplicationScoped: false, isMachineScoped: false, isBuiltin: false, targetPlatform: 'undefined' } });
+    fs.writeFileSync(file, JSON.stringify(list));
+  } catch {}
+  try {
+    const file = path.join(dir, '.obsolete');
+    if (fs.existsSync(file)) {
+      const o = JSON.parse(fs.readFileSync(file, 'utf8'));
+      for (const k of Object.keys(o)) if (k.startsWith('kreft.kreftjs-') || k.startsWith('kreft.kreft-')) delete o[k];
+      fs.writeFileSync(file, JSON.stringify(o));
+    }
+  } catch {}
+}
+
 function installVscode() {
   const os = require('os');
   const from = path.join(__dirname, '..', 'editors', 'vscode');
@@ -595,6 +619,7 @@ function installVscode() {
     fs.mkdirSync(dir, { recursive: true });
     fs.readdirSync(dir).filter((n) => n.startsWith('kreft.kreftjs-') || n.startsWith('kreft.kreft-')) /* the older extensions go too */.forEach((n) => fs.rmSync(path.join(dir, n), { recursive: true, force: true }));
     copyFolder(from, path.join(dir, `kreft.kreftjs-${ext.version}`));
+    registerExtension(dir, `kreft.kreftjs-${ext.version}`, ext.version);
     console.log(`  Installed in ${path.join(dir, `kreft.kreftjs-${ext.version}`)}`);
   }
   // Ensure current project .vscode/settings.json maps .kreft files to Kreft and configures formatter
@@ -615,7 +640,7 @@ function installVscode() {
 /* ------------------------------------------------------------------ kreft dev */
 async function devServer(args, { production = false } = {}) {
   const isProd = Boolean(production || process.env.APP_ENV === 'production' || process.env.NODE_ENV === 'production');
-  let port = production ? Number(process.env.PORT) || 8000 : 8000, folder = production ? 'dist' : '.', apiFile = null, delay = 0, saveApi = true, hot = !production, dbUrl = null, migrations = null, serverFolder = null, backendFolder = null, seedNew = false;
+  let port = production ? Number(process.env.PORT) || 8000 : 8000, folder = production ? 'dist' : '.', apiFile = null, delay = 0, saveApi = true, hot = !production, dbUrl = null, migrations = null, serverFolder = null, backendFolder = null, seedNew = false, force = false;
   // kreft dev only answers this computer; --host 0.0.0.0 shares it on your network.
   // kreft serve answers everyone (HOST in the environment can narrow it).
   let host = production ? process.env.HOST || '0.0.0.0' : '127.0.0.1';
@@ -630,6 +655,7 @@ async function devServer(args, { production = false } = {}) {
     else if (args[i] === '--server') serverFolder = path.resolve(args[++i]);
     else if (args[i] === '--backend') backendFolder = path.resolve(args[++i]);
     else if (args[i] === '--seed') seedNew = true;
+    else if (args[i] === '--force') force = true;
     else if (args[i] === '--host') host = args[++i];
     else if (/^\d+$/.test(args[i])) port = Number(args[i]);
     else folder = args[i];
@@ -655,6 +681,16 @@ async function devServer(args, { production = false } = {}) {
   const backendDir = backendFolder || (lay.split ? lay.backend : envDir);
   const apiRoutesFile = require('./backend/typescript.js').findFile(path.join(backendDir, 'routes', 'api')); // api.js or api.ts
   const hasBackend = Boolean(apiRoutesFile);
+  // Not a Kreft project and nothing to show: do not start a server on whatever folder this happens to be (an empty
+  // one, or your home folder). --force serves it anyway.
+  if (!force && !dbUrl && !apiFile && !serverFolder && !hasBackend && !lay.split) {
+    const names = (() => { try { return fs.readdirSync(root); } catch (_) { return []; } })();
+    const isSite = names.includes('index.html') || names.some((n) => /\.kreft$/.test(n)) || fs.existsSync(path.join(root, 'demo', 'index.html')) || fs.existsSync(path.join(config.dir || root, 'kreftjs.config.json'));
+    if (!isSite) {
+      console.error(`  ${path.resolve(root)} is not a Kreft project: there is no index.html, no frontend/ folder and no .kreft pages.\n\n  Make one:                  kreft new my-app   (then: cd my-app, kreft dev)\n  Or go into your project:   cd path/to/your-app\n  To serve this folder anyway: kreft ${production ? 'serve' : 'dev'} ${folder === '.' ? '' : folder + ' '}--force`);
+      process.exit(1);
+    }
+  }
   // kreftjs serve: the backend must not sit inside the folder that is served, or its files could be downloaded
   if (production && hasBackend && (backendDir === root || backendDir.startsWith(root + path.sep))) {
     console.error(`  The backend (${backendDir}) is inside the folder being served (${root}).\n  Serve the built site instead: kreft build, then kreft serve dist`);
@@ -736,7 +772,7 @@ async function devServer(args, { production = false } = {}) {
     '.html': 'text/html', '.js': 'text/javascript', '.mjs': 'text/javascript', '.kreft': 'text/plain', '.kreftjs': 'text/plain',
     '.css': 'text/css', '.json': 'application/json', '.svg': 'image/svg+xml', '.png': 'image/png',
     '.jpg': 'image/jpeg', '.jpeg': 'image/jpeg', '.gif': 'image/gif', '.webp': 'image/webp',
-    '.ico': 'image/x-icon', '.woff2': 'font/woff2', '.woff': 'font/woff', '.txt': 'text/plain', '.md': 'text/markdown',
+    '.ico': 'image/x-icon', ...(({ '.ts': _ts, ...media }) => media)(require('./backend/stream.js').MEDIA_TYPES), '.woff2': 'font/woff2', '.woff': 'font/woff', '.txt': 'text/plain', '.md': 'text/markdown',
   };
   const isFile = (p) => { try { return fs.statSync(p).isFile(); } catch (_) { return false; } };
 
@@ -754,12 +790,15 @@ async function devServer(args, { production = false } = {}) {
       }
     }
     const type = types[path.extname(file).toLowerCase()] || 'application/octet-stream';
-    res.writeHead(opts.status || 200, {
+    const fileHeaders = {
       'Content-Type': type + (type.startsWith('text/') || type.endsWith('json') ? '; charset=utf-8' : ''),
       'Cache-Control': isProd ? 'no-cache' : 'no-store', // dev: always pick up your latest changes
       'X-Content-Type-Options': 'nosniff',
       ...prodHeaders,
-    });
+    };
+    // everything but pages is sent with byte ranges (video and audio seek, Safari plays)
+    if (type !== 'text/html') return require('./backend/stream.js').sendFile(res.req, res, file, { status: opts.status, type: fileHeaders['Content-Type'], headers: fileHeaders });
+    res.writeHead(opts.status || 200, fileHeaders);
     if (!production && type === 'text/html') {
       let html = fs.readFileSync(file, 'utf8');
       // PUBLIC_ values from .env, as Kreftjs.env (kreft build puts them in app.js)
@@ -794,12 +833,9 @@ async function devServer(args, { production = false } = {}) {
       return res.end(opts.seo ? require('./backend/seo-pages.js').inject(html, opts.seo) : html);
     }
     if (type === 'text/html' && opts.seo) return res.end(require('./backend/seo-pages.js').inject(fs.readFileSync(file, 'utf8'), opts.seo));
-    const stream = fs.createReadStream(file);
-    stream.on('error', () => {
-      if (!res.headersSent) res.writeHead(404, { 'Content-Type': 'text/plain; charset=utf-8' });
-      res.end('Not found');
-    });
-    stream.pipe(res);
+    const page = fs.createReadStream(file); // a page in production: headers are written, send it whole
+    page.on('error', () => res.end('Not found'));
+    page.pipe(res);
   }
 
   // ----- hot reload: watch the folder, tell open pages what changed -----
@@ -1111,8 +1147,7 @@ async function devServer(args, { production = false } = {}) {
         const realPub = real(pub), realF = real(f);
         if ((f.startsWith(pub + path.sep)) && !secret(urlPath) && isFile(f) && realPub && realF && realF.startsWith(realPub + path.sep)) {
           const type = types[path.extname(f).toLowerCase()] || 'application/octet-stream';
-          res.writeHead(200, { 'Content-Type': type, 'X-Content-Type-Options': 'nosniff', 'Content-Security-Policy': "default-src 'none'; img-src 'self'; style-src 'unsafe-inline'; sandbox", 'Cache-Control': 'public, max-age=3600' });
-          return fs.createReadStream(f).pipe(res);
+          return require('./backend/stream.js').sendFile(req, res, f, { type, headers: { 'Content-Security-Policy': "default-src 'none'; img-src 'self'; media-src 'self'; style-src 'unsafe-inline'; sandbox", 'Cache-Control': /\.(m3u8|mpd)$/i.test(f) ? 'no-cache' : 'public, max-age=3600' } }); // a live playlist changes every few seconds
         }
         res.writeHead(404, { 'Content-Type': 'text/plain; charset=utf-8' });
         return res.end('Not found: ' + urlPath);

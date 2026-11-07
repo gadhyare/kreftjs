@@ -1,0 +1,12 @@
+<snippet>
+	<content><![CDATA[
+<kreft-wait>
+  $0
+  <p k-waiting>Loading…</p>
+  <p k-failed="error">Could not load: {error.message}</p>
+</kreft-wait>
+]]></content>
+	<tabTrigger>kreft-wait</tabTrigger>
+	<scope>text.html.kreft</scope>
+	<description>Show something until everything inside has loaded</description>
+</snippet>

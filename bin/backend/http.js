@@ -96,6 +96,8 @@ const cookieSecure = () => {
 function response(body, status = 200, headers = {}) { return new Response(body, status, headers); }
 response.json = (body, status = 200, headers = {}) => new Response(body, status, headers);
 response.noContent = () => new Response(undefined, 204);
+// response.stream('/path/video.mp4') - sends a file with byte-range support (seeking, Safari); { type, download, headers }
+response.stream = (file, opts = {}) => { const r = new Response(undefined, 200); r.streamFile = { file, ...opts }; return r; };
 const noContent = () => new Response(undefined, 204);
 const toResponse = (v) => (v instanceof Response ? v : v === undefined ? new Response(undefined, 204) : new Response(v, 200));
 
@@ -313,8 +315,10 @@ class Request {
         if (kind === 'unique' && ignore && ignore !== 'NULL') { sql += ` AND ${conn.q(idColumn)} != ?`; params.push(ignore); }
         const found = (await conn.query(sql + ' LIMIT 1', params)).length > 0;
         const label = (names && names[field]) || field.replace(/_/g, ' ');
-        if (kind === 'unique' && found) (errors[field] = errors[field] || []).push(`The ${label} has already been taken.`);
-        if (kind === 'exists' && !found) (errors[field] = errors[field] || []).push(`The selected ${label} is invalid.`);
+        // your own message for the rule: { 'title.unique': 'That title is already used.' }
+        const own = messages && (messages[`${field}.${kind}`] || messages[kind]);
+        if (kind === 'unique' && found) (errors[field] = errors[field] || []).push(own || `The ${label} has already been taken.`);
+        if (kind === 'exists' && !found) (errors[field] = errors[field] || []).push(own || `The selected ${label} is invalid.`);
       }
     }
     if (Object.keys(errors).length) throw new ValidationError(errors);

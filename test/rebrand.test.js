@@ -34,7 +34,7 @@ test('package: kreftjs with the `kreftjs` and `kreft` commands', () => {
   assert.strictEqual(pkg.name, 'kreftjs');
   assert.strictEqual(pkg.main, 'kreftjs.js');
   assert.deepStrictEqual(pkg.bin, { kreftjs: 'bin/kreftjs.js', kreft: 'bin/kreftjs.js' });
-  for (const f of pkg.files) assert.ok(require('node:fs').existsSync(path.join(ROOT, f)), `${f} is listed in "files" and exists`);
+  for (const f of pkg.files.filter((x) => !x.startsWith('!'))) assert.ok(require('node:fs').existsSync(path.join(ROOT, f)), `${f} is listed in "files" and exists`);
 });
 
 test('settings: kreftjs.config.json wins; kreft.config.json is read when it is missing', () => {

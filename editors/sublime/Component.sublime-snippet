@@ -1,0 +1,20 @@
+<snippet>
+	<content><![CDATA[
+state ${1:count} = ${2:0}
+
+action ${3:add}() {
+  ${1:count}++
+}
+
+<view>
+  <button @click={${3:add}}>{${1:count}}</button>
+</view>
+
+<style scoped>
+  $0
+</style>
+]]></content>
+	<tabTrigger>kreftjs</tabTrigger>
+	<scope>text.html.kreft</scope>
+	<description>A new .kreft component</description>
+</snippet>

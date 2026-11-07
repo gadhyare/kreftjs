@@ -1,0 +1,8 @@
+<snippet>
+	<content><![CDATA[
+k-if={${1:condition}}
+]]></content>
+	<tabTrigger>k-if</tabTrigger>
+	<scope>text.html.kreft</scope>
+	<description>Show only when true</description>
+</snippet>

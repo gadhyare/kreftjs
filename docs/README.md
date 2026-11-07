@@ -55,34 +55,34 @@ node --version      # v22.5.0 or higher
 
 ### Install the command
 
-Pick one way.
+Always ask npm for the newest version with `@latest`. Pick one way.
 
 **1. Once, for every project (recommended).** The `kreft` command then works in any folder (the package is called `kreftjs`):
 
 ```bash
-npm i -g kreftjs
+npm install -g kreftjs@latest
 ```
 
-**2. Without installing anything.** `npx` downloads Kreft, runs it and forgets it. Good for trying it out:
+**2. Inside one project.** The version is saved in the project's `package.json`, so everyone who clones the project, your server and your CI get the same one:
 
 ```bash
-npx kreftjs new my-app
-```
-
-**3. Inside one project.** The command is saved in the project's `package.json`, so everyone who clones the project gets the same version, and so does your server or CI:
-
-```bash
-npm i -D kreftjs
+npm install -D kreftjs@latest
 npx kreftjs dev
 ```
 
+**3. Without installing anything.** `npx` downloads Kreft, runs it and forgets it. Good for trying it out:
+
+```bash
+npx kreftjs@latest new my-app
+```
+
 > [!NOTE]
-> The scripts of a new project (`npm run dev`, `build`, `serve` …) call `kreftjs`. With way 1 that is the global command. With way 3, npm finds it in the project's `node_modules` by itself. On a server where you did not install it globally, run `npm i -D kreftjs` in the project before `npm run build` or `npm run serve`.
+> The scripts of a new project (`npm run dev`, `build`, `serve` …) call `kreftjs`. With way 1 that is the global command. With way 2, npm finds it in the project's `node_modules` by itself. On a server where it is not installed globally, run `npm install -D kreftjs@latest` in the project before `npm run build` or `npm run serve`.
 
 ### Check that it works
 
 ```bash
-kreft --version     # for example 0.0.20-beta
+kreft --version     # for example 0.0.22-beta
 kreft about         # Kreft and Node.js versions, this project's settings and drivers
 kreft list          # every command your version has
 ```
@@ -100,7 +100,7 @@ installs colors and snippets for `.kreft` files in VS Code (also Cursor and VSCo
 ### Update
 
 ```bash
-npm i -g kreftjs@latest      # the command (or: npm i -D kreftjs@latest inside a project)
+npm install -g kreftjs@latest      # the command (or: npm install -D kreftjs@latest inside a project)
 cd my-app
 kreft update --check       # what would change
 kreft update --core        # refresh this app's kreftjs.js and type files (a backup is saved)
@@ -381,6 +381,7 @@ Modifiers: `.prevent` `.stop` `.self` `.once` `.capture` `.passive`. Keys: `.ent
 | Directive | What it does |
 |---|---|
 | `k-if` / `k-elif` / `k-else` | Adds or removes the element. |
+| `k-match="value"` + `k-case` / `k-default` on its children | Shows the child whose `k-case` equals the value. See [Choosing with k-match](#choosing-with-k-match). |
 | `k-each="item in list"` + `k-key="item.id"` | Repeats the element. Also `(item, i) in list`, `(value, key) in object`, `n in 10`. |
 | `k-model="name"` | Two-way binding for input, textarea, select, checkbox and radio. Modifiers `.trim` `.number` `.lazy`. |
 | `k-show` | Hides with CSS instead of removing. |
@@ -475,6 +476,62 @@ app.directive('focus', {
 <div k-tooltip:top={message}></div>   <!-- binding.arg = 'top', binding.value = message -->
 ```
 
+### Choosing with k-match
+
+When one value decides what to show, `k-match` reads better than a chain of `k-if` / `k-elif`:
+
+```html
+<div k-match="status">
+  <b k-case="'ok'">Done</b>
+  <i k-case="'wait', 'queued'">Waiting</i>
+  <u k-default>Unknown</u>
+</div>
+```
+
+- The comparison is strict (`===`). Several values in one `k-case` (separated by commas) mean "one of these".
+- Only the first matching case shows. `k-default` shows when none match; put it last.
+- The children are turned into `k-if` / `k-elif` / `k-else`, so components, `<template>` and `k-animate` work on them as usual.
+
+### Pipes
+
+Pass a value through a pipe with `|` to format it, instead of calling helper functions in the view:
+
+```html
+<p>{price | currency:'EUR'}</p>
+<p>{createdAt | ago}</p>
+<p>{title | capitalize | truncate:30}</p>
+<a title={name | upper}>{tags | join:' · '}</a>
+```
+
+- Arguments follow a colon (`truncate:30`, `currency:'EUR'`) or sit in parentheses (`number(2)`). Pipes run left to right.
+- `||`, `|=` and a `|` inside a string, a regular expression or brackets are not pipes.
+- Numbers, currency and dates follow the app's language (`Kreftjs.locale`).
+
+| Pipe | Result |
+|---|---|
+| `upper` `lower` `capitalize` `trim` | Text case and spaces. |
+| `truncate:n` | Cuts text to `n` characters and adds `…`. |
+| `currency:'USD'` | `$1,234.50`, in the current language. |
+| `number:digits` `percent:digits` | `1,234.5`, `45%` (0.45). |
+| `date:'short'` `time` | `short`, `medium` (default), `long`, `full`; or an `Intl.DateTimeFormat` options object. |
+| `ago` | `3 hours ago`, `in 2 days`. A date like `2026-11-05 15:39:58` from the Kreft database is read as UTC. |
+| `bytes` | `1.5 KB`. |
+| `json` | Pretty-printed JSON, for debugging. |
+| `fallback:'n/a'` | The value, or the fallback when it is empty. |
+| `join:sep` `first` `last` `slice:a:b` `reverse` `sortBy:'key':'desc'` `count` | Lists. |
+
+**Your own pipe.** Any function in the component works as a pipe, and wins over a built-in with the same name:
+
+```html
+const wrap = (value, left = '«', right = '»') => left + value + right
+
+<view><p>{name | wrap}</p> <p>{name | wrap:'[':']'}</p></view>
+```
+
+For the whole app: `Kreftjs.pipe('shout', (value) => String(value).toUpperCase() + '!')`.
+
+> `a | b` used to be a bitwise OR. In a view it is now a pipe; write bit operations inside a function in the script.
+
 ## Props, events and slots
 
 ### Using a component
@@ -515,6 +572,23 @@ prop admin = false
 ```
 
 The default's type decides how plain text attributes are read: `age="30"` becomes the number `30`, and `admin` with no value becomes `true`. A child cannot change a prop; send an event instead.
+
+### Typed props
+
+Write the type the way TypeScript does. A wrong value, or a missing required prop, warns while you develop (in `kreft dev` and in a built app's console):
+
+```html
+prop tone: 'info' | 'warn' = 'info'   // only these values; 'info' when not given
+prop label: string                     // required: leaving it out warns
+prop count?: number                    // optional
+prop items: string[] = []
+prop onSave: (id: number) => void
+```
+
+- Checked: `string` `number` `boolean` `null` `undefined` `object` `Date`, `T[]`, functions, literal values (`'sm'`, `3`, `true`) and unions of them. Your own type names (`User`), `any` and `unknown` are not checked.
+- A prop is required when it has no default, no `?` and its type has no `null` / `undefined`.
+- `number`, `boolean` and `string` also decide how a plain attribute is read: `count="5"` becomes `5`.
+
 
 ### Events: child to parent
 
@@ -1217,10 +1291,36 @@ Generate one with `kreft make:controller PostController --api` (also `--model Po
 |---|---|
 | `req.input('name', default)`, `req.all()`, `req.only('a', 'b')`, `req.except(…)`, `req.has(…)`, `req.filled(…)` | Values from the body and the query. |
 | `req.boolean('x')`, `req.integer('page', 1)`, `req.string('q')` | A value in the right type. |
-| `await req.validate(rules)` | The same rules as `form()`, plus `unique:table,column` and `exists:table,column`. Returns only the checked fields, or answers `422`. |
+| `await req.validate(rules, messages, names)` | The same rules as `form()`, plus `unique:table,column` and `exists:table,column`. Returns only the checked fields, or answers `422`. `messages` are your own texts (`{ 'title.unique': 'That title is already used.' }`, or `{ unique: '…' }` for every field); `names` are nicer field names (`{ email: 'e-mail address' }`). |
 | `req.params`, `req.query`, `req.body`, `req.header('x')`, `req.bearerToken()`, `req.ip()`, `req.user` | The rest. |
 | `req.file('avatar').store('avatars')` | Saves an upload with a random name. |
 | `response(data, 201)`, `response(data).header('X', 'y')`, `abort(403, 'message')` | Answers. |
+| `response.stream('/path/video.mp4', { type, download, headers })` | Sends a file with byte ranges. See [Video and audio files](#video-and-audio-files). |
+
+### Video and audio files
+
+To serve a video or audio file, return `response.stream(path)` instead of reading the file yourself:
+
+```js
+const path = require('path')
+
+Route.get('/videos/:name', (req) =>
+  response.stream(path.join(__dirname, '../storage/videos', path.basename(req.params.name))))
+
+Route.get('/podcast/:id/download', (req) =>
+  response.stream('/var/media/episode.mp3', { download: true }))   // saved as a file instead of played
+```
+
+- **Seeking works.** The server answers `Range` requests with `206 Partial Content`, so a player can jump to any minute without downloading the rest, and Safari, which refuses to play video without ranges, plays it. A range that does not fit the file gets `416`.
+- **Only the needed bytes are read**, and reading stops when the viewer leaves or seeks elsewhere.
+- **Caching is built in.** The answer carries `ETag` and `Last-Modified`, so an unchanged file is answered with `304`. `HEAD` requests get the headers only.
+- **A missing file is a plain `404`**, not a crash.
+- Options: `type` (the media type; guessed from the extension for `mp4`, `webm`, `mov`, `mp3`, `m4a`, `ogg`, `wav`, `flac`, `m3u8`, `mpd`, `vtt` …), `download: true` (adds `Content-Disposition: attachment`), and `headers` (extra headers).
+
+> [!WARNING]
+> Never build the path straight from the request. Use `path.basename(...)` as above, or look the file up in your database, so nobody can ask for `../../.env`.
+
+`kreft dev` and `kreft serve` also send the static media files of your app (`.mp4`, `.webm`, `.mp3`, HLS playlists …) with ranges, so a `<video src="/intro.mp4" controls>` seeks without any code.
 
 ### Form requests, resources and policies
 
@@ -1758,7 +1858,7 @@ Apache only knows the files on disk, so without these rules `/docs` or any other
 > [!NOTE]
 > This hosts the front end only. Login, the database and everything under `/api` need the Node.js server, which Apache does not run.
 
-**A Node.js plan or a VPS.** Upload the whole project (without `node_modules`), not `dist/`. Add Kreft to its dependencies with `npm i kreftjs`, build with `npm run build`, and start the server with `npm run serve` (it reads the `PORT` your host sets). The generated `start` script runs the development server, so do not use it in production.
+**A Node.js plan or a VPS.** Upload the whole project (without `node_modules`), not `dist/`. Add Kreft to its dependencies with `npm install kreftjs@latest`, build with `npm run build`, and start the server with `npm run serve` (it reads the `PORT` your host sets). The generated `start` script runs the development server, so do not use it in production.
 
 
 On a VPS, keep it running with PM2 and put nginx in front of it for your domain and HTTPS:
@@ -1782,6 +1882,30 @@ server {
 
 Then `sudo certbot --nginx -d example.com` adds HTTPS. Set `APP_ENV=production` and a real `APP_KEY` in `.env` first, and read the [Production checklist](#production-checklist).
 
+
+### Publish the website (kreftjs.com)
+
+The Kreft website is the `demo/` app plus the `docs/` manual. Three commands make it, and a fourth puts it online:
+
+```bash
+npm install kreftjs@latest     # in a project that uses Kreft; in this repository, plain: npm install
+npm run build                  # writes the finished site to dist/kreftjs-com
+```
+
+Then upload what is *inside* `dist/kreftjs-com` (not the folder itself, and including the hidden `.htaccess`) to the folder kreftjs.com is served from, normally `public_html` (see [Upload to a host](#upload-to-a-host)). Open https://kreftjs.com and reload a page such as `/docs` to check that the clean addresses work.
+
+`npm run build` runs `kreft build demo --out dist/kreftjs-com --base / --include docs`. `--base /` makes every path start at the site's root, and `--include docs` copies the manual in. To look at the result before you upload it, run `npm run preview`.
+
+**Releasing a new version of the package.** This is done by the maintainer, before the site is built, so the site and the package agree:
+
+```bash
+npm test                       # the regression tests must pass
+npm version prerelease --preid=beta   # or: patch, minor (changes package.json and makes a git tag)
+npm publish --tag latest       # needs npm login; the package is then installed with kreftjs@latest
+npm run build                  # then upload dist/kreftjs-com as above
+```
+
+Check that people get it with `npm view kreftjs version` and a fresh `npm install -g kreftjs@latest`.
 
 ### Ready HTML for every page: `--prerender`
 
@@ -2182,6 +2306,10 @@ await quran.close()
 
 `call` returns the structured result (or the text, parsed as JSON when possible) and throws if the tool reports an error. Only `http(s)` URLs are accepted, redirects are refused, and a response over `maxBytes` (10 MB) is cut off. Never pass a URL a visitor typed: your server would fetch addresses of their choosing, including your internal network (SSRF). Use a fixed or allow-listed URL.
 
+## Running `kreft dev` outside a project
+
+`kreft dev` and `kreft serve` start only in a Kreft project: a folder with `index.html`, a `frontend/` folder, `.kreft` pages, a backend or a `kreftjs.config.json`. In any other folder (an empty one, your home folder) they stop and say so, instead of serving whatever is there. `kreft dev --force` serves the folder anyway. `kreft run dev` is not a command: inside a project use `kreft dev`, or `npm run dev`.
+
 ## Kreft Shield
 
 Floods and scanners from one address can slow a server to a crawl. Turn on the Shield with one line in `.env` (changes apply without a restart):
@@ -2419,7 +2547,7 @@ Set these in `.env` (never commit it). Variables that start with `PUBLIC_` are c
 |---|---|
 | `.kreft` keywords | `state` `derive` `action` `when` `watch` `on` `prop` `event` `use` `share` `receive` `import` `saved` `load` `layout` |
 | In the script | `send` `props` `bus` `store` `$route` `$router` `tick` and every `Kreft` function |
-| In the view | `{expr}` `attr={expr}` `@event` `k-if` `k-elif` `k-else` `k-each` `k-key` `k-model` `k-show` `k-text` `k-html` `k-ref` `k-skip` `k-once` `k-memo` `k-animate` `{for}` |
+| In the view | `{expr}` `attr={expr}` `@event` `k-if` `k-elif` `k-else` `k-each` `k-key` `k-match` `k-case` `k-default` `k-model` `k-show` `k-text` `k-html` `k-ref` `k-skip` `k-once` `k-memo` `k-animate` `{for}` |
 | App | `Kreftjs.app(rootOrPath)` then `.component()` `.directive()` `.share()` `.use()` `.mount()` `.unmount()` |
 | Data | `store` (`$patch` `$reset` `$watch`) `state` `signal` `derived` `readonly` `saved` `storage` |
 | Reacting | `watch` `effect` `tick` `onCleanup` `onReady` `onUpdate` `onShow` `onHide` `onDestroy` |

@@ -1,0 +1,10 @@
+<snippet>
+	<content><![CDATA[
+<kreft-section name="${1:actions}">
+  $0
+</kreft-section>
+]]></content>
+	<tabTrigger>kreft-section</tabTrigger>
+	<scope>text.html.kreft</scope>
+	<description>Content for the layout's &lt;kreft-yield name&gt;</description>
+</snippet>

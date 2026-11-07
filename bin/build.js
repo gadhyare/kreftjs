@@ -25,7 +25,7 @@ const path = require('path');
 const Kreftjs = require('../kreftjs.js');
 
 const { expandBlocks, prepareTemplate, splitKreft, splitInterp, exactBrace, stripBrace, interpToExpr, quoteBraceAttrs, expandSelfClosing,
-  scopeCss, hashString, propType, simplePathRE, fnExpRE, forAliasRE, stripTypeScript } = Kreftjs.__internal;
+  scopeCss, hashString, propType, typeCheck, caseCond, simplePathRE, fnExpRE, forAliasRE, stripTypeScript } = Kreftjs.__internal;
 
 const deps = require('./deps.js');
 // component files: .kreft, or .kreftjs in a project from the 0.0.x betas
@@ -329,12 +329,16 @@ function compileFile(file, rel, root) {
 
   // props: keep the default as a function so every instance gets its own copy
   const props = Object.entries(sp.props).map(([p, expr]) => {
-    if (expr == null) return `${JSON.stringify(p)}: {}`;
+    // `prop size: 'sm' | 'lg'`: the type text is kept, so the built app warns about a wrong value too
+    const ti = sp.propTypes && sp.propTypes[p];
+    const simple = ti && { string: 'String', number: 'Number', boolean: 'Boolean' }[ti.type.trim()];
+    const typed = ti ? `, typeText: ${JSON.stringify(ti.type)}, check: Kreftjs.__typeCheck(${JSON.stringify(ti.type)})${ti.required ? ', required: true' : ''}` : '';
+    if (expr == null) return `${JSON.stringify(p)}: { ${simple ? `type: ${simple}` : ''}${typed} }`.replace('{ , ', '{ ').replace('{  }', '{}');
     let sample;
     try { sample = new Function(`return (${expr})`)(); } catch (_) { /* uses something only known at runtime */ }
-    if (typeof sample === 'function') return `${JSON.stringify(p)}: { type: Function, default: (${expr}) }`;
+    if (typeof sample === 'function') return `${JSON.stringify(p)}: { type: Function, default: (${expr})${typed} }`;
     const type = propType(sample);
-    return `${JSON.stringify(p)}: { ${type ? `type: ${type.name}, ` : ''}default: function () { return (${expr}); } }`;
+    return `${JSON.stringify(p)}: { ${type ? `type: ${type.name}, ` : ''}default: function () { return (${expr}); }${typed} }`;
   });
 
   // imports: other .kreft files become component references; .js modules load with import()
@@ -439,12 +443,15 @@ function addRouterTemplates(fns) {
   addHandler(fns, 'navigate($event)');
 }
 
-const STRUCTURAL = new Set(['if', 'elif', 'else', 'each', 'key', 'ref', 'skip', 'cloak', 'slot', 'empty', 'once', 'animate', 'waiting', 'failed']);
+const STRUCTURAL = new Set(['match', 'case', 'default', 'if', 'elif', 'else', 'each', 'key', 'ref', 'skip', 'cloak', 'slot', 'empty', 'once', 'animate', 'waiting', 'failed']);
 
 function collectExpressions(template, fns) {
   const html = prepareTemplate(template);
+  const subjects = []; // k-match subjects seen so far: a k-case is compared with one of them
   scanHtml(html, {
     attr(name, value) {
+      if (name === 'k-match') { const v = stripBrace(value); subjects.push(v); return addEval(fns, v); }
+      if (name === 'k-case') { const raw = stripBrace(value); for (const sub of subjects) addEval(fns, caseCond(sub, raw)); return; }
       if (name[0] === ':' || name === 'k-bind' || name.startsWith('k-bind:')) return addEval(fns, value);
       if (name[0] === '@' || name.startsWith('k-on:')) return addHandler(fns, stripBrace(value));
       if (name.startsWith('k-')) {

@@ -1,0 +1,8 @@
+<snippet>
+	<content><![CDATA[
+prop ${1:size}: ${2:'sm' | 'lg'} = ${3:'sm'}
+]]></content>
+	<tabTrigger>proptyped</tabTrigger>
+	<scope>text.html.kreft</scope>
+	<description>A prop with a type; a wrong value warns while you develop</description>
+</snippet>

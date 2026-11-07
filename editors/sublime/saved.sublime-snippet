@@ -1,0 +1,8 @@
+<snippet>
+	<content><![CDATA[
+saved ${1:name} = ${2:[]}
+]]></content>
+	<tabTrigger>saved</tabTrigger>
+	<scope>text.html.kreft</scope>
+	<description>A value kept after a reload (localStorage)</description>
+</snippet>

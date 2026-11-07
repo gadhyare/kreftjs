@@ -1,5 +1,5 @@
 /*!
- * Kreft v0.0.20-beta — reactive by nature
+ * Kreft v0.0.22-beta — reactive by nature
  * The .kreft component language (state · derive · action · when · watch · on),
  * { } views with k-if / k-each / k-model, components, slots, router, stores,
  * share / receive, event bus and a template engine.
@@ -1026,6 +1026,7 @@
         onceDepth++;
         try { return compile(el, scope, inst); } finally { onceDepth--; }
       }
+      if (el.hasAttribute('k-match')) return compileMatch(el, scope, inst); // becomes k-if / k-elif / k-else on its children
       if (el.hasAttribute('k-if')) return compileIf(el, scope, inst); // k-if is checked before k-each
       if (el.hasAttribute('k-elif') || el.hasAttribute('k-else')) {
         warn('k-elif / k-else has no k-if right before it.', el);
@@ -1060,6 +1061,157 @@
     compileElement(el, scope, inst, needAttrs, hasAnim, info);
   }
 
+  /* ---------- pipes: { price | currency:'EUR' | upper } ---------- */
+  // positions of `want` at the top level of an expression: not inside (), [], {}, strings or regular expressions.
+  // For '|' a lone bar only: `a || b` and `a |= b` are not pipes.
+  function topLevel(s, want) {
+    const hits = [];
+    let depth = 0, prev = '';
+    for (let i = 0; i < s.length; i++) {
+      const c = s[i];
+      if (c === '"' || c === "'" || c === '`') {
+        for (i++; i < s.length && s[i] !== c; i++) if (s[i] === '\\') i++;
+        prev = c;
+        continue;
+      }
+      if (c === '/' && s[i + 1] !== '/' && s[i + 1] !== '*' && (prev === '' || '(,=:?!&|{[;+-*%<>~^'.includes(prev))) { // a regular expression
+        let cls = false;
+        for (i++; i < s.length; i++) {
+          if (s[i] === '\\') i++;
+          else if (s[i] === '[') cls = true;
+          else if (s[i] === ']') cls = false;
+          else if (s[i] === '/' && !cls) break;
+        }
+        prev = '/';
+        continue;
+      }
+      if (c === '(' || c === '[' || c === '{') depth++;
+      else if (c === ')' || c === ']' || c === '}') depth--;
+      else if (depth === 0 && c === want && (want !== '|' || (s[i + 1] !== '|' && s[i - 1] !== '|' && s[i + 1] !== '='))) hits.push(i);
+      if (!/\s/.test(c)) prev = c;
+    }
+    return hits;
+  }
+  const cutAt = (s, cuts) => { const out = []; let from = 0; for (const i of cuts) { out.push(s.slice(from, i)); from = i + 1; } out.push(s.slice(from)); return out; };
+  const pipeCache = new Map();
+  // "price | currency:'EUR' | upper"  →  Kreftjs.__pipe("upper")(Kreftjs.__pipe("currency")((price), 'EUR'))
+  // A pipe is a function in your component (a local function wins) or one added with Kreftjs.pipe(name, fn).
+  function applyPipes(expr) {
+    if (typeof expr !== 'string' || expr.indexOf('|') < 0) return expr;
+    let r = pipeCache.get(expr);
+    if (r !== undefined) return r;
+    r = expr;
+    const cuts = topLevel(expr, '|');
+    if (cuts.length) {
+      const segs = cutAt(expr, cuts);
+      let code = '(' + segs[0].trim() + ')', ok = true;
+      for (const seg of segs.slice(1)) {
+        const m = /^\s*([A-Za-z_$][\w$]*)\s*([\s\S]*)$/.exec(seg);
+        if (!m) { ok = false; break; }
+        const name = m[1];
+        const rest = m[2].trim();
+        let args = '';
+        if (rest[0] === ':') args = cutAt(rest.slice(1), topLevel(rest.slice(1), ':')).map((a) => a.trim()).join(', ');
+        else if (rest[0] === '(' && rest[rest.length - 1] === ')') args = rest.slice(1, -1).trim();
+        else if (rest) { ok = false; break; }
+        code = `Kreftjs.__pipe(${JSON.stringify(name)}, typeof ${name} === "function" ? ${name} : null)(${code}${args ? ', ' + args : ''})`;
+      }
+      if (ok) r = code;
+    }
+    if (pipeCache.size > 5000) pipeCache.clear();
+    pipeCache.set(expr, r);
+    return r;
+  }
+  const pipes = Object.create(null);
+  const asText = (v) => (v == null ? '' : String(v));
+  // "2026-11-05 15:39:58" (a date from the Kreft database) has no time zone: the database stores UTC, so read it as UTC
+  const toDate = (v) => (v instanceof Date ? v : typeof v === 'string' && /^\d{4}-\d\d-\d\d \d\d:\d\d(:\d\d)?$/.test(v) ? new Date(v.replace(' ', 'T') + 'Z') : new Date(v));
+  Object.assign(pipes, {
+    upper: (v) => asText(v).toUpperCase(),
+    lower: (v) => asText(v).toLowerCase(),
+    capitalize: (v) => { const t = asText(v); return t.charAt(0).toUpperCase() + t.slice(1); },
+    trim: (v) => asText(v).trim(),
+    truncate: (v, n = 50, tail = '…') => { const t = asText(v); return t.length > n ? t.slice(0, Math.max(0, n)).trimEnd() + tail : t; },
+    currency: (v, code = 'USD') => (v == null || v === '' ? '' : formatCurrency(Number(v), code)),
+    number: (v, digits) => (v == null || v === '' ? '' : formatNumber(Number(v), digits && typeof digits === 'object' ? digits : digits == null ? undefined : { maximumFractionDigits: digits, minimumFractionDigits: digits })),
+    percent: (v, digits = 0) => (v == null || v === '' ? '' : formatNumber(Number(v), { style: 'percent', maximumFractionDigits: digits, minimumFractionDigits: digits })),
+    date: (v, style = 'medium') => (v == null || v === '' ? '' : formatDate(toDate(v), typeof style === 'object' ? style : { dateStyle: style })),
+    time: (v, style = 'short') => (v == null || v === '' ? '' : formatDate(toDate(v), typeof style === 'object' ? style : { timeStyle: style })),
+    ago: (v) => {
+      if (v == null || v === '') return '';
+      const secs = Math.round((toDate(v).getTime() - Date.now()) / 1000);
+      if (isNaN(secs)) return '';
+      const rtf = new Intl.RelativeTimeFormat(currentLocaleRef.value, { numeric: 'auto' });
+      const steps = [['year', 31536000], ['month', 2592000], ['day', 86400], ['hour', 3600], ['minute', 60]];
+      for (const [unit, size] of steps) if (Math.abs(secs) >= size) return rtf.format(Math.round(secs / size), unit);
+      return rtf.format(secs, 'second');
+    },
+    json: (v, indent = 2) => { try { return JSON.stringify(v, null, indent); } catch (_) { return String(v); } },
+    fallback: (v, d = '') => (v == null || v === '' ? d : v),
+    join: (v, sep = ', ') => (isArray(v) ? v.join(sep) : asText(v)),
+    first: (v, n) => (n == null ? (v == null ? v : v[0]) : (v || []).slice(0, n)),
+    last: (v, n) => (n == null ? (v == null ? v : v[v.length - 1]) : (v || []).slice(-n)),
+    slice: (v, a, b) => (v == null ? v : v.slice(a, b)),
+    reverse: (v) => (isArray(v) ? [...v].reverse() : [...asText(v)].reverse().join('')),
+    sortBy: (v, key, dir = 'asc') => (isArray(v) ? [...v].sort((x, y) => { const a = key ? x[key] : x, b = key ? y[key] : y; return (a > b ? 1 : a < b ? -1 : 0) * (dir === 'desc' ? -1 : 1); }) : v),
+    count: (v) => (v == null ? 0 : typeof v === 'object' && !isArray(v) ? Object.keys(v).length : v.length || 0),
+    bytes: (v) => {
+      let n = Number(v);
+      if (!isFinite(n)) return '';
+      const units = ['B', 'KB', 'MB', 'GB', 'TB'];
+      let u = 0;
+      while (Math.abs(n) >= 1024 && u < units.length - 1) { n /= 1024; u++; }
+      return (u ? n.toFixed(n < 10 ? 1 : 0) : n) + ' ' + units[u];
+    },
+  });
+  const definePipe = (name, fn) => { if (!isFunction(fn)) throw new Error(`Kreftjs.pipe("${name}", fn): fn must be a function.`); pipes[name] = fn; };
+  function lookupPipe(name, local) {
+    const f = local || pipes[name];
+    if (f) return f;
+    warn(`Unknown pipe "${name}". Use a function of your own named ${name}, or Kreftjs.pipe('${name}', fn).`);
+    return (v) => v;
+  }
+
+  /* ---------- prop types: prop size: 'sm' | 'lg' = 'sm' ---------- */
+  // TypeScript type text → (value) => boolean, or null when it can't be checked (your own type names, any)
+  function typeCheck(text) {
+    const members = cutAt(String(text), topLevel(String(text), '|')).map((t) => t.trim()).filter(Boolean);
+    if (!members.length) return null;
+    const checks = [];
+    for (const m of members) {
+      let c;
+      if (m === 'string') c = (v) => typeof v === 'string';
+      else if (m === 'number') c = (v) => typeof v === 'number' && !isNaN(v);
+      else if (m === 'boolean') c = (v) => typeof v === 'boolean';
+      else if (m === 'null') c = (v) => v === null;
+      else if (m === 'undefined' || m === 'void') c = (v) => v === undefined;
+      else if (m === 'true' || m === 'false') c = (v) => v === (m === 'true');
+      else if (m === 'object') c = (v) => v !== null && typeof v === 'object';
+      else if (m === 'Date') c = (v) => v instanceof Date;
+      else if (m === 'Function' || /=>/.test(m)) c = isFunction;
+      else if (/\[\]$/.test(m) || /^(?:readonly\s+)?Array\s*</.test(m) || /^\[/.test(m)) c = isArray;
+      else if (/^(?:Record|Partial|Map|Set)\s*</.test(m) || m[0] === '{') c = (v) => v !== null && typeof v === 'object';
+      else if (/^(['"`])[\s\S]*\1$/.test(m)) { const lit = m.slice(1, -1); c = (v) => v === lit; }
+      else if (/^-?\d+(?:\.\d+)?$/.test(m)) { const n = Number(m); c = (v) => v === n; }
+      else return null; // any, unknown, User, … : not checked
+      checks.push(c);
+    }
+    return (v) => checks.some((c) => c(v));
+  }
+  const simpleType = (t) => ({ string: String, number: Number, boolean: Boolean }[String(t).trim()]);
+  const describeValue = (v) => (v === null ? 'null' : isArray(v) ? 'an array' : typeof v === 'string' ? `"${v.length > 20 ? v.slice(0, 20) + '…' : v}"` : typeof v === 'object' ? 'an object' : typeof v + (typeof v === 'number' || typeof v === 'boolean' ? ' ' + v : ''));
+  function checkProp(comp, k, opt, v) {
+    if (opt.check && v !== undefined && !opt.check(v)) warn(`<${comp}> prop "${k}" should be ${opt.typeText}, but got ${describeValue(v)}.`);
+  }
+  function typedProp(opt, info) {
+    opt.typeText = info.type;
+    const chk = typeCheck(info.type);
+    if (chk) opt.check = chk;
+    if (info.required) opt.required = true;
+    if (!opt.type) { const t = simpleType(info.type); if (t) opt.type = t; }
+    return opt;
+  }
+
   /* ---------- { expr } interpolation ---------- */
   // "Hi {name}!" → [{ text: 'Hi ' }, { expr: 'name' }, { text: '!' }]; write \{ for a literal brace
   const interpCache = new Map();
@@ -1087,7 +1239,7 @@
         if (!expr) { buf += str.slice(i, end); i = end; continue; }
         if (buf) parts.push({ text: buf });
         buf = '';
-        parts.push({ expr });
+        parts.push({ expr: applyPipes(expr) });
         i = end;
         continue;
       }
@@ -1108,7 +1260,7 @@
   function exactBraceRaw(v) {
     const t = (v || '').trim();
     if (t[0] !== '{') return null;
-    try { return matchBrace(t, 0) === t.length ? t.slice(1, -1).trim() : null; } catch (_) { return null; }
+    try { return matchBrace(t, 0) === t.length ? applyPipes(t.slice(1, -1).trim()) : null; } catch (_) { return null; }
   }
   const stripBrace = (v) => { const e = exactBrace(v); return e != null ? e : v; };
   // "btn {active ? 'on' : ''}" → "`btn ${…}`"; null when there is nothing to interpolate
@@ -1789,6 +1941,41 @@
         while (n && n !== stop) { const next = n.nextSibling; p.insertBefore(n, b); n = next; }
       },
     };
+  }
+
+  /* ---------- k-match / k-case / k-default ---------- */
+  //   <div k-match="status">
+  //     <b k-case="'ok'">Fine</b>
+  //     <i k-case="'wait', 'queued'">Waiting</i>      several values: one of them
+  //     <u k-default>Unknown</u>
+  //   </div>
+  // The children turn into k-if / k-elif / k-else, so animations, components and templates work as they do there.
+  function caseCond(subject, raw) {
+    const list = cutAt(raw, topLevel(raw, ',')).map((v) => v.trim()).filter(Boolean);
+    return list.length > 1 ? `[${list.join(', ')}].includes(${subject})` : `(${subject}) === (${list[0] || 'undefined'})`;
+  }
+  function compileMatch(el, scope, inst) {
+    const subject = stripBrace(el.getAttribute('k-match'));
+    el.removeAttribute('k-match');
+    let started = false, fallback = null;
+    for (const child of [...el.children]) {
+      if (child.hasAttribute('k-case')) {
+        const raw = stripBrace(child.getAttribute('k-case'));
+        child.removeAttribute('k-case');
+        child.setAttribute(started ? 'k-elif' : 'k-if', caseCond(subject, raw));
+        started = true;
+      } else if (child.hasAttribute('k-default')) {
+        child.removeAttribute('k-default');
+        if (fallback) warn('k-match has more than one k-default; only the first is used.', child);
+        else fallback = child;
+      }
+    }
+    if (fallback) {
+      if (fallback.nextElementSibling) warn('k-default belongs last in k-match.', fallback);
+      if (started) { fallback.setAttribute('k-else', ''); el.appendChild(fallback); } // right after the last case
+      else fallback.setAttribute('k-if', 'true');
+    }
+    return compile(el, scope, inst);
   }
 
   /* ---------- k-if / k-elif / k-else ---------- */
@@ -2811,12 +2998,13 @@
         if (hasType(opt, Number) && v !== '' && !isNaN(v)) v = Number(v);
       } else if (hasOwn(extra, k)) { v = extra[k]; present = true; }
       props[k] = resolvePropValue(opt, v, present);
+      checkProp(def.__name || def.name || 'component', k, opt, props[k]);
       if (opt.required && !present) warn(`Missing required prop: "${k}"`);
     }
     for (const k in extra) if (!hasOwn(propsOptions, k)) attrs[k] = extra[k];
     dynamicProps.forEach(([k, expr]) => {
       if (!hasOwn(propsOptions, k)) return void dynamicAttrs.push([k, expr]);
-      renderEffect(() => { props[k] = resolvePropValue(propsOptions[k], evaluate(parentScope, expr, el), true); });
+      renderEffect(() => { props[k] = resolvePropValue(propsOptions[k], evaluate(parentScope, expr, el), true); checkProp(def.__name || def.name || 'component', k, propsOptions[k], props[k]); });
     });
     dynamicAttrs.forEach(([k, expr]) => renderEffect(() => { attrs[k] = evaluate(parentScope, expr, el); }));
     if (options.liveProps) renderEffect(() => { // props that follow the route (<kreft-view>)
@@ -3993,7 +4181,17 @@
     try { return parseKreftScriptInner(src, url); } finally { scanScript = false; }
   }
   function parseKreftScriptInner(src, url) {
-    const out = [], imports = [], props = {}, events = [];
+    const out = [], imports = [], props = {}, events = [], propTypes = {};
+    // `prop size: 'sm' | 'lg' = 'sm'` keeps its type, to warn when a parent sends something else
+    const notePropType = (lhs, hasDefault) => {
+      const c = lhs.indexOf(':');
+      if (c < 0) return;
+      const raw = lhs.slice(0, c).trim();
+      const name = raw.replace(/\?$/, '').trim();
+      const type = lhs.slice(c + 1).trim();
+      if (!type || !IDENT.test(name)) return;
+      propTypes[name] = { type, required: !hasDefault && !/\?$/.test(raw) && !/(?:^|[|\s])(?:null|undefined|any|unknown)(?:[|\s]|$)/.test(type) };
+    };
     const kw = /(prop|state|derive|derived|action|when|watch|on|use|share|receive|event|import|saved|load|layout|interface|type)(?![\w$])/y;
     let layout;
     // `saved` and `load` are keywords when followed by `name =` or `name: Type =`, so `load(…)` stays a normal call
@@ -4089,6 +4287,7 @@
           if (word === 'prop' && eq > 0) {
             const { name, value } = nameValue(j, end, 'prop');
             props[name] = value;
+            notePropType(text.slice(0, eq), true);
           } else if (word === 'use' && eq > 0) { // use mouse = trackMouse() or use mouse: MousePos = trackMouse()
             const { name, value } = nameValue(j, end, 'use');
             out.push(`$h.use(${JSON.stringify(name)}, () => (${value}));`);
@@ -4097,7 +4296,7 @@
             const colon = text.indexOf(':');
             const name = text.slice(0, colon).replace(/\?\s*$/, '').trim();
             if (!IDENT.test(name) && word !== 'event') fail(j, `Invalid name "${name}"`);
-            if (word === 'prop') props[name] = null;
+            if (word === 'prop') { props[name] = null; notePropType(text, false); }
             else events.push(name);
           } else {
             text.split(',').map((s) => s.trim()).filter(Boolean).forEach((rawN) => {
@@ -4194,7 +4393,7 @@
         fail(i, e.message);
       }
     }
-    return { code: out.join('\n'), imports, props, events, layout };
+    return { code: out.join('\n'), imports, props, propTypes, events, layout };
   }
 
   // a CSS file imported by a .kreft file: one <link> for the whole page, before the components' own styles
@@ -4451,6 +4650,7 @@
       code: parsed.code,
       imports: parsed.imports,
       props: parsed.props, // name → default expression (or null)
+      propTypes: parsed.propTypes, // name → { type, required } from `prop name: Type`
       events: parsed.events,
       layout: parsed.layout, // undefined: not said; false: none; or a name / path
       styles: styles.map((m) => ({ css: m[2], scoped: /\bscoped\b/.test(m[1] || '') })),
@@ -4483,11 +4683,14 @@
     const props = {};
     for (const p in sp.props) {
       const expr = sp.props[p];
-      if (expr == null) { props[p] = {}; continue; }
-      const make = new Function(`return (${expr})`);
-      let sample;
-      try { sample = make(); } catch (_) { /* default uses something only known later */ }
-      props[p] = isFunction(sample) ? { type: Function, default: sample } : { type: propType(sample), default: make };
+      if (expr == null) props[p] = {};
+      else {
+        const make = new Function(`return (${expr})`);
+        let sample;
+        try { sample = make(); } catch (_) { /* default uses something only known later */ }
+        props[p] = isFunction(sample) ? { type: Function, default: sample } : { type: propType(sample), default: make };
+      }
+      if (sp.propTypes && sp.propTypes[p]) typedProp(props[p], sp.propTypes[p]);
     }
 
     let scopeId = null;
@@ -5398,7 +5601,7 @@
     stores, storeLog, busLog,
   };
 
-  const VERSION = '0.0.20-beta';
+  const VERSION = '0.0.22-beta';
   const Kreftjs = {
     version: VERSION,
     // PUBLIC_ values from .env (kreft dev and kreft build put them here); never secrets
@@ -5450,6 +5653,8 @@
     choice: choiceTranslation, transChoice: choiceTranslation, trans_choice: choiceTranslation,
     hasTranslation,
     formatNumber, formatCurrency, formatDate,
+    // pipes: { price | currency }; add yours with Kreftjs.pipe('name', fn)
+    pipe: definePipe, pipes, __pipe: lookupPipe, __typeCheck: typeCheck,
     // reacting to changes
     watch, effect: watchEffect, tick: nextTick, onCleanup: onScopeDispose,
     // sharing data
@@ -5464,7 +5669,7 @@
 
   // the text-only helpers the build tool reuses, so built code matches the browser exactly
   Object.defineProperty(Kreftjs, '__internal', {
-    value: { expandBlocks, prepareTemplate, splitKreft, splitInterp, exactBrace, stripBrace, interpToExpr, quoteBraceAttrs, expandSelfClosing, scopeCss, hashString, propType, simplePathRE, fnExpRE, forAliasRE, makeKreftDef, compileFn, evaluate, stripTypeScript, stripTsParams },
+    value: { expandBlocks, prepareTemplate, splitKreft, splitInterp, exactBrace, stripBrace, interpToExpr, quoteBraceAttrs, expandSelfClosing, scopeCss, hashString, propType, typeCheck, caseCond, simplePathRE, fnExpRE, forAliasRE, makeKreftDef, compileFn, evaluate, stripTypeScript, stripTsParams },
   });
 
   if (typeof module !== 'undefined' && module.exports) module.exports = Kreftjs;

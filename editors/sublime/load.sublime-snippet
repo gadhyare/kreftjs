@@ -1,0 +1,8 @@
+<snippet>
+	<content><![CDATA[
+load ${1:posts} = api.get('${2:/api/posts}')
+]]></content>
+	<tabTrigger>load</tabTrigger>
+	<scope>text.html.kreft</scope>
+	<description>Load data: .data, .loading, .error</description>
+</snippet>

@@ -1,0 +1,8 @@
+<snippet>
+	<content><![CDATA[
+derive ${1:name} = ${2:expression}
+]]></content>
+	<tabTrigger>derive</tabTrigger>
+	<scope>text.html.kreft</scope>
+	<description>A value worked out from others</description>
+</snippet>

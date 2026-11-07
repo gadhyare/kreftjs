@@ -1,0 +1,8 @@
+<snippet>
+	<content><![CDATA[
+{ ${1:value} | ${2:upper} }
+]]></content>
+	<tabTrigger>pipe</tabTrigger>
+	<scope>text.html.kreft</scope>
+	<description>Pipe: upper, lower, capitalize, truncate:n, currency:'USD', number:2, percent, date, time, ago, bytes, join, fallback, json</description>
+</snippet>

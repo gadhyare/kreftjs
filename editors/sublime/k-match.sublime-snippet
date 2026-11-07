@@ -1,0 +1,12 @@
+<snippet>
+	<content><![CDATA[
+<div k-match="${1:value}">
+  <${2:b} k-case="${3:'a'}">${4:A}</${2:b}>
+  <${5:i} k-case="${6:'b', 'c'}">${7:B or C}</${5:i}>
+  <${8:u} k-default>${9:other}</${8:u}>
+</div>
+]]></content>
+	<tabTrigger>k-match</tabTrigger>
+	<scope>text.html.kreft</scope>
+	<description>Show the child whose k-case equals the value (k-default: none matched)</description>
+</snippet>

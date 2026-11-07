@@ -1,0 +1,10 @@
+<snippet>
+	<content><![CDATA[
+on ${1|start,ready,update,show,hide,destroy|} {
+  $0
+}
+]]></content>
+	<tabTrigger>on</tabTrigger>
+	<scope>text.html.kreft</scope>
+	<description>Lifecycle</description>
+</snippet>

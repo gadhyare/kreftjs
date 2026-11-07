@@ -1,0 +1,8 @@
+<snippet>
+	<content><![CDATA[
+k-case="${1:'value'}"
+]]></content>
+	<tabTrigger>k-case</tabTrigger>
+	<scope>text.html.kreft</scope>
+	<description>A branch of k-match; several values: k-case="'a', 'b'"</description>
+</snippet>

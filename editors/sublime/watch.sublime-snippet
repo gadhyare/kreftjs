@@ -1,0 +1,10 @@
+<snippet>
+	<content><![CDATA[
+watch ${1:value} {
+  $0
+}
+]]></content>
+	<tabTrigger>watch</tabTrigger>
+	<scope>text.html.kreft</scope>
+	<description>Run when a value changes (value, old)</description>
+</snippet>

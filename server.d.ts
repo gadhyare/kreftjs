@@ -79,6 +79,8 @@ export declare function response(body?: any, status?: number, headers?: Record<s
 export declare namespace response {
   function json(body: any, status?: number, headers?: Record<string, string>): Response
   function noContent(): Response
+  /** send a file with byte ranges (206), so video and audio can seek: return response.stream(path, { type?, download?, headers? }) */
+  function stream(file: string, options?: { type?: string; download?: boolean; headers?: Record<string, string> }): Response
 }
 export declare function noContent(): Response
 export declare function abort(status: number, message?: string): never
