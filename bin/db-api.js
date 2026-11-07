@@ -16,10 +16,14 @@
  * Which tables, and what each allows, comes from `tables` (kreftjs.config.json):
  *   { "posts": true, "users": { "write": false, "hidden": ["password"] }, "logs": false }
  * `kreft dev` shows every table unless you list them; `kreft serve` shows only the tables you list.
+ * Credential-looking columns (password, token, secret, hash, …) are hidden by default ("show": ["token"] opens one), and
+ * tables of sessions, tokens and jobs are only opened when named in the list.
  */
 const { validate } = require('../kreftjs.js'); // the same rules as Kreftjs.validate in the browser
 const MAX_BODY = 1024 * 1024;
 const MAX_ROWS = 1000;
+const SECRET_COL_RE = /(password|passwd|secret|token|api_?key|private_?key|recovery_?code|remember|two_factor|salt|hash)/i;
+const SECRET_TABLE_RE = /^(personal_access_tokens|password_reset_tokens|password_resets|sessions|failed_jobs|jobs|job_batches|cache|cache_locks)$/i;
 
 function createDbApi(db, { tables: allow = null, production = false, prefix = '/api', log = console } = {}) {
   const isProd = Boolean(production || process.env.APP_ENV === 'production' || process.env.NODE_ENV === 'production');
@@ -29,13 +33,17 @@ function createDbApi(db, { tables: allow = null, production = false, prefix = '/
     const out = new Map();
     for (const t of all) {
       if (t.name === 'kreft_migrations') continue;
+      // tables that hold logins, tokens or queued payloads are never shown by default, even by `kreft dev` with no list:
+      // only a table named in kreftjs.config.json is opened
+      if (SECRET_TABLE_RE.test(t.name) && !(allow && allow[t.name] != null && allow[t.name] !== false)) continue;
       let rules = allow ? allow[t.name] : true;
       if (rules == null || rules === false) continue;
       if (rules === true) rules = {};
       const write = rules.write === undefined ? true : rules.write;
       out.set(t.name, {
         ...t,
-        hidden: new Set(rules.hidden || []),
+        // columns that look like credentials are hidden unless "show": ["token"] lists them (a "hidden" list adds to them)
+        hidden: new Set([...t.columns.map((c) => c.name).filter((n) => SECRET_COL_RE.test(n) && !(rules.show || []).includes(n)), ...(rules.hidden || [])]),
         rules: rules.rules || null, // { "title": "required|min:3", "email": "required|email" }
         can: {
           read: rules.read !== false,

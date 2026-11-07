@@ -6,11 +6,15 @@
 //
 // An app or script that sends `device_name` when it logs in gets an API token in the answer instead:
 // Authorization: Bearer 5|k3J9…
-const { response, Str, Crypt, cookieSecure } = require('kreftjs/server')
+const { response, Str, Crypt, Hash, cookieSecure } = require('kreftjs/server')
 const PersonalAccessToken = require('../Models/PersonalAccessToken')
 
 const SESSION = 'kreft_session'
 const XSRF = 'XSRF-TOKEN'
+// The XSRF-TOKEN cookie is not a random value anyone could plant: it is derived from this login's secret token, so a
+// page on a sibling subdomain (or a script that can only set cookies) cannot make one that matches. Only a page that
+// can read this browser's cookie, i.e. your own, can send it back in X-XSRF-TOKEN.
+const xsrfFor = (sessionToken) => Hash.sha256('xsrf|' + sessionToken)
 const days = () => Number(process.env.AUTH_TOKEN_DAYS || 30)
 
 const resolveSecure = () => typeof cookieSecure === 'function' ? cookieSecure() : (process.env.SESSION_SECURE_COOKIE ? process.env.SESSION_SECURE_COOKIE === 'true' : (process.env.APP_ENV === 'production' || /^https:/i.test(process.env.APP_URL || '')))
@@ -57,7 +61,7 @@ async function signIn(req, user, { remember = false, status = 200 } = {}) {
     path: '/',
     maxAge: remember ? days() * 86400 : undefined,
   })
-  res.cookie(XSRF, Str.random(40), {
+  res.cookie(XSRF, xsrfFor(plainTextToken), {
     httpOnly: false,
     secure: isSecure,
     sameSite,
@@ -99,7 +103,7 @@ async function regenerate(req, res, user = null) {
     path: '/',
     maxAge: remember ? days() * 86400 : undefined,
   })
-  res.cookie(XSRF, Str.random(40), {
+  res.cookie(XSRF, xsrfFor(plainTextToken), {
     httpOnly: false,
     secure: isSecure,
     sameSite,
@@ -174,4 +178,4 @@ function browserName(ua) {
   return os ? `${b} on ${os}` : b
 }
 
-module.exports = { signIn, signOut, regenerate, pendingTwoFactor, readPendingTwoFactor, recordTwoFactorFailure, consumeTwoFactorTicket, browserName, SESSION, XSRF }
+module.exports = { xsrfFor, signIn, signOut, regenerate, pendingTwoFactor, readPendingTwoFactor, recordTwoFactorFailure, consumeTwoFactorTicket, browserName, SESSION, XSRF }

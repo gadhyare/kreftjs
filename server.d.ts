@@ -971,6 +971,23 @@ export declare function namespace(prefix: string): Record<string, any>
 export declare function startAutoGarbageCollector(options?: { thresholdMB?: number; intervalMs?: number; log?: boolean }): void
 export declare function stopAutoGarbageCollector(): void
 export declare function getMemoryStats(): { rssMB: number; heapTotalMB: number; heapUsedMB: number; externalMB: number; gcExposed: boolean }
+export interface MemoryAlert { type: 'memory-high' | 'memory-leak'; message: string; at: string; heapUsedMB: number; rssMB: number; [k: string]: any }
+export interface MemoryReport {
+  heapUsedMB: number; heapTotalMB: number; rssMB: number; externalMB: number; gcExposed: boolean
+  running: boolean; startedAt: string | null; checks: number; cleanups: number; gcRuns: number; v8Collections: number
+  reclaimedMB: number; evictedEntries: number; trendMBPerMin: number | null; overStreak: number
+  leak: { suspected: boolean; riseMB: number; floorsMB: number[] }
+  alerts: MemoryAlert[]; history: Array<{ t: number; heapUsedMB: number; rssMB: number }>; config: any
+}
+/** Everything a dashboard or alert needs, as plain JSON */
+export declare function getMemoryReport(): MemoryReport
+/** Register a cache cleaner: fn(fraction) drops that share of its least-used entries and returns how many went */
+export declare function onMemoryPressure(name: string, fn: (fraction: number) => number | void): () => void
+/** Called when memory stays high after cleaning, or a leak is suspected */
+export declare function onMemoryAlert(fn: (alert: MemoryAlert) => void): () => void
+/** Writes a V8 heap snapshot (open in Chrome DevTools > Memory); returns the file path */
+export declare function writeHeapSnapshot(file?: string): string
+export declare function checkMemory(): { action: string; [k: string]: any }
 
 /** Native Model Context Protocol (MCP) Server */
 export declare class McpServer {
@@ -981,6 +998,31 @@ export declare class McpServer {
   listenStdio(): void
 }
 export declare function getMcpServer(options?: { baseDir?: string }): McpServer
+
+/** Kreft Shield: SHIELD=true in .env limits and bans abusive addresses */
+export interface ShieldBan { ip: string; until: string; level: number; secondsLeft: number }
+export declare const Shield: {
+  enabled(): boolean
+  bans(): ShieldBan[]
+  ban(ip: string, minutes?: number, reason?: string): { ip: string; minutes: number; reason: string; until: string; level: number }
+  unban(ip: string): boolean
+  status(): { enabled: boolean; tracked: number; banned: number; blocked: number; limited: number; bans: number; eventLoopLagMs: number; overloaded: boolean; limits: Record<string, number> }
+  on(event: 'ban', fn: (info: { ip: string; minutes: number; reason: string; until: string; level: number }) => void): typeof Shield
+  off(event: 'ban', fn: (...a: any[]) => void): typeof Shield
+}
+
+/** MCP client (Streamable HTTP): call tools on a remote MCP server */
+export declare class McpClient {
+  constructor(url: string, options?: { headers?: Record<string, string>; timeout?: number })
+  server: any
+  connect(): Promise<this>
+  tools(): Promise<Array<{ name: string; description?: string; inputSchema?: any }>>
+  call(name: string, args?: Record<string, any>): Promise<any>
+  resources(): Promise<any[]>
+  readResource(uri: string): Promise<any>
+  close(): Promise<void>
+}
+export declare const Mcp: { connect(url: string, options?: { headers?: Record<string, string>; timeout?: number }): Promise<McpClient> }
 
 export interface CleanHtmlOptions {
   allowedTags?: string[]

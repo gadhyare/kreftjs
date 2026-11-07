@@ -262,7 +262,9 @@ class ${name} {
   // POST /api/${plural(snake(model))}
   async store(req) {
     // const data = await req.validate({ title: 'required|max:200' })
-    const data = req.all()
+    // only the columns listed in static fillable on the model are taken: never req.all(), or a visitor could send
+    // { "is_admin": true } and have it saved
+    const data = req.only(...(${model}.fillable || abort(500, 'Set static fillable on the ${model} model first (the columns a visitor may fill).')))
     // if (data.title && !data.slug) data.slug = await slug.unique(${model}, 'slug', data.title)
     return response(await ${model}.create(data), 201)
   }
@@ -276,7 +278,7 @@ class ${name} {
   async update(req, id) {
     const ${snake(model)} = await ${model}.findOrFail(id)
     // const data = await req.validate({ title: 'sometimes|required|max:200' })
-    const data = req.all()
+    const data = req.only(...(${model}.fillable || abort(500, 'Set static fillable on the ${model} model first (the columns a visitor may fill).')))
     return ${snake(model)}.update(data)
   }
 

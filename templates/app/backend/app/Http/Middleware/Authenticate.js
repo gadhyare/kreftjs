@@ -5,7 +5,7 @@ const { abort, Hash, Str, Crypt, response, cookieSecure } = require('kreftjs/ser
 const crypto = require('crypto')
 const PersonalAccessToken = require('../../Models/PersonalAccessToken')
 const User = require('../../Models/User')
-const { SESSION, XSRF } = require('../../Auth/Session')
+const { SESSION, XSRF, xsrfFor } = require('../../Auth/Session')
 
 const SAFE = ['GET', 'HEAD', 'OPTIONS']
 const NEEDS = { GET: 'read', HEAD: 'read', OPTIONS: 'read', POST: 'create', PUT: 'update', PATCH: 'update', DELETE: 'delete' }
@@ -41,8 +41,11 @@ class Authenticate {
       abort(401, 'Unauthenticated.', extra)
     }
 
-    // a cookie login must prove the page is ours for every change: X-XSRF-TOKEN = the XSRF-TOKEN cookie
-    if (fromCookie && !SAFE.includes(req.method) && !same(req.header('x-xsrf-token'), req.cookie(XSRF))) {
+    // a cookie login must prove the page is ours for every change: X-XSRF-TOKEN must be the value made from this login's
+    // secret (Session.xsrfFor), which the XSRF-TOKEN cookie carries. A planted cookie is not enough, as it would be if
+    // the header only had to equal the cookie.
+    const expectedXsrf = fromCookie ? xsrfFor(sessionPayload) : null
+    if (fromCookie && !SAFE.includes(req.method) && !same(req.header('x-xsrf-token'), expectedXsrf)) {
       abort(419, 'CSRF token mismatch. Reload the page and try again.')
     }
 
@@ -76,7 +79,7 @@ class Authenticate {
     req.accessToken = token
     const res = await next(req)
     // a cookie login without the XSRF cookie (cleared, or an old browser): give it a new one
-    if (fromCookie && !req.cookie(XSRF)) res.cookie(XSRF, Str.random(40), { httpOnly: false, secure: cookieSecure(), sameSite: process.env.SESSION_SAME_SITE || 'Lax', path: '/', maxAge: token.remember ? days * 86400 : undefined })
+    if (fromCookie && req.cookie(XSRF) !== expectedXsrf) res.cookie(XSRF, expectedXsrf, { httpOnly: false, secure: cookieSecure(), sameSite: process.env.SESSION_SAME_SITE || 'Lax', path: '/', maxAge: token.remember ? days * 86400 : undefined })
     return res
   }
 }

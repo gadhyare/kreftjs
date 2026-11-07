@@ -159,6 +159,23 @@ class McpServer {
       };
     });
 
+    // 3b. Tool: memory_report - GC runs, evictions, trend, leak suspicion, alerts, recent samples
+    this.registerTool('memory_report', {
+      description: 'Memory Manager report: heap trend, GC and cache-eviction counts, leak suspicion, recent alerts and samples.',
+      inputSchema: { type: 'object', properties: {} },
+    }, async () => ({
+      content: [{ type: 'text', text: JSON.stringify(require('./gc.js').getMemoryReport(), null, 2) }],
+    }));
+
+    // 3c. Tool: shield_status - the abuse shield: banned addresses, counters, limits
+    this.registerTool('shield_status', {
+      description: 'Kreft Shield (SHIELD=true): whether it is on, its limits, counters, event-loop lag and the currently banned addresses.',
+      inputSchema: { type: 'object', properties: {} },
+    }, async () => {
+      const { Shield } = require('./shield.js');
+      return { content: [{ type: 'text', text: JSON.stringify({ ...Shield.status(), bans: Shield.bans() }, null, 2) }] };
+    });
+
     // 4. Resource: kreft://routes
     const routesResource = async () => {
       const { Route } = require('./index.js');

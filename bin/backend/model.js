@@ -255,6 +255,17 @@ class ModelBuilder extends Builder {
   async restore() { const M = this._model; const b = this.clone(); b._trashed = 'only'; return Builder.prototype.update.call(b, { [M.deletedAtColumn]: null }); }
 }
 
+// A model with no `static fillable` lets create()/update() set every column but `id`. If the data came from a request,
+// a visitor could send { "is_admin": true } or { "role": "admin" }. Say so once per model and column.
+const PRIVILEGE_KEY_RE = /^(is_?admin|is_?super_?user|is_?staff|is_?owner|role|roles|role_?id|permissions?|remember_token|api_token|email_verified_at)$/i;
+const warnedFill = new Set();
+function warnPrivilegeFill(C, key) {
+  const id = (C.name || C.table) + '.' + key;
+  if (warnedFill.has(id)) return;
+  warnedFill.add(id);
+  console.warn(`  [Kreft Security] ${C.name || C.table}.${key} is being mass-assigned and the model has no static fillable. If this value can come from a request, a visitor could set it themselves. List the allowed columns in static fillable (or add '${key}' to static guarded); use forceFill() where you really mean it.`);
+}
+
 /* ------------------------------------------------------------------ the model */
 class Model {
   // ---- settings a model can change
@@ -415,7 +426,10 @@ class Model {
     for (const [k, v] of Object.entries(attributes)) {
       if (BAD_KEYS.has(k)) continue;
       const allowed = C.fillable ? C.fillable.includes(k) : !(C.guarded || []).includes(k) && !(C.guarded || []).includes('*');
-      if (allowed) this.setAttribute(k, v);
+      if (allowed) {
+        if (!C.fillable && PRIVILEGE_KEY_RE.test(k)) warnPrivilegeFill(C, k);
+        this.setAttribute(k, v);
+      }
     }
     return this;
   }

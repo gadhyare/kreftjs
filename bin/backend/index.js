@@ -449,6 +449,8 @@ module.exports = {
   QR: require('./qr.js').QR,
   ...require('./gc.js'),
   ...require('./mcp.js'),
+  ...require('./mcp-client.js'), // Mcp.connect(url), McpClient
+  ...require('./shield.js'),     // Shield: SHIELD=true in .env limits and bans abusive addresses
   ...require('./config.js'), // config, Config, ConfigRepository
   ...require('./html.js'),   // cleanHtml, sanitizeHtml, stripTags, escapeHtml, e, unescapeHtml, SafeHtml, html
   // for the kreftjs command

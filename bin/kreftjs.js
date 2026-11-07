@@ -1035,6 +1035,8 @@ async function devServer(args, { production = false } = {}) {
 
   const server = http.createServer(async (req, res) => {
     try {
+      // SHIELD=true in .env: rate limits, bans and load shedding per visitor address (see backend/shield.js)
+      if (require('./backend/shield.js').Shield.guard(req, res)) return;
       if (loopbackBind && !isLocalName(hostOnly(req.headers.host)) && !allowedHosts.has(hostOnly(req.headers.host))) {
         res.writeHead(403, { 'Content-Type': 'text/plain; charset=utf-8' });
         return res.end(`Blocked: this server only answers localhost. To reach it by the name "${hostOnly(req.headers.host)}", start it with KREFT_ALLOWED_HOSTS=${hostOnly(req.headers.host)} (or --host 0.0.0.0 to share it on your network).`);
@@ -1153,6 +1155,7 @@ async function devServer(args, { production = false } = {}) {
 
   // if the port is taken (another server is still running), try the next one
   let tries = 0;
+  require('./backend/shield.js').Shield.watch(server); // SHIELD=true: caps open connections per address
   server.on('error', (err) => {
     if (err.code === 'EADDRINUSE' && tries < 20) {
       console.log(`  Port ${port + tries} is already in use by another program, trying ${port + tries + 1}…`);

@@ -1276,6 +1276,8 @@ class Post extends Model {
 module.exports = Post
 ```
 
+**Always set `static fillable`.** Without it a model lets `create()` and `update()` set every column except `id`, so `Post.create(req.all())` would save `{ "is_admin": true }` from a visitor. The controllers made by `kreft make:controller --model` read only the `fillable` columns (`req.only(...Model.fillable)`) and stop with an error until you set it. Kreft prints a warning when a model without `fillable` is given a privilege-looking column (`is_admin`, `role`, `permissions` …).
+
 The table is the plural of the class name (`Post` is `posts`); set `static table = '…'` for another one.
 
 ### Querying
@@ -2165,9 +2167,75 @@ curl -H "Authorization: Bearer a-long-random-secret" -d '{"jsonrpc":"2.0","id":1
 > [!WARNING]
 > The MCP database tool can still read every other table. Use a database account with read-only access and no access to credentials, and keep the token out of version control.
 
+### Calling other MCP servers (client)
+
+Your app can also call tools on a remote MCP server over Streamable HTTP:
+
+```js
+const { Mcp } = require('kreftjs/server')
+
+const quran = await Mcp.connect('https://mcp.quran.ai')   // { headers: { Authorization: 'Bearer …' } } if needed
+const tools = await quran.tools()
+const verses = await quran.call('fetch_quran', { ayahs: '1:1-2' })
+await quran.close()
+```
+
+`call` returns the structured result (or the text, parsed as JSON when possible) and throws if the tool reports an error. Only `http(s)` URLs are accepted, redirects are refused, and a response over `maxBytes` (10 MB) is cut off. Never pass a URL a visitor typed: your server would fetch addresses of their choosing, including your internal network (SSRF). Use a fixed or allow-listed URL.
+
+## Kreft Shield
+
+Floods and scanners from one address can slow a server to a crawl. Turn on the Shield with one line in `.env` (changes apply without a restart):
+
+```
+SHIELD=true
+```
+
+For every visitor address (the same `req.ip()` that `throttle` uses, so set `TRUSTED_PROXIES` behind a proxy):
+
+| Protection | Default | Setting |
+|---|---|---|
+| Rate limit: over the limit answers `429` with `Retry-After` | 300 requests in 10 s | `SHIELD_MAX_REQUESTS`, `SHIELD_WINDOW_SEC` |
+| Probing counts more: `401`, `403`, `404` and `405` answers weigh 5 requests | 5 | `SHIELD_ERROR_WEIGHT` |
+| Concurrency: requests in flight at once from one address | 60 | `SHIELD_MAX_CONCURRENT` |
+| Ban: this many rate-limit hits within the strike window | 3 hits in 10 min | `SHIELD_STRIKES`, `SHIELD_STRIKE_WINDOW_MIN` |
+| Ban length, doubling at every repeat up to 24 h | 15 min | `SHIELD_BAN_MINUTES` |
+| Connections: open sockets from one address; extra ones are closed (stops slowloris floods that never finish a request) | 100 | `SHIELD_MAX_CONNECTIONS` |
+| Overload: when the event loop lags, limits shrink to a quarter | 300 ms lag | `SHIELD_MAX_LAG_MS` |
+
+IPv6 visitors are counted by their `/64` prefix, because one customer owns billions of addresses in it and could otherwise rotate through them.
+
+**Behind nginx, Caddy or a CDN, set `TRUSTED_PROXIES`.** Without it every visitor looks like the proxy: all users would share one limit and one ban, and a proxy on the same computer (`127.0.0.1`) is never limited at all. The Shield prints a warning when it sees `X-Forwarded-For` from an address that is not trusted.
+
+Never limited: addresses in `SHIELD_ALLOW="1.2.3.4,5.6.7.8"` and this computer (`127.0.0.1`, `::1`), unless `SHIELD_LOCAL=true` (use it to try the Shield on your own machine). A banned address is answered with a bare `429` before any work is done.
+
+```js
+const { Shield } = require('kreftjs/server')
+Shield.on('ban', (b) => Log.warning(`banned ${b.ip} for ${b.minutes} min: ${b.reason}`))
+Shield.bans()            // who is banned now
+Shield.unban('1.2.3.4')  // let an address back in
+Shield.ban('1.2.3.4', 60)
+Shield.status()          // counters, limits, event-loop lag
+```
+
+The MCP tool `shield_status` returns the same. Bans are kept in memory, so a restart clears them. The Shield protects the application; a flood that fills your network connection has to be stopped by a firewall or a CDN in front of the server.
+
 ## Memory watchdog
 
 Long-running servers can slowly collect memory. Start with `--gc` (or `AUTO_GC=1`) and Kreft samples the heap every 30 seconds (`AUTO_GC_INTERVAL_MS`). When it passes `AUTO_GC_THRESHOLD_MB`, Kreft clears its own caches and runs garbage collection. This is a safety net; find the leak if you see it often.
+
+The watchdog is a small memory manager:
+
+- **Adaptive.** A cleanup also runs when the heap keeps growing (more than `AUTO_GC_GROWTH_MB_PER_MIN`, default 20) while already above 60% of the threshold, not only after it passes the limit.
+- **Least-used first.** The in-memory cache (`CACHE_STORE=memory`) keeps at most `CACHE_MEMORY_MAX` entries (default 5000) and, under pressure, drops expired and least recently used entries instead of everything. Register your own cache with `onMemoryPressure('name', (fraction) => dropped)`.
+- **Leak hint.** After each real GC (needs `--gc`) Kreft records the heap that remains. If it keeps rising by `AUTO_GC_LEAK_RISE_MB` (default 20) over several collections, it reports a suspected leak. `writeHeapSnapshot()` saves a `.heapsnapshot` for Chrome DevTools to show what holds the memory.
+- **Alerts.** `onMemoryAlert((alert) => …)` is called when memory is still high after `AUTO_GC_ALERT_AFTER` cleanups in a row (default 3), or a leak is suspected, at most once per 10 minutes. Without a listener the alert is printed as a warning.
+- **Report.** `getMemoryReport()` returns the samples, trend, GC and eviction counts, leak state and alerts as JSON; the MCP tool `memory_report` returns the same.
+
+```js
+const { getMemoryReport, onMemoryAlert } = require('kreftjs/server')
+onMemoryAlert((a) => Log.warning(a.message))
+Route.get('/admin/memory', () => getMemoryReport()).middleware('auth')
+```
 
 # Security
 
