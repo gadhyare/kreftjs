@@ -1,0 +1,185 @@
+<!-- Every edge component and every native call, live. Open /edge. Copy what you need into your own pages. -->
+use edge
+
+state tab = 'layout'
+state tabs = [{ label: 'Layout', value: 'layout' }, { label: 'Inputs', value: 'inputs' }, { label: 'Display', value: 'display' }, { label: 'Overlays', value: 'overlays' }, { label: 'Native', value: 'native' }]
+
+// inputs
+state name = ''
+state pw = ''
+state agree = false
+state notify = true
+state volume = 40
+state plan = 'free'
+state country = ''
+state period = 'week'
+state chip = true
+// display
+state progress = 35
+state page = 0
+state acc = false
+state tab2 = 'all'
+state refreshing = false
+state photos = Array.from({ length: 60 }, (_, i) => ({ id: i, hue: (i * 37) % 360 }))
+state rows = Array.from({ length: 5000 }, (_, i) => 'Row ' + (i + 1))
+state deals = [{ name: 'Free delivery', c: '#2563eb' }, { name: '2 for 1 today', c: '#16a34a' }, { name: 'New arrivals', c: '#d97706' }, { name: 'Members only', c: '#9333ea' }]
+// overlays
+state modal = false
+state sheet = false
+state drawer = false
+state fabHidden = false
+state picked = 'nothing yet'
+// native
+state info = ''
+state net = ''
+state safe = ''
+state log = ''
+
+action drawBars(p) {
+  const { ctx, width, height } = p
+  const n = 12
+  for (let i = 0; i < n; i++) {
+    const h = (0.3 + 0.7 * Math.abs(Math.sin(i * 0.9 + progress / 10))) * (height - 20)
+    ctx.fillStyle = 'hsl(' + (i * 28) + ' 70% 55%)'
+    ctx.fillRect(10 + i * ((width - 20) / n), height - 10 - h, (width - 20) / n - 6, h)
+  }
+}
+action reload() { refreshing = true; setTimeout(() => { refreshing = false; Kreftjs.native.dialog.toast('Updated') }, 1200) }
+action showInfo() { Kreftjs.native.device.info().then((i) => { info = i.platform + ' · ' + i.operatingSystem + ' ' + (i.osVersion || '') + ' · ' + (i.model || '') + ' · ' + i.screen.width + 'x' + i.screen.height }) }
+action showNet() { Kreftjs.native.system.network().then((n) => { net = (n.connected ? 'online' : 'offline') + ' (' + n.connectionType + ')' }) }
+action showSafe() { const s = Kreftjs.native.safeArea(); safe = 'top ' + s.top + ' · bottom ' + s.bottom + ' · left ' + s.left + ' · right ' + s.right }
+action ask() { Kreftjs.native.dialog.confirm('Delete this item?', { title: 'Delete', ok: 'Delete', danger: true }).then((v) => { log = 'confirm → ' + v }) }
+action askText() { Kreftjs.native.dialog.prompt('Your name?', { title: 'Hello', placeholder: 'Name' }).then((v) => { log = 'prompt → ' + v }) }
+action sheetOpts() { Kreftjs.native.dialog.actionSheet({ title: 'Photo', options: [{ label: 'Take photo', value: 'cam' }, { label: 'Choose from library', value: 'lib' }, { label: 'Remove', value: 'rm', danger: true }] }).then((v) => { log = 'sheet → ' + v }) }
+action pickFile() { Kreftjs.native.file.pick({ accept: 'image/*' }).then((f) => { log = f.length ? 'file → ' + f[0].name + ' (' + f[0].size + ' bytes)' : 'no file' }) }
+action where() { Kreftjs.native.position.get().then((p) => { log = p ? 'position → ' + p.coords.latitude.toFixed(4) + ', ' + p.coords.longitude.toFixed(4) : 'position not available' }) }
+action recolor() { edge.setTop({ bg: '#111827', color: '#ffffff' }); edge.setBottom({ bg: '#111827', color: '#9ca3af', activeColor: '#ffffff', indicator: 'line' }) }
+action floatBar() { edge.setBottom({ floating: true, labels: 'active', indicator: 'pill' }) }
+action actions() { edge.setTop({ title: 'Components', center: true, right: [{ icon: 'search', id: 'search', onTap: () => Kreftjs.native.dialog.toast('Search') }, { icon: 'bell', id: 'bell', badge: 3, onTap: () => Kreftjs.native.dialog.toast('3 new') }] }) }
+action plain() { edge.reset(); edge.setBottom({ items: edge.bottom.items }) }
+
+on ready { edge.setTop({ title: 'Components' }) }
+
+<view>
+  <div class="gal">
+    <edge-tab-row k-model="tab" tabs={tabs} fill></edge-tab-row>
+
+    <section k-if="tab === 'layout'" class="sec">
+      <h3>Row, Column, Spacer, Divider</h3>
+      <edge-row gap={8}><edge-shape shape="circle" size={36}>A</edge-shape><edge-text weight={700}>Title</edge-text><edge-spacer></edge-spacer><edge-badge value={5}></edge-badge></edge-row>
+      <edge-divider></edge-divider>
+      <edge-column gap={4}><edge-text size="sm" muted>First line</edge-text><edge-text size="sm" muted>Second line</edge-text></edge-column>
+      <edge-divider label="or"></edge-divider>
+      <h3>Stack</h3>
+      <edge-stack align="end" height={90}><edge-shape shape="rounded" width={300} height={90} color="#2563eb"></edge-shape><edge-chip label="On top"></edge-chip></edge-stack>
+      <h3>Text and Icon</h3>
+      <edge-row><edge-icon name="home"></edge-icon><edge-icon name="heart" color="#dc2626"></edge-icon><edge-icon name="star" size={32} color="#d97706"></edge-icon><edge-icon text="🚀" size={28}></edge-icon></edge-row>
+      <edge-text size="xl" weight={800}>Big text</edge-text>
+      <edge-text lines={2} muted>A long paragraph that is cut after two lines with three dots at the end so lists stay tidy and even. A long paragraph that is cut after two lines.</edge-text>
+      <h3>Image</h3>
+      <edge-image src="logo-mark.svg" alt="Logo" ratio="16/9" radius={12} placeholder="#f4f4f5"></edge-image>
+      <h3>List</h3>
+      <edge-list inset items={[{ title: 'Profile', subtitle: 'Name and photo', icon: 'user', to: '/' }, { title: 'Notifications', icon: 'bell', badge: 2 }, { title: 'Version', icon: 'info', right: '1.0.0' }]}></edge-list>
+      <h3>Scroll view (sideways)</h3>
+      <edge-scroll-view horizontal snap hideBar><edge-chip k-each="n in 12" label={'Chip ' + n}></edge-chip></edge-scroll-view>
+      <h3>Lazy grid (adds items as you scroll)</h3>
+      <edge-lazy-grid items={photos} columns={3} gap={6} step={9}>
+        <template k-slot:item="{ item }"><edge-shape shape="rect" width={90} height={90} color={'hsl(' + item.hue + ' 70% 60%)'}>{item.id}</edge-shape></template>
+      </edge-lazy-grid>
+    </section>
+
+    <section k-if="tab === 'inputs'" class="sec">
+      <edge-column gap={16}>
+        <edge-text-input k-model="name" label="Name" placeholder="Your name" icon="user" clearable hint="Shown on your profile"></edge-text-input>
+        <edge-text-input k-model="pw" label="Password" type="password" icon="lock" error={pw && pw.length < 6 ? 'At least 6 characters' : ''}></edge-text-input>
+        <edge-select k-model="country" label="Country" placeholder="Choose…" options={['Somalia', 'Kenya', 'Ethiopia', 'Djibouti']}></edge-select>
+        <edge-checkbox k-model="agree" label="I agree to the terms"></edge-checkbox>
+        <edge-toggle k-model="notify" label="Notifications"></edge-toggle>
+        <edge-slider k-model="volume" label="Volume" showValue></edge-slider>
+        <edge-radio-group k-model="plan" options={[{ label: 'Free', value: 'free', subtitle: '0 per month' }, { label: 'Pro', value: 'pro', subtitle: '9 per month' }]}></edge-radio-group>
+        <edge-button-group k-model="period" options={[{ label: 'Day', value: 'day' }, { label: 'Week', value: 'week' }, { label: 'Month', value: 'month' }]}></edge-button-group>
+        <edge-row wrap><edge-chip label="Selected" selected={chip} @click="chip = !chip"></edge-chip><edge-chip label="Closable" closable tone="accent"></edge-chip></edge-row>
+        <edge-button label="Filled" icon="check" full @click="Kreftjs.native.dialog.toast('Saved', { tone: 'success' })"></edge-button>
+        <edge-row><edge-button label="Tonal" variant="tonal"></edge-button><edge-button label="Outline" variant="outline"></edge-button><edge-button label="Text" variant="text"></edge-button></edge-row>
+        <edge-row><edge-button label="Delete" variant="danger" size="sm"></edge-button><edge-button label="Loading" loading></edge-button></edge-row>
+        <p class="muted">name: {name || '—'} · agree: {agree} · notify: {notify} · volume: {volume} · plan: {plan} · country: {country || '—'} · period: {period}</p>
+      </edge-column>
+    </section>
+
+    <section k-if="tab === 'display'" class="sec">
+      <edge-column gap={16}>
+        <edge-progress-bar value={progress} label="Upload" showValue></edge-progress-bar>
+        <edge-progress-bar indeterminate></edge-progress-bar>
+        <edge-slider k-model="progress" label="Change the progress"></edge-slider>
+        <edge-row gap={16}><edge-activity-indicator></edge-activity-indicator><edge-shape shape="triangle" size={40} color="#16a34a"></edge-shape><edge-shape shape="hexagon" size={40} color="#9333ea"></edge-shape><edge-shape shape="star" size={40} color="#d97706"></edge-shape><edge-shape shape="pill" width={70} height={32} color="#dc2626"></edge-shape></edge-row>
+        <h3>Canvas</h3>
+        <edge-canvas height={140} redraw={progress} @draw="drawBars($event)"></edge-canvas>
+        <h3>Carousel</h3>
+        <edge-carousel items={deals} peek={40}><template k-slot:item="{ item }"><div class="deal" :style="{ background: item.c }">{item.name}</div></template></edge-carousel>
+        <h3>Pager</h3>
+        <edge-pager k-model="page" height={120}><div class="pg a">One</div><div class="pg b">Two</div><div class="pg c">Three</div></edge-pager>
+        <p class="muted">page {page + 1}</p>
+        <h3>Tab row and Accordion</h3>
+        <edge-tab-row k-model="tab2" tabs={[{ label: 'All', value: 'all' }, { label: 'Unread', value: 'unread', badge: 3 }, { label: 'Starred', value: 'star' }]}></edge-tab-row>
+        <edge-accordion items={[{ title: 'Shipping', body: 'Free over 50 in two to four days.' }, { title: 'Returns', body: '30 days, no questions.' }]} single></edge-accordion>
+        <h3>Virtual list (5000 rows)</h3>
+        <div class="box"><edge-virtual-list items={rows} itemHeight={44} height={220}><template k-slot:item="{ item, index }"><div class="vrow">{item}</div></template></edge-virtual-list></div>
+        <h3>Pull to refresh</h3>
+        <div class="box"><edge-refreshable refreshing={refreshing} height={140} @refresh="reload()"><div class="pad">Pull this box down on a touch screen.<br>Rows below.<br>One<br>Two<br>Three<br>Four<br>Five<br>Six</div></edge-refreshable></div>
+        <h3>Pressable and gesture area</h3>
+        <edge-pressable feedback="scale" haptics @press="log = 'pressed'" @longpress="log = 'long pressed'"><div class="card">Press or hold me</div></edge-pressable>
+        <edge-gesture-area @swipeleft="log = 'swiped left'" @swiperight="log = 'swiped right'" @doubletap="log = 'double tap'"><div class="card">Swipe left or right, or double tap</div></edge-gesture-area>
+        <p class="muted">{log}</p>
+      </edge-column>
+    </section>
+
+    <section k-if="tab === 'overlays'" class="sec">
+      <edge-column gap={12}>
+        <edge-button label="Open modal" @click="modal = true"></edge-button>
+        <edge-button label="Open bottom sheet" variant="tonal" @click="sheet = true"></edge-button>
+        <edge-button label="Open side menu" variant="tonal" @click="drawer = true"></edge-button>
+        <edge-row><edge-menu items={[{ label: 'Edit', icon: 'edit', value: 'edit' }, { label: 'Share', icon: 'share', value: 'share' }, { divider: true }, { label: 'Delete', icon: 'trash', value: 'delete', danger: true }]} @select="picked = $event.label"><edge-button label="Menu" variant="outline" icon="more"></edge-button></edge-menu><edge-menu sheet items={[{ label: 'One' }, { label: 'Two' }]} @select="picked = $event.label"><edge-button label="As sheet" variant="outline"></edge-button></edge-menu></edge-row>
+        <p class="muted">picked: {picked}</p>
+        <edge-button label="Hide / show the + button" variant="text" @click="fabHidden = !fabHidden"></edge-button>
+        <h3>Web view</h3>
+        <edge-web-view src="docs/" height={180}></edge-web-view>
+      </edge-column>
+      <edge-fab icon="plus" hidden={fabHidden} @click="Kreftjs.native.dialog.toast('Add')"></edge-fab>
+      <edge-modal k-model="modal" title="Modal"><p>A dialog over the page. Tap outside, press Esc or the back button to close.</p><template k-slot:footer><edge-button label="Close" variant="tonal" @click="modal = false"></edge-button></template></edge-modal>
+      <edge-bottom-sheet k-model="sheet" title="Bottom sheet"><p>Drag the handle down to close.</p><edge-list items={[{ title: 'Message', icon: 'mail' }, { title: 'Copy link', icon: 'link' }]}></edge-list></edge-bottom-sheet>
+      <edge-side-nav k-model="drawer" title="Menu" items={[{ label: 'Home', icon: 'home', to: '/' }, { label: 'Components', icon: 'grid', to: '/edge' }, { label: 'Docs', icon: 'book', to: '/docs' }]}></edge-side-nav>
+    </section>
+
+    <section k-if="tab === 'native'" class="sec">
+      <edge-column gap={10}>
+        <h3>Bars (top and bottom stay fixed)</h3>
+        <edge-row wrap><edge-button label="Dark colours" size="sm" variant="tonal" @click="recolor()"></edge-button><edge-button label="Floating bar" size="sm" variant="tonal" @click="floatBar()"></edge-button><edge-button label="Top actions" size="sm" variant="tonal" @click="actions()"></edge-button><edge-button label="Reset" size="sm" variant="outline" @click="plain()"></edge-button></edge-row>
+        <h3>Device and system</h3>
+        <edge-button label="Device info" variant="outline" icon="phone" @click="showInfo()"></edge-button><p class="muted">{info}</p>
+        <edge-button label="Network" variant="outline" icon="wifi" @click="showNet()"></edge-button><p class="muted">{net}</p>
+        <edge-button label="Safe area" variant="outline" icon="grid" @click="showSafe()"></edge-button><p class="muted">{safe}</p>
+        <h3>Haptics</h3>
+        <edge-row wrap><edge-button label="Light" size="sm" variant="tonal" @click="Kreftjs.native.haptics.impact('light')"></edge-button><edge-button label="Heavy" size="sm" variant="tonal" @click="Kreftjs.native.haptics.impact('heavy')"></edge-button><edge-button label="Success" size="sm" variant="tonal" @click="Kreftjs.native.haptics.notification('success')"></edge-button></edge-row>
+        <h3>Dialogs</h3>
+        <edge-row wrap><edge-button label="Alert" size="sm" variant="tonal" @click="Kreftjs.native.dialog.alert('Saved!', { title: 'Done' })"></edge-button><edge-button label="Confirm" size="sm" variant="tonal" @click="ask()"></edge-button><edge-button label="Prompt" size="sm" variant="tonal" @click="askText()"></edge-button><edge-button label="Sheet" size="sm" variant="tonal" @click="sheetOpts()"></edge-button><edge-button label="Toast" size="sm" variant="tonal" @click="Kreftjs.native.dialog.toast('Hello')"></edge-button></edge-row>
+        <h3>Files, share, position</h3>
+        <edge-row wrap><edge-button label="Pick image" size="sm" variant="outline" icon="image" @click="pickFile()"></edge-button><edge-button label="Share" size="sm" variant="outline" icon="share" @click="Kreftjs.native.system.share({ title: 'Kreft', text: 'Build apps in plain words', url: 'https://kreftjs.com' })"></edge-button><edge-button label="My position" size="sm" variant="outline" icon="pin" @click="where()"></edge-button><edge-button label="Copy" size="sm" variant="outline" icon="copy" @click="Kreftjs.native.system.copy('Kreft').then((ok) => { log = ok ? 'copied' : 'could not copy' })"></edge-button></edge-row>
+        <p class="muted">{log}</p>
+      </edge-column>
+    </section>
+  </div>
+</view>
+
+<style scoped>
+.gal { padding-bottom: 96px; }
+.sec { padding: 16px; }
+h3 { margin: 20px 0 8px; font-size: 13px; text-transform: uppercase; letter-spacing: .06em; color: var(--edge-muted); }
+.muted { color: var(--edge-muted); font-size: 14px; margin: 0; word-break: break-word; }
+.card { padding: 16px; border: 1px solid var(--edge-border); border-radius: var(--edge-radius); background: var(--edge-card); }
+.box { border: 1px solid var(--edge-border); border-radius: 12px; overflow: hidden; }
+.pad { padding: 16px; line-height: 2; }
+.vrow { display: flex; align-items: center; height: 100%; padding: 0 16px; border-bottom: 1px solid var(--edge-border); }
+.deal { height: 110px; display: flex; align-items: center; justify-content: center; border-radius: 16px; color: #fff; font-weight: 700; font-size: 18px; }
+.pg { height: 120px; display: flex; align-items: center; justify-content: center; font-size: 22px; font-weight: 700; color: #fff; }
+.pg.a { background: #2563eb; } .pg.b { background: #16a34a; } .pg.c { background: #9333ea; }
+</style>

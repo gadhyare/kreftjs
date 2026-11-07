@@ -1,0 +1,33 @@
+<!-- Tabs in a row (they scroll sideways when there are many). <edge-tab-row k-model="tab" tabs={[{ label: 'All', value: 'all' }, { label: 'Unread', value: 'unread', badge: 3 }]}></edge-tab-row>
+     tabs: [{ label, value, icon, badge, disabled }] or plain strings      modelValue      fill (tabs share the width)      color (the line and the active text) -->
+prop modelValue = ''
+prop tabs = []
+prop fill = false
+prop color = ''
+event update:modelValue
+
+derive list = tabs.map((t) => (typeof t === 'object' ? t : { label: String(t), value: t }))
+derive st = ({ '--tab-color': color || null })
+
+action pick(t) {
+  if (t.disabled || t.value === modelValue) return
+  if (Kreftjs.native) Kreftjs.native.haptics.selection()
+  send('update:modelValue', t.value)
+}
+
+<view>
+  <div class="tabs {fill ? 'fill' : ''}" :style="st" role="tablist">
+    <button data-edge k-each="t in list" k-key="t.value" type="button" class="tab" :class="{ on: t.value === modelValue }" role="tab" aria-selected={t.value === modelValue ? 'true' : 'false'} disabled={t.disabled} @click="pick(t)">
+      <edge-icon k-if="t.icon" name={t.icon} size={18}></edge-icon><span>{t.label}</span><edge-badge k-if="t.badge" value={t.badge}></edge-badge>
+    </button>
+  </div>
+</view>
+
+<style scoped>
+.tabs { display: flex; overflow-x: auto; scrollbar-width: none; border-bottom: 1px solid var(--edge-border); }
+.tabs::-webkit-scrollbar { display: none; }
+.tab { flex: none; display: inline-flex; align-items: center; justify-content: center; gap: 6px; min-height: 48px; padding: 0 16px; border: 0; border-bottom: 3px solid transparent; background: transparent; color: var(--edge-muted); font: inherit; font-size: 15px; font-weight: 600; white-space: nowrap; }
+.tabs.fill .tab { flex: 1 1 0; }
+.tab.on { color: var(--tab-color, var(--edge-accent)); border-bottom-color: var(--tab-color, var(--edge-accent)); }
+.tab:disabled { opacity: .4; }
+</style>

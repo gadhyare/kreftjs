@@ -1,0 +1,34 @@
+<!-- <edge-slider k-model="volume" min={0} max={100} step={5} label="Volume" showValue></edge-slider>      color (the filled part)   disabled -->
+prop modelValue = 0
+prop min = 0
+prop max = 100
+prop step = 1
+prop label = ''
+prop showValue = false
+prop color = ''
+prop disabled = false
+event update:modelValue
+
+derive pct = max === min ? 0 : ((modelValue - min) / (max - min)) * 100
+derive st = ({ '--pct': pct + '%', '--s-color': color || null })
+
+action input(e) { send('update:modelValue', Number(e.target.value)) }
+
+<view>
+  <label class="sl">
+    <span k-if="label || showValue" class="head"><span>{label}</span><b k-if="showValue">{modelValue}</b></span>
+    <input data-edge type="range" :style="st" min={min} max={max} step={step} value={modelValue} disabled={disabled} @input="input($event)">
+  </label>
+</view>
+
+<style scoped>
+.sl { display: flex; flex-direction: column; gap: 4px; }
+.head { display: flex; justify-content: space-between; font-size: 14px; color: var(--edge-muted); } .head b { color: var(--edge-fg); }
+input { -webkit-appearance: none; appearance: none; width: 100%; height: var(--edge-tap); margin: 0; background: transparent; }
+input::-webkit-slider-runnable-track { height: 6px; border-radius: 3px; background: linear-gradient(to right, var(--s-color, var(--edge-accent)) var(--pct), var(--edge-surface) var(--pct)); }
+input::-webkit-slider-thumb { -webkit-appearance: none; width: 26px; height: 26px; margin-top: -10px; border-radius: 50%; background: #fff; border: 1px solid var(--edge-border); box-shadow: 0 1px 4px rgba(0, 0, 0, .3); }
+input::-moz-range-track { height: 6px; border-radius: 3px; background: var(--edge-surface); }
+input::-moz-range-progress { height: 6px; border-radius: 3px; background: var(--s-color, var(--edge-accent)); }
+input::-moz-range-thumb { width: 24px; height: 24px; border-radius: 50%; background: #fff; border: 1px solid var(--edge-border); }
+input:disabled { opacity: .5; }
+</style>

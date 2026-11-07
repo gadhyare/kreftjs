@@ -1,0 +1,73 @@
+<!-- The row of buttons at the bottom of the screen. Everything about it can be changed.
+     <edge-bottom-nav items={[{ label: 'Home', icon: 'home', to: '/' }, { label: 'Chat', icon: 'mail', to: '/chat', badge: 3 }]}></edge-bottom-nav>
+     items      [{ label, icon | text | src, to, id, badge, disabled, onTap }]   (an item with `to` opens that page and is active on it)
+     active     the id of the active item, for items without `to`
+     labels     'always' | 'active' | 'never'          indicator  'pill' | 'line' | 'none'
+     bg / color / activeColor / height   colours and height in px      border  the line above      floating  a rounded bar with a gap
+     blur       frosted glass      haptics  a small buzz on tap (phone)
+     @select    sends the tapped item -->
+prop items = []
+prop active = ''
+prop labels = 'always'
+prop indicator = 'pill'
+prop bg = ''
+prop color = ''
+prop activeColor = ''
+prop height = 0
+prop border = true
+prop floating = false
+prop blur = false
+prop haptics = true
+event select
+
+derive navClass = 'nav ind-' + indicator + ' lab-' + labels + (border ? ' border' : '') + (floating ? ' floating' : '') + (blur ? ' blur' : '')
+derive vars = ({ '--edge-bottom-bg': bg || null, '--edge-bottom-fg': color || null, '--edge-bottom-active': activeColor || null, '--edge-bottom-height': height ? height + 'px' : null })
+
+action isOn(it) {
+  if (it.to) {
+    const p = $route.path
+    return it.to === '/' ? p === '/' : (p === it.to || p.startsWith(it.to + '/'))
+  }
+  return active !== '' && active === (it.id || it.label)
+}
+action showLabel(it) { return labels === 'always' || (labels === 'active' && isOn(it)) }
+action pick(it) {
+  if (it.disabled) return
+  if (haptics && Kreftjs.native) Kreftjs.native.haptics.selection()
+  if (it.onTap) it.onTap(it)
+  if (it.to && $route.path !== it.to) $router.go(it.to)
+  send('select', it)
+}
+
+<view>
+  <nav class={navClass} :style="vars" role="tablist" aria-label="Main">
+    <button data-edge k-each="it in items" k-key="it.id || it.to || it.label" class="item" :class="{ on: isOn(it) }" type="button" role="tab"
+            aria-selected={isOn(it) ? 'true' : 'false'} disabled={it.disabled} @click="pick(it)">
+      <span class="ico">
+        <edge-icon name={it.icon} text={it.text} src={it.src} size={24}></edge-icon>
+        <edge-badge k-if="it.badge" class="pin" value={it.badge}></edge-badge>
+      </span>
+      <span k-if="showLabel(it)" class="lbl">{it.label}</span>
+    </button>
+  </nav>
+</view>
+
+<style scoped>
+.nav { position: relative; z-index: 20; flex: none; display: flex; box-sizing: border-box;
+  min-height: calc(var(--edge-bottom-height) + var(--edge-safe-bottom, 0px));
+  padding: 6px calc(6px + var(--edge-safe-right, 0px)) calc(6px + var(--edge-safe-bottom, 0px)) calc(6px + var(--edge-safe-left, 0px));
+  background: var(--edge-bottom-bg); color: var(--edge-bottom-fg); }
+.nav.border { border-top: 1px solid var(--edge-bottom-border); }
+.nav.blur { background: color-mix(in srgb, var(--edge-bottom-bg) 78%, transparent); -webkit-backdrop-filter: blur(14px); backdrop-filter: blur(14px); }
+.nav.floating { margin: 0 12px calc(10px + var(--edge-safe-bottom, 0px)); padding-bottom: 6px; min-height: var(--edge-bottom-height); border: 0; border-radius: 26px; box-shadow: 0 6px 24px rgba(0, 0, 0, .18); }
+.item { flex: 1 1 0; min-width: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px; min-height: 48px; padding: 4px 2px; border: 0; background: transparent; color: inherit; font: inherit; font-size: 12px; border-radius: 14px; position: relative; }
+.item:disabled { opacity: .4; }
+.item.on { color: var(--edge-bottom-active); font-weight: 700; }
+.ico { position: relative; display: inline-flex; align-items: center; justify-content: center; min-width: 52px; height: 30px; border-radius: 999px; transition: background .15s ease; }
+.pin { position: absolute; top: -2px; right: 6px; }
+.lab-never .ico { height: 36px; }
+.ind-pill .item.on .ico { background: var(--edge-bottom-indicator); }
+.ind-line .item.on::before { content: ''; position: absolute; top: -6px; left: 22%; right: 22%; height: 3px; border-radius: 0 0 3px 3px; background: var(--edge-bottom-active); }
+.lbl { max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+@media (prefers-reduced-motion: reduce) { .ico { transition: none; } }
+</style>

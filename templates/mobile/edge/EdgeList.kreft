@@ -1,0 +1,46 @@
+<!-- A list of rows, like a settings screen. Give it items, or fill the `item` slot to draw each row yourself.
+     <edge-list items={[{ title: 'Profile', subtitle: 'Name, photo', icon: 'user', to: '/profile', badge: 2 }, { title: 'Version', right: '1.0' }]} @select="open"></edge-list>
+     item: { title, subtitle, icon | text | src, right (text), to, id, badge, disabled }     inset: a rounded card     divider: lines between rows -->
+prop items = []
+prop inset = false
+prop divider = true
+event select
+
+action pick(it) {
+  if (it.disabled) return
+  if (it.onTap) it.onTap(it)
+  if (it.to) $router.go(it.to)
+  send('select', it)
+}
+derive cls = 'list' + (inset ? ' inset' : '') + (divider ? ' divided' : '')
+
+<view>
+  <ul class={cls} role="list">
+    <li k-each="it in items" k-key="it.id || it.to || it.title" role="listitem">
+      <slot name="item" item={it}>
+        <button data-edge type="button" class="row" disabled={it.disabled} @click="pick(it)">
+          <edge-icon k-if="it.icon || it.text || it.src" class="ldi" name={it.icon} text={it.text} src={it.src} size={24}></edge-icon>
+          <span class="body"><span class="t">{it.title}</span><span k-if="it.subtitle" class="s">{it.subtitle}</span></span>
+          <edge-badge k-if="it.badge" value={it.badge}></edge-badge>
+          <span k-if="it.right" class="right">{it.right}</span>
+          <edge-icon k-if="it.to" class="chev" name="chevron-right" size={18}></edge-icon>
+        </button>
+      </slot>
+    </li>
+  </ul>
+</view>
+
+<style scoped>
+.list { list-style: none; margin: 0; padding: 0; background: var(--edge-bg); }
+.list.inset { margin: 12px; border: 1px solid var(--edge-border); border-radius: var(--edge-radius); background: var(--edge-card); overflow: hidden; }
+.list.divided li + li { border-top: 1px solid var(--edge-border); }
+.row { width: 100%; display: flex; align-items: center; gap: 12px; min-height: 56px; padding: 8px 16px; border: 0; background: transparent; color: var(--edge-fg); font: inherit; text-align: left; }
+.row:active { background: var(--edge-surface); }
+.row:disabled { opacity: .45; }
+.ldi { color: var(--edge-muted); }
+.body { flex: 1; min-width: 0; display: flex; flex-direction: column; }
+.t { font-size: 16px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.s { font-size: 13px; color: var(--edge-muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.right { color: var(--edge-muted); font-size: 14px; }
+.chev { color: var(--edge-muted); }
+</style>

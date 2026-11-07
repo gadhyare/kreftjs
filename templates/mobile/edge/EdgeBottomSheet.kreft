@@ -1,0 +1,63 @@
+<!-- A panel that slides up from the bottom. Drag it down to close.
+     <edge-bottom-sheet k-model="show" title="Share" size="half"> … </edge-bottom-sheet>
+     modelValue (open)   title   size: auto | half | full      handle (the little bar, default yes)      dismissible (tap outside, drag down, back button) -->
+prop modelValue = false
+prop title = ''
+prop size = 'auto'
+prop handle = true
+prop dismissible = true
+event update:modelValue
+event close
+
+state drag = 0
+let startY = null
+let offBack = null
+
+derive cls = 'sheet s-' + size + (drag ? ' dragging' : '')
+derive st = ({ transform: drag ? 'translateY(' + drag + 'px)' : null })
+
+action close() { drag = 0; send('update:modelValue', false); send('close') }
+action outside(e) { if (dismissible && e.target === e.currentTarget) close() }
+action down(e) { if (dismissible) startY = e.clientY }
+action move(e) { if (startY !== null) drag = Math.max(0, e.clientY - startY) }
+action up() {
+  if (startY === null) return
+  const far = drag > 100
+  startY = null
+  if (far) close(); else drag = 0
+}
+
+watch modelValue {
+  drag = 0
+  if (offBack) { offBack(); offBack = null }
+  if (modelValue && Kreftjs.native && dismissible) offBack = Kreftjs.native.pushBack(() => { close(); return true })
+}
+on destroy { if (offBack) offBack() }
+
+<view>
+  <kreft-portal to="body">
+    <div k-if="modelValue" class="scrim" k-animate="fade" @click="outside($event)">
+      <section class={cls} :style="st" role="dialog" aria-modal="true" aria-label={title}>
+        <div class="grab" @pointerdown="down($event)" @pointermove="move($event)" @pointerup="up()" @pointercancel="up()">
+          <span k-if="handle" class="bar"></span>
+          <h2 k-if="title" class="t">{title}</h2>
+        </div>
+        <div class="body"><slot></slot></div>
+      </section>
+    </div>
+  </kreft-portal>
+</view>
+
+<style scoped>
+.scrim { position: fixed; inset: 0; z-index: 900; display: flex; align-items: flex-end; justify-content: center; background: rgba(0, 0, 0, .45); }
+.sheet { display: flex; flex-direction: column; width: 100%; max-width: 560px; max-height: 92%; background: var(--edge-card); color: var(--edge-fg); border-radius: 22px 22px 0 0; padding-bottom: var(--edge-safe-bottom, 0px); animation: edge-up .24s ease; }
+.sheet.dragging { animation: none; transition: none; }
+.s-half { height: 50%; } .s-full { height: 92%; }
+.grab { flex: none; padding: 8px 20px 4px; touch-action: none; cursor: grab; }
+.bar { display: block; width: 40px; height: 5px; margin: 0 auto 8px; border-radius: 3px; background: var(--edge-border); }
+.t { margin: 0 0 4px; font-size: 18px; }
+.body { flex: 1; min-height: 0; overflow-y: auto; overscroll-behavior: contain; padding: 4px 20px 20px; }
+@keyframes edge-up { from { transform: translateY(100%); } to { transform: none; } }
+.fade-in, .fade-out { transition: opacity .18s ease; } .fade-in-from, .fade-out-to { opacity: 0; }
+@media (prefers-reduced-motion: reduce) { .sheet { animation: none; } }
+</style>

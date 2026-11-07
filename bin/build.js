@@ -8,6 +8,7 @@
  *   kreft build --prerender      also save every page as ready HTML (needs: npm i -D jsdom)
  *   kreft build --prerender --urls urls.js   ... and the addresses in that file (pages that come from your data)
  *   kreft build --include docs   also copy another folder into the output
+ *   kreft build --pwa            also write manifest.webmanifest + sw.js (installable, works offline)
  *   kreft build --no-htaccess    do not write dist/.htaccess (the Apache / Hostinger page-address rules)
  *
  * What it does:
@@ -34,11 +35,12 @@ const SERVER_DIRS = new Set();
 const SKIP = new Set(['node_modules', 'dist', 'dist-electron', '.git', '.vscode', '.idea', 'package.json', 'package-lock.json', '.DS_Store']);
 
 module.exports = function build(args) {
-  let folder = null, out = null, base = null, prerender = null, urlsFile = null, htaccess = true, minify = true;
+  let pwa = false, folder = null, out = null, base = null, prerender = null, urlsFile = null, htaccess = true, minify = true;
   const include = [];
   for (let i = 0; i < args.length; i++) {
     if (args[i] === '--out' || args[i] === '-o') out = args[++i];
     else if (args[i] === '--base') base = args[++i];
+    else if (args[i] === '--pwa') pwa = true; // manifest + service worker: installable and works offline
     else if (args[i] === '--no-htaccess') htaccess = false;
     else if (args[i] === '--no-minify') minify = false; // keep kreftjs.js readable (for debugging)
     else if (args[i] === '--include') include.push(args[++i]); // another folder to copy in, like the docs
@@ -241,6 +243,7 @@ ${indent(components.join('\n\n'))}
   }
   write(dist, 'index.html', html);
   addCacheBusters(dist);
+  if (pwa) require('./pwa.js').apply(dist, root, { project });
   if (htaccess) writeHtaccess(dist, html);
 
   const report = () => {

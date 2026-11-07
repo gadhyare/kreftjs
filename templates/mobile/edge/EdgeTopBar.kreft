@@ -1,0 +1,81 @@
+<!-- The bar at the top of the screen. Everything about it can be changed.
+     <edge-top-bar title="Cart" back bg="#111" color="#fff" right={[{ icon: 'search', id: 'search' }]} @action="onAction"></edge-top-bar>
+     title / subtitle       the text            center     centre the title      border    the line under the bar
+     bg / color / height    colours, and the height in px (the notch area is added)  elevated  a shadow     blur  frosted glass
+     left / right           buttons: [{ icon, text, src, label, id, badge, onTap }]
+     back                   shows the back arrow (it goes back in history, or send @back yourself with autoBack={false})
+     slots                  left, title, right replace those parts -->
+prop title = ''
+prop subtitle = ''
+prop back = false
+prop autoBack = true
+prop bg = ''
+prop color = ''
+prop border = true
+prop height = 0
+prop center = false
+prop elevated = false
+prop blur = false
+prop left = []
+prop right = []
+event back
+event action
+
+derive vars = ({ '--edge-top-bg': bg || null, '--edge-top-fg': color || null, '--edge-top-height': height ? height + 'px' : null })
+
+action goBack() {
+  send('back')
+  if (autoBack) history.back()
+}
+action act(a) {
+  if (Kreftjs.native) Kreftjs.native.haptics.selection()
+  if (a.onTap) a.onTap(a)
+  send('action', a)
+}
+
+<view>
+  <header class="bar" :class="{ border: border, elevated: elevated, center: center, blur: blur }" :style="vars">
+    <div class="side">
+      <button data-edge k-if="back" class="eb" type="button" aria-label="Back" @click="goBack()"><edge-icon name="back"></edge-icon></button>
+      <button data-edge k-each="a in left" k-key="a.id || a.icon || a.label" class="eb" type="button" aria-label={a.label || a.id} @click="act(a)">
+        <edge-icon name={a.icon} text={a.text} src={a.src}></edge-icon>
+        <span k-if="a.label && a.showLabel" class="lbl">{a.label}</span>
+        <edge-badge k-if="a.badge" class="pin" value={a.badge}></edge-badge>
+      </button>
+      <slot name="left"></slot>
+    </div>
+    <div class="mid">
+      <slot name="title">
+        <div class="title">{title}</div>
+        <div k-if="subtitle" class="sub">{subtitle}</div>
+      </slot>
+    </div>
+    <div class="side end">
+      <slot name="right"></slot>
+      <button data-edge k-each="a in right" k-key="a.id || a.icon || a.label" class="eb" type="button" aria-label={a.label || a.id} @click="act(a)">
+        <edge-icon name={a.icon} text={a.text} src={a.src}></edge-icon>
+        <span k-if="a.label && a.showLabel" class="lbl">{a.label}</span>
+        <edge-badge k-if="a.badge" class="pin" value={a.badge}></edge-badge>
+      </button>
+    </div>
+  </header>
+</view>
+
+<style scoped>
+.bar { position: relative; z-index: 20; flex: none; display: flex; align-items: center; gap: 4px; box-sizing: border-box;
+  min-height: calc(var(--edge-top-height) + var(--edge-safe-top, 0px));
+  padding: var(--edge-safe-top, 0px) calc(8px + var(--edge-safe-right, 0px)) 0 calc(8px + var(--edge-safe-left, 0px));
+  background: var(--edge-top-bg); color: var(--edge-top-fg); }
+.bar.border { border-bottom: 1px solid var(--edge-top-border); }
+.bar.elevated { box-shadow: 0 2px 12px rgba(0, 0, 0, .14); }
+.bar.blur { background: color-mix(in srgb, var(--edge-top-bg) 78%, transparent); -webkit-backdrop-filter: blur(14px); backdrop-filter: blur(14px); }
+.side { flex: none; min-width: 48px; display: flex; align-items: center; gap: 2px; }
+.side.end { justify-content: flex-end; }
+.mid { flex: 1 1 auto; min-width: 0; padding: 0 6px; display: flex; flex-direction: column; justify-content: center; }
+.bar.center .mid { align-items: center; text-align: center; }
+.title { font-size: 18px; font-weight: 700; letter-spacing: -0.02em; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.sub { font-size: 12px; opacity: .65; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.eb { position: relative; display: inline-flex; align-items: center; justify-content: center; gap: 4px; min-width: var(--edge-tap); min-height: var(--edge-tap); padding: 0 8px; border: 0; border-radius: 12px; background: transparent; color: inherit; font: inherit; font-size: 14px; }
+.eb:active { background: color-mix(in srgb, currentColor 12%, transparent); }
+.pin { position: absolute; top: 4px; right: 2px; }
+</style>

@@ -1,0 +1,31 @@
+<!-- A switch. <edge-toggle k-model="notifications" label="Notifications"></edge-toggle>      color (when on)   disabled -->
+prop modelValue = false
+prop label = ''
+prop color = ''
+prop disabled = false
+event update:modelValue
+
+derive st = ({ '--t-on': color || null })
+
+action flip() {
+  if (disabled) return
+  if (Kreftjs.native) Kreftjs.native.haptics.impact('light')
+  send('update:modelValue', !modelValue)
+}
+
+<view>
+  <button data-edge type="button" class="tg" :style="st" role="switch" aria-checked={modelValue ? 'true' : 'false'} disabled={disabled} @click="flip()">
+    <span k-if="label" class="lbl">{label}</span><slot></slot>
+    <span class="track" :class="{ on: modelValue }"><span class="knob"></span></span>
+  </button>
+</view>
+
+<style scoped>
+.tg { display: flex; align-items: center; justify-content: space-between; gap: 12px; width: 100%; min-height: var(--edge-tap); padding: 0; border: 0; background: transparent; color: var(--edge-fg); font: inherit; font-size: 16px; text-align: left; }
+.tg:disabled { opacity: .5; }
+.track { position: relative; flex: none; width: 50px; height: 30px; border-radius: 999px; background: var(--edge-border); transition: background .15s ease; }
+.track.on { background: var(--t-on, var(--edge-success)); }
+.knob { position: absolute; top: 3px; left: 3px; width: 24px; height: 24px; border-radius: 50%; background: #fff; box-shadow: 0 1px 3px rgba(0, 0, 0, .35); transition: transform .15s ease; }
+.track.on .knob { transform: translateX(20px); }
+@media (prefers-reduced-motion: reduce) { .track, .knob { transition: none; } }
+</style>

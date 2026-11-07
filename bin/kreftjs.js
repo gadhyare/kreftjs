@@ -48,6 +48,16 @@ const commands = {
   'electron:init': (a) => require('./electron.js').init(a),
   'electron:help': () => require('./electron.js').help(),
   'make:electron': (a) => require('./electron.js').init(a),
+  'mobile:icons': (a) => require('./mobile.js').icons(a),
+  'mobile:splash': (a) => require('./mobile.js').splash(a),
+  'mobile:ui': (a) => require('./mobile-ui.js').run(a),
+  'make:home': (a) => require('./home-variants.js').make(a),
+  'mobile:init': (a) => require('./mobile.js').init(a.find((x) => !x.startsWith('-'))),
+  'mobile:build': (a) => require('./mobile.js').build(a),
+  'mobile:open': (a) => require('./mobile.js').open(a),
+  'mobile:dev': (a) => require('./mobile.js').dev(a),
+  'mobile:help': () => require('./mobile.js').help(),
+  'make:mobile': (a) => require('./mobile.js').init(a.find((x) => !x.startsWith('-'))),
   vite: (a) => require('./vite.js').dev(a),
   'vite:dev': (a) => require('./vite.js').dev(a),
   'vite:build': (a) => require('./vite.js').build(a),
@@ -91,6 +101,7 @@ function help() {
         --ts                …use TypeScript across frontend (.kreft, .ts) and backend (.ts)
         --js                …use JavaScript (default when non-interactive)
         --electron          …with Electron desktop app support (main.js, preload.js, packaging)
+        --mobile            …with iOS / Android support (Capacitor)
         --vite              …with Vite.js bundling & instant HMR (vite.config.js, npm run vite)
     kreft dev [folder]      Start the dev server (default: this folder)
         --port <number>     Port to use (default: 8000, or the next free one)
@@ -121,6 +132,8 @@ function help() {
     kreft electron          Open the app in a desktop window only: no browser, no URL (alias: kreft electron:dev)
     kreft electron:build    Build and make installers (--mac, --win, --linux; or npm run electron:build:all)
     kreft electron:init     Add Electron support to an existing project (alias: kreft make:electron)
+    kreft make:home         Write an app-style home page: --mobile (phone screen) or --desktop (sidebar workspace)
+    kreft mobile:build      Build for iOS / Android with Capacitor (--android, --ios, --api-url; see kreft mobile:help)
     kreft electron:help     Everything about desktop apps: menu, icon, installers, errors
 
   The backend (kreft list shows every command, yours too):
@@ -196,11 +209,12 @@ function unknown() {
 
 /* ------------------------------------------------------------------ kreft new */
 async function createProject(args) {
-  let name = null, dbKind = null, ui = null, ts = false, langChosen = false, electron = false, vite = false, redis = false, auth = true, authChosen = false;
+  let name = null, dbKind = null, ui = null, ts = false, langChosen = false, electron = false, mobile = false, vite = false, redis = false, auth = true, authChosen = false;
   for (let i = 0; i < args.length; i++) {
     if (args[i] === '--ts' || args[i] === '--typescript') { ts = true; langChosen = true; }
     else if (args[i] === '--js' || args[i] === '--javascript') { ts = false; langChosen = true; }
     else if (args[i] === '--electron' || args[i] === '--desktop') electron = true;
+    else if (args[i] === '--mobile') mobile = true;
     else if (args[i] === '--vite') vite = true;
     else if (args[i] === '--auth') { auth = true; authChosen = true; }
     else if (args[i] === '--no-auth') { auth = false; authChosen = true; }
@@ -295,6 +309,11 @@ async function createProject(args) {
   }
   fs.writeFileSync(path.join(target, 'package.json'), JSON.stringify(projectPkg, null, 2) + '\n');
   if (electron) require('./electron.js').init(target);
+  if (mobile) {
+    require('./mobile.js').init(target);
+    require('./mobile-ui.js').install(target, { layout: !electron, gallery: true }); // top bar and bottom bar that never move; /edge shows every component
+  }
+  if (mobile || electron) require('./home-variants.js').apply(target, { mobile, desktop: electron }); // a home page made for the app, not the web
   if (vite) require('./vite.js').init(target, { ts });
 
   console.log(`

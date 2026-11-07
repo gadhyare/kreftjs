@@ -1,0 +1,24 @@
+<!-- A coloured shape. <edge-shape shape="circle" size={48} color="#2563eb">A</edge-shape>   <edge-shape shape="star" size={32} color="gold"></edge-shape>
+     shape: circle | rect | rounded | triangle | diamond | hexagon | star | pill      size (px, square)  or  width and height      color   border (colour)   radius (for rounded)
+     Whatever you put inside is centred. -->
+prop shape = 'circle'
+prop size = 40
+prop width = 0
+prop height = 0
+prop color = ''
+prop border = ''
+prop radius = 12
+
+const CLIP = {
+  triangle: 'polygon(50% 0, 100% 100%, 0 100%)',
+  diamond: 'polygon(50% 0, 100% 50%, 50% 100%, 0 50%)',
+  hexagon: 'polygon(25% 5%, 75% 5%, 100% 50%, 75% 95%, 25% 95%, 0 50%)',
+  star: 'polygon(50% 0, 61% 35%, 98% 35%, 68% 57%, 79% 91%, 50% 70%, 21% 91%, 32% 57%, 2% 35%, 39% 35%)',
+}
+derive st = ({ width: (width || size) + 'px', height: (height || size) + 'px', background: color || null, clipPath: CLIP[shape] || null, borderRadius: shape === 'circle' ? '50%' : (shape === 'pill' ? '999px' : (shape === 'rounded' ? radius + 'px' : null)), border: border ? '2px solid ' + border : null })
+
+<view><span class="shape" :style="st"><slot></slot></span></view>
+
+<style scoped>
+.shape { display: inline-flex; align-items: center; justify-content: center; flex: none; box-sizing: border-box; background: var(--edge-accent); color: var(--edge-on-accent); font-weight: 700; }
+</style>

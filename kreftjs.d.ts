@@ -342,6 +342,10 @@ export interface RouterOptions {
 
 /* ---------------- Kreft ---------------- */
 export interface KreftStatic {
+  /** the phone UI kit's native API (needs kreftjs-native.js) */
+  native: Native
+  /** the built-in icons of the edge components */
+  edgeIcons: EdgeIcons
   readonly version: string
   /** PUBLIC_ values from .env (also `env` in .kreft files). Never secrets: those stay in server code */
   readonly env: Readonly<Record<string, string>>
@@ -541,6 +545,69 @@ export interface InactivityTimerOptions {
   onWarning?: (info: { remainingMs: number; remainingMinutes: number }) => void
   onTimeout?: () => void
 }
+
+/* ---- kreftjs-native.js (the phone UI kit: kreft mobile:ui, or kreft new --mobile) ---- */
+export interface NativeDeviceInfo { platform: 'android' | 'ios' | 'electron' | 'web'; operatingSystem: string; osVersion: string; model: string; manufacturer: string; isVirtual: boolean; webViewVersion: string; screen: { width: number; height: number; pixelRatio: number }; [key: string]: any }
+export interface NativePosition { timestamp: number; coords: { latitude: number; longitude: number; accuracy: number; altitude?: number | null; speed?: number | null; heading?: number | null } }
+export interface NativeDialogs {
+  alert(message: string, options?: { title?: string; button?: string }): Promise<void>
+  confirm(message: string, options?: { title?: string; ok?: string; cancel?: string; danger?: boolean }): Promise<boolean>
+  prompt(message: string, options?: { title?: string; value?: string; placeholder?: string; type?: string; ok?: string; cancel?: string }): Promise<string | null>
+  actionSheet<T = any>(options: { title?: string; options: Array<string | { label: string; value?: T; danger?: boolean }>; cancel?: string }): Promise<T | string | null>
+  toast(message: string, options?: { tone?: 'success' | 'error' | ''; position?: 'top' | 'bottom'; duration?: number }): void
+}
+export interface Native {
+  platform(): 'android' | 'ios' | 'electron' | 'web'
+  isNative(): boolean
+  isDesktop(): boolean
+  isWeb(): boolean
+  /** call a Capacitor plugin method; resolves with null when there is no such plugin (browser, or not installed) */
+  plugin(name: string, method: string, options?: any): Promise<any>
+  device: { info(): Promise<NativeDeviceInfo>; id(): Promise<string>; battery(): Promise<{ batteryLevel: number | null; isCharging: boolean | null }>; language(): Promise<string> }
+  haptics: { impact(style?: 'light' | 'medium' | 'heavy'): Promise<any>; notification(type?: 'success' | 'warning' | 'error'): Promise<any>; selection(): Promise<any>; vibrate(ms?: number): Promise<any> }
+  file: {
+    pick(options?: { accept?: string; multiple?: boolean; capture?: string }): Promise<File[]>
+    readText(file: File): Promise<string>
+    readDataUrl(file: File): Promise<string>
+    write(path: string, data: string, options?: { directory?: string; base64?: boolean }): Promise<{ uri: string; saved?: boolean }>
+    read(path: string, options?: { directory?: string; base64?: boolean }): Promise<string | null>
+    remove(path: string, options?: { directory?: string }): Promise<void>
+    list(path?: string, options?: { directory?: string }): Promise<string[]>
+    save(name: string, data: string | Blob, mime?: string): Promise<{ uri: string }>
+  }
+  system: {
+    openUrl(url: string): Promise<boolean>
+    share(options: { title?: string; text?: string; url?: string }): Promise<boolean>
+    copy(text: string): Promise<boolean>
+    paste(): Promise<string>
+    network(): Promise<{ connected: boolean; connectionType: string }>
+    app(): Promise<{ name: string; id: string; build: string; version: string }>
+    statusBar(options: { color?: string; style?: 'light' | 'dark'; overlay?: boolean }): Promise<void>
+    keyboard: { show(): Promise<any>; hide(): Promise<any> }
+    hideSplash(): Promise<any>
+    exit(): Promise<any>
+  }
+  position: { get(options?: { accurate?: boolean; timeout?: number }): Promise<NativePosition | null>; watch(fn: (p: NativePosition) => void, options?: { accurate?: boolean }): Stop }
+  dialog: NativeDialogs
+  on(event: 'pause' | 'resume' | 'network' | 'urlOpen' | 'keyboardShow' | 'keyboardHide' | string, fn: (data?: any) => void): Stop
+  emit(event: string, data?: any): void
+  /** the newest handler gets the Android back button first; return false to pass it on. Returns a remover. */
+  pushBack(fn: () => boolean | void): Stop
+  back(): boolean
+  safeArea(): { top: number; right: number; bottom: number; left: number }
+  asset(path: string): string
+}
+export interface EdgeButtonDef { icon?: string; text?: string; src?: string; label?: string; showLabel?: boolean; id?: string; badge?: number | string | boolean; disabled?: boolean; to?: string; onTap?: (item: EdgeButtonDef) => void }
+export interface EdgeStore {
+  top: { show: boolean; title: string; subtitle: string; back: boolean | 'auto'; bg: string; color: string; border: boolean; height: number; center: boolean; elevated: boolean; blur: boolean; left: EdgeButtonDef[]; right: EdgeButtonDef[] }
+  bottom: { show: boolean; items: EdgeButtonDef[]; bg: string; color: string; active: string; activeColor?: string; indicator: 'pill' | 'line' | 'none'; labels: 'always' | 'active' | 'never'; border: boolean; height: number; floating: boolean; blur: boolean; haptics: boolean }
+  setTop(options: Partial<EdgeStore['top']>): void
+  setBottom(options: Partial<EdgeStore['bottom']>): void
+  reset(): void
+  hideBars(): void
+  showBars(): void
+}
+export interface EdgeIcons { paths: Record<string, string>; add(name: string, path: string): void; has(name: string): boolean }
 
 declare const Kreftjs: KreftStatic
 export default Kreftjs

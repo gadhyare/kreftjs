@@ -1,0 +1,55 @@
+<!-- A small menu that opens from a button. Put the button inside; items go in `items`.
+     <edge-menu items={[{ label: 'Edit', icon: 'edit', value: 'edit' }, { divider: true }, { label: 'Delete', icon: 'trash', value: 'delete', danger: true }]} @select={onPick}><edge-button label="More" variant="tonal"></edge-button></edge-menu>
+     items: [{ label, icon, value, danger, disabled }] and { divider: true }      align: start | end (which edge lines up)      sheet: open as a bottom action sheet instead (nicer with thumbs) -->
+prop items = []
+prop align = 'end'
+prop sheet = false
+event select
+
+state open = false
+state wrap = null
+
+action toggle() {
+  if (sheet && Kreftjs.native) {
+    Kreftjs.native.dialog.actionSheet({ options: items.filter((i) => !i.divider).map((i) => ({ label: i.label, value: i.value !== undefined ? i.value : i.label, danger: i.danger })) }).then((v) => {
+      if (v !== null) send('select', items.find((i) => (i.value !== undefined ? i.value : i.label) === v))
+    })
+    return
+  }
+  open = !open
+}
+action pick(it) {
+  if (it.disabled) return
+  open = false
+  if (it.onTap) it.onTap(it)
+  send('select', it)
+}
+action away(e) { if (open && wrap && !wrap.contains(e.target)) open = false }
+action key(e) { if (e.key === 'Escape') open = false }
+
+on ready { document.addEventListener('pointerdown', away) }
+on destroy { document.removeEventListener('pointerdown', away) }
+
+<view>
+  <span k-ref="wrap" class="menu" @keydown="key($event)">
+    <span class="trigger" aria-haspopup="menu" aria-expanded={open ? 'true' : 'false'} @click="toggle()"><slot></slot></span>
+    <ul k-if="open" class="pop {align}" role="menu" k-animate="fade">
+      <li k-each="it in items" class="li" role="none">
+        <hr k-if="it.divider">
+        <button data-edge k-else type="button" class="mi {it.danger ? 'dng' : ''}" role="menuitem" disabled={it.disabled} @click="pick(it)">
+          <edge-icon k-if="it.icon" name={it.icon} size={20}></edge-icon><span>{it.label}</span>
+        </button>
+      </li>
+    </ul>
+  </span>
+</view>
+
+<style scoped>
+.menu { position: relative; display: inline-block; }
+.pop { position: absolute; top: calc(100% + 6px); z-index: 800; min-width: 190px; margin: 0; padding: 6px; list-style: none; background: var(--edge-card); color: var(--edge-fg); border: 1px solid var(--edge-border); border-radius: 14px; box-shadow: 0 10px 30px rgba(0, 0, 0, .22); }
+.pop.end { right: 0; } .pop.start { left: 0; }
+.mi { width: 100%; display: flex; align-items: center; gap: 10px; min-height: var(--edge-tap); padding: 0 12px; border: 0; border-radius: 10px; background: transparent; color: inherit; font: inherit; font-size: 15px; text-align: left; }
+.mi:active, .mi:hover { background: var(--edge-surface); } .mi:disabled { opacity: .4; } .mi.dng { color: var(--edge-danger); }
+hr { margin: 4px 6px; border: 0; border-top: 1px solid var(--edge-border); }
+.fade-in, .fade-out { transition: opacity .12s ease; } .fade-in-from, .fade-out-to { opacity: 0; }
+</style>

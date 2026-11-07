@@ -1,0 +1,62 @@
+<!-- A drawer that slides in from the side (the "hamburger" menu). Swipe it back to close.
+     <edge-side-nav k-model="menu" title="My app" items={[{ label: 'Home', icon: 'home', to: '/' }, { label: 'Settings', icon: 'settings', to: '/settings' }]}></edge-side-nav>
+     modelValue (open)   side: left | right   width (px)   title   items: [{ label, icon, to, badge, id, onTap }]   slots: header, default (replaces items), footer -->
+prop modelValue = false
+prop side = 'left'
+prop width = 280
+prop title = ''
+prop items = []
+event update:modelValue
+event select
+
+let offBack = null
+
+derive st = ({ width: width + 'px' })
+derive cls = 'drawer ' + side
+
+action close() { send('update:modelValue', false) }
+action pick(it) {
+  if (it.onTap) it.onTap(it)
+  send('select', it)
+  if (it.to) $router.go(it.to)
+  close()
+}
+action swiped() { close() }
+
+watch modelValue {
+  if (offBack) { offBack(); offBack = null }
+  if (modelValue && Kreftjs.native) offBack = Kreftjs.native.pushBack(() => { close(); return true })
+}
+on destroy { if (offBack) offBack() }
+
+<view>
+  <kreft-portal to="body">
+    <div k-if="modelValue" class="scrim" k-animate="fade" @click.self="close()">
+      <aside class={cls} :style="st" role="dialog" aria-modal="true" aria-label={title || 'Menu'} @swipeleft={side === 'left' ? swiped : null} @swiperight={side === 'right' ? swiped : null}>
+        <header class="head"><slot name="header"><b class="t">{title}</b></slot></header>
+        <nav class="list"><slot>
+          <button data-edge k-each="it in items" k-key="it.id || it.to || it.label" type="button" class="item" @click="pick(it)">
+            <edge-icon k-if="it.icon || it.text" name={it.icon} text={it.text} size={22}></edge-icon><span class="l">{it.label}</span><edge-badge k-if="it.badge" value={it.badge}></edge-badge>
+          </button>
+        </slot></nav>
+        <footer class="foot"><slot name="footer"></slot></footer>
+      </aside>
+    </div>
+  </kreft-portal>
+</view>
+
+<style scoped>
+.scrim { position: fixed; inset: 0; z-index: 900; background: rgba(0, 0, 0, .45); }
+.drawer { position: absolute; top: 0; bottom: 0; max-width: 88%; display: flex; flex-direction: column; background: var(--edge-card); color: var(--edge-fg); padding: var(--edge-safe-top, 0px) 0 var(--edge-safe-bottom, 0px); box-sizing: border-box; }
+.drawer.left { left: 0; animation: edge-in-left .22s ease; border-radius: 0 20px 20px 0; }
+.drawer.right { right: 0; animation: edge-in-right .22s ease; border-radius: 20px 0 0 20px; }
+.head { padding: 20px 20px 12px; font-size: 20px; }
+.list { flex: 1; overflow-y: auto; padding: 4px 8px; }
+.item { width: 100%; display: flex; align-items: center; gap: 14px; min-height: 52px; padding: 0 12px; border: 0; border-radius: 12px; background: transparent; color: inherit; font: inherit; font-size: 16px; text-align: left; }
+.item:active { background: var(--edge-surface); } .l { flex: 1; }
+.foot { padding: 12px 20px; } .foot:empty { display: none; }
+.fade-in, .fade-out { transition: opacity .18s ease; } .fade-in-from, .fade-out-to { opacity: 0; }
+@keyframes edge-in-left { from { transform: translateX(-100%); } to { transform: none; } }
+@keyframes edge-in-right { from { transform: translateX(100%); } to { transform: none; } }
+@media (prefers-reduced-motion: reduce) { .drawer { animation: none; } }
+</style>

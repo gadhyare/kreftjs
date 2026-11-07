@@ -1,0 +1,32 @@
+<!-- The frame of an app screen. The top bar and the bottom bar stay exactly where they are; only the middle scrolls
+     (no page bounce, no moving bars). Put the bars in the named slots:
+       <edge-shell>
+         <template k-slot:top><edge-top-bar title="Home"></edge-top-bar></template>
+         ...the page...
+         <template k-slot:bottom><edge-bottom-nav items={tabs}></edge-bottom-nav></template>
+       </edge-shell> -->
+prop scroll = true
+
+on ready {
+  document.documentElement.classList.add('edge-app')
+  document.body.classList.add('edge-app')
+}
+on destroy {
+  document.documentElement.classList.remove('edge-app')
+  document.body.classList.remove('edge-app')
+}
+
+<view>
+  <div class="shell">
+    <slot name="top"></slot>
+    <main class="content" :class="{ still: !scroll }"><slot></slot></main>
+    <slot name="bottom"></slot>
+    <slot name="overlay"></slot>
+  </div>
+</view>
+
+<style scoped>
+.shell { position: fixed; inset: 0; display: flex; flex-direction: column; overflow: hidden; background: var(--edge-bg); color: var(--edge-fg); }
+.content { flex: 1 1 auto; min-height: 0; overflow-y: auto; overflow-x: hidden; overscroll-behavior: contain; -webkit-overflow-scrolling: touch; padding-left: var(--edge-safe-left, 0px); padding-right: var(--edge-safe-right, 0px); }
+.content.still { overflow: hidden; }
+</style>

@@ -1,0 +1,20 @@
+<!-- A thin line. <edge-divider></edge-divider>   <edge-divider label="or"></edge-divider>   <edge-divider vertical></edge-divider>
+     inset (px) leaves space at the start; color changes it. -->
+prop vertical = false
+prop inset = 0
+prop color = ''
+prop label = ''
+
+derive st = ({ '--edge-line': color || null, marginLeft: !vertical && inset ? inset + 'px' : null })
+
+<view>
+  <div k-if="label" class="div labeled" :style="st" role="separator"><span>{label}</span></div>
+  <div k-else class="div {vertical ? 'vert' : 'horiz'}" :style="st" role="separator"></div>
+</view>
+
+<style scoped>
+.horiz { height: 1px; width: 100%; background: var(--edge-line, var(--edge-border)); flex: none; }
+.vert { width: 1px; align-self: stretch; background: var(--edge-line, var(--edge-border)); flex: none; }
+.labeled { display: flex; align-items: center; gap: 12px; color: var(--edge-muted); font-size: 13px; }
+.labeled::before, .labeled::after { content: ''; flex: 1; height: 1px; background: var(--edge-line, var(--edge-border)); }
+</style>

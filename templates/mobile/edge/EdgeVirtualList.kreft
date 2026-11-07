@@ -1,0 +1,47 @@
+<!-- A very long list that stays fast: only the rows on screen exist. Rows must have the same height.
+     <edge-virtual-list items={rows} itemHeight={56} height={500}><template k-slot:item="{ item, index }"><div class="row">{index}. {item.name}</div></template></edge-virtual-list>
+     itemHeight (px, required)      height (px; default fills the parent)      overscan: extra rows above and below (6)      @end when the last rows come into viewport (load more) -->
+prop items = []
+prop itemHeight = 56
+prop height = 0
+prop overscan = 6
+event end
+
+state top = 0
+state viewport = 400
+state box = null
+
+derive first = Math.max(0, Math.floor(top / itemHeight) - overscan)
+derive last = Math.min(items.length, Math.ceil((top + viewport) / itemHeight) + overscan)
+derive rows = items.slice(first, last).map((item, i) => ({ item, index: first + i }))
+derive st = ({ height: height ? height + 'px' : null })
+derive inner = ({ height: items.length * itemHeight + 'px' })
+derive lift = ({ transform: 'translateY(' + first * itemHeight + 'px)' })
+
+action measure() { if (box) viewport = box.clientHeight || 400 }
+action onScroll() {
+  top = box.scrollTop
+  if (top + viewport >= items.length * itemHeight - itemHeight * 2) send('end')
+}
+on ready {
+  measure()
+  window.addEventListener('resize', measure)
+}
+on destroy { window.removeEventListener('resize', measure) }
+
+<view>
+  <div k-ref="box" class="vl" :style="st" @scroll.passive="onScroll()">
+    <div class="inner" :style="inner">
+      <div class="lift" :style="lift">
+        <div k-each="r in rows" k-key="r.index" class="cell" :style="{ height: itemHeight + 'px' }"><slot name="item" item={r.item} index={r.index}>{r.item}</slot></div>
+      </div>
+    </div>
+  </div>
+</view>
+
+<style scoped>
+.vl { overflow-y: auto; overscroll-behavior: contain; -webkit-overflow-scrolling: touch; height: 100%; }
+.inner { position: relative; }
+.lift { position: absolute; left: 0; right: 0; top: 0; will-change: transform; }
+.cell { overflow: hidden; box-sizing: border-box; }
+</style>

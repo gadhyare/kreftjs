@@ -1,0 +1,54 @@
+<!-- The layout of a phone app: a top bar and a bottom bar that never move, and a page that scrolls between them.
+     Change how the bars look in the "Appearance" block below, or per page:  edge.setTop({ title: 'Cart', bg: '#111', color: '#fff' }),
+     edge.setBottom({ labels: 'never' }),  edge.hideBars().  Every part is a prop, see components/edge/EdgeTopBar.kreft and EdgeBottomNav.kreft. -->
+use edge
+
+// ---- Appearance: the starting look of the bars on every page ----
+const appName = Kreftjs.env.PUBLIC_APP_NAME || 'My app'
+const base = {
+  top: {
+    // bg: '#111827', color: '#ffffff',      // colours (they fall back to edge.css, which follows light and dark mode)
+    // height: 56, center: true, elevated: false, blur: false, border: true,
+    right: [],                               // buttons on the right: [{ icon: 'search', id: 'search', onTap: () => {} }]
+  },
+  bottom: {
+    items: [                                 // the buttons: { label, icon (or text / src), to, badge }
+      { label: 'Home', icon: 'home', to: '/' },
+      { label: 'Docs', icon: 'book', to: '/docs' },
+    ],
+    // bg: '#ffffff', color: '#71717a', active: '#2563eb',
+    labels: 'always',                        // 'always' | 'active' | 'never'
+    indicator: 'pill',                       // 'pill' | 'line' | 'none'
+    floating: false, blur: false, border: true,
+  },
+}
+
+action applyBase() {
+  edge.reset()
+  edge.setTop(base.top)
+  edge.setBottom(base.bottom)
+}
+applyBase()
+
+// the back arrow shows on pages that are not one of the bottom buttons
+derive isRoot = $route.path === '/' || edge.bottom.items.some((i) => i.to === $route.path)
+derive showBack = edge.top.back === 'auto' ? !isRoot : Boolean(edge.top.back)
+derive title = edge.top.title || ($route.meta && $route.meta.title) || appName
+
+watch $route.path { applyBase() }
+
+<view>
+  <edge-shell>
+    <template k-slot:top>
+      <edge-top-bar k-if="edge.top.show" title={title} subtitle={edge.top.subtitle} back={showBack} bg={edge.top.bg} color={edge.top.color}
+                    border={edge.top.border} height={edge.top.height} center={edge.top.center} elevated={edge.top.elevated} blur={edge.top.blur}
+                    left={edge.top.left} right={edge.top.right}></edge-top-bar>
+    </template>
+    <slot></slot>
+    <template k-slot:bottom>
+      <edge-bottom-nav k-if="edge.bottom.show" items={edge.bottom.items} active={edge.bottom.active} labels={edge.bottom.labels} indicator={edge.bottom.indicator}
+                       bg={edge.bottom.bg} color={edge.bottom.color} activeColor={edge.bottom.activeColor} height={edge.bottom.height}
+                       border={edge.bottom.border} floating={edge.bottom.floating} blur={edge.bottom.blur} haptics={edge.bottom.haptics}></edge-bottom-nav>
+    </template>
+  </edge-shell>
+</view>

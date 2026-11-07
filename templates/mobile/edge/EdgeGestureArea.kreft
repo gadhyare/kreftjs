@@ -1,0 +1,26 @@
+<!-- An area that tells you what the finger did. <edge-gesture-area @swipeleft={next} @swiperight={prev} @doubletap={like} @longpress={menu}>…</edge-gesture-area>
+     Events: tap  doubletap  longpress  swipe (with .direction)  swipeleft  swiperight  swipeup  swipedown      each one sends { type, dx, dy, direction, duration }
+     It keeps the page able to scroll in the other direction. -->
+event tap
+event doubletap
+event longpress
+event swipe
+event swipeleft
+event swiperight
+event swipeup
+event swipedown
+
+let last = 0
+
+action onTap(e) {
+  const now = Date.now()
+  if (now - last < 300) { last = 0; send('doubletap', e) } else { last = now; send('tap', e) }
+}
+
+<view>
+  <div class="area" @tap="onTap($event)" @longpress="send('longpress', $event)" @swipe="send('swipe', $event)" @swipeleft="send('swipeleft', $event)" @swiperight="send('swiperight', $event)" @swipeup="send('swipeup', $event)" @swipedown="send('swipedown', $event)"><slot></slot></div>
+</view>
+
+<style scoped>
+.area { touch-action: pan-y; -webkit-user-select: none; user-select: none; }
+</style>

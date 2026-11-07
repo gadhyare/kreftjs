@@ -1,0 +1,43 @@
+<!-- A dropdown that opens the phone's own picker. <edge-select k-model="country" label="Country" options={['Somalia', 'Kenya']} placeholder="Choose…"></edge-select>
+     options: [{ label, value }] or plain strings      label   placeholder   hint   error   disabled -->
+prop modelValue = ''
+prop options = []
+prop label = ''
+prop placeholder = ''
+prop hint = ''
+prop error = ''
+prop disabled = false
+event update:modelValue
+
+derive list = options.map((o) => (typeof o === 'object' ? o : { label: String(o), value: o }))
+derive cls = 'sel' + (error ? ' bad' : '') + (disabled ? ' off' : '')
+
+action change(e) {
+  const o = list[e.target.selectedIndex - (placeholder ? 1 : 0)]
+  send('update:modelValue', o ? o.value : '')
+}
+
+<view>
+  <label class="wrap">
+    <span k-if="label" class="slabel">{label}</span>
+    <span class={cls}>
+      <select data-edge disabled={disabled} @change="change($event)">
+        <option k-if="placeholder" value="" disabled selected={modelValue === '' || modelValue === null}>{placeholder}</option>
+        <option k-each="o in list" k-key="o.value" selected={o.value === modelValue} disabled={o.disabled}>{o.label}</option>
+      </select>
+      <edge-icon class="arrow" name="chevron-down" size={20}></edge-icon>
+    </span>
+    <span k-if="error" class="msg err" role="alert">{error}</span>
+    <span k-elif="hint" class="msg">{hint}</span>
+  </label>
+</view>
+
+<style scoped>
+.wrap { display: flex; flex-direction: column; gap: 6px; }
+.slabel { font-size: 13px; font-weight: 600; color: var(--edge-muted); }
+.sel { position: relative; display: flex; align-items: center; min-height: 48px; border: 1px solid var(--edge-border); border-radius: 12px; background: var(--edge-card); }
+.sel.bad { border-color: var(--edge-danger); } .sel.off { opacity: .55; }
+select { appearance: none; -webkit-appearance: none; width: 100%; min-height: 46px; padding: 0 40px 0 12px; border: 0; outline: 0; background: transparent; color: var(--edge-fg); font: inherit; font-size: 16px; }
+.arrow { position: absolute; right: 10px; pointer-events: none; color: var(--edge-muted); }
+.msg { font-size: 13px; color: var(--edge-muted); } .msg.err { color: var(--edge-danger); }
+</style>

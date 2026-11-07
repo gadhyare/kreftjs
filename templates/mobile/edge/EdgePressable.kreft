@@ -1,0 +1,38 @@
+<!-- Anything you can press, with the press feeling you choose. <edge-pressable feedback="scale" @press={open} @longpress={menu}><div class="card">…</div></edge-pressable>
+     feedback: opacity | scale | highlight | none      disabled      haptics (a small buzz; default off)      @press  @longpress  @pressin  @pressout -->
+prop feedback = 'opacity'
+prop disabled = false
+prop haptics = false
+event press
+event longpress
+event pressin
+event pressout
+
+state down = false
+
+derive cls = 'pr f-' + feedback + (down ? ' down' : '') + (disabled ? ' off' : '')
+
+action tap(e) {
+  if (disabled) return
+  if (haptics && Kreftjs.native) Kreftjs.native.haptics.impact('light')
+  send('press', e)
+}
+action hold(e) {
+  if (disabled) return
+  if (haptics && Kreftjs.native) Kreftjs.native.haptics.impact('medium')
+  send('longpress', e)
+}
+action pressIn() { if (disabled) return; down = true; send('pressin') }
+action pressOut() { if (down) { down = false; send('pressout') } }
+
+<view>
+  <div class={cls} role="button" tabindex={disabled ? -1 : 0} aria-disabled={disabled ? 'true' : 'false'} @tap="tap($event)" @longpress="hold($event)" @pointerdown="pressIn()" @pointerup="pressOut()" @pointercancel="pressOut()" @pointerleave="pressOut()" @keydown.enter="tap($event)" @keydown.space.prevent="tap($event)"><slot></slot></div>
+</view>
+
+<style scoped>
+.pr { cursor: pointer; outline: 0; transition: opacity .1s ease, transform .1s ease, background .1s ease; -webkit-touch-callout: none; }
+.pr:focus-visible { outline: 2px solid var(--edge-accent); outline-offset: 2px; }
+.f-opacity.down { opacity: .55; } .f-scale.down { transform: scale(.96); } .f-highlight.down { background: var(--edge-surface); }
+.pr.off { opacity: .5; cursor: default; }
+@media (prefers-reduced-motion: reduce) { .pr { transition: none; } }
+</style>

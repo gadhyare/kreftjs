@@ -1,0 +1,44 @@
+<!-- A grid that draws more items as you scroll toward the end (good for long lists of cards or photos).
+     <edge-lazy-grid items={photos} columns={3} gap={8}><template k-slot:item="{ item }"><edge-image src={item.url} ratio="1"></edge-image></template></edge-lazy-grid>
+     columns (a number)  or  min (px: as many columns as fit)      gap      step: how many items to add each time (24)
+     Inside a scrolling parent (the page, an edge-scroll-view). -->
+prop items = []
+prop columns = 2
+prop min = 0
+prop gap = 8
+prop step = 24
+event more
+
+state shown = 0
+state end = null
+let io = null
+
+derive visible = items.slice(0, shown || step)
+derive st = ({ gap: gap + 'px', gridTemplateColumns: min ? 'repeat(auto-fill, minmax(' + min + 'px, 1fr))' : 'repeat(' + columns + ', minmax(0, 1fr))' })
+
+action grow() {
+  if ((shown || step) < items.length) { shown = (shown || step) + step; send('more') }
+}
+on ready {
+  shown = step
+  if (typeof IntersectionObserver === 'undefined') { shown = items.length; return }
+  io = new IntersectionObserver((entries) => { if (entries.some((e) => e.isIntersecting)) grow() }, { rootMargin: '300px' })
+  if (end) io.observe(end)
+}
+on destroy { if (io) io.disconnect() }
+watch items { shown = step }
+
+<view>
+  <div>
+    <div class="grid" :style="st">
+      <div k-each="item in visible" class="cell"><slot name="item" item={item}>{item}</slot></div>
+    </div>
+    <div k-ref="end" class="end" aria-hidden="true"></div>
+  </div>
+</view>
+
+<style scoped>
+.grid { display: grid; }
+.cell { min-width: 0; }
+.end { height: 1px; }
+</style>

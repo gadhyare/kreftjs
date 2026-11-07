@@ -1,0 +1,11 @@
+<!-- Space. With no size it pushes its neighbours apart (inside a row or column); with size it is that many px.
+     <edge-row><b>Title</b><edge-spacer></edge-spacer><button>Edit</button></edge-row> -->
+prop size = 0
+
+derive st = ({ flex: size ? '0 0 ' + size + 'px' : '1 1 0', width: size ? size + 'px' : null, height: size ? size + 'px' : null })
+
+<view><div class="sp" :style="st" aria-hidden="true"></div></view>
+
+<style scoped>
+.sp { min-width: 0; min-height: 0; }
+</style>

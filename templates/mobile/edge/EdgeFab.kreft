@@ -1,0 +1,36 @@
+<!-- The round button that floats over the page. <edge-fab icon="plus" @click={add}></edge-fab>   <edge-fab icon="edit" label="Compose" extended></edge-fab>
+     icon   label (shown when extended)   extended (a pill with text)   position: right | left | center      bg / color      size: md | lg      hidden (slides away; use it while scrolling down)
+     It sits above the bottom bar by itself. -->
+prop icon = 'plus'
+prop label = ''
+prop extended = false
+prop position = 'right'
+prop bg = ''
+prop color = ''
+prop size = 'md'
+prop hidden = false
+event click
+
+derive st = ({ '--f-bg': bg || null, '--f-fg': color || null })
+derive cls = 'fab p-' + position + ' s-' + size + (extended ? ' ext' : '') + (hidden ? ' away' : '')
+
+action press(e) {
+  if (Kreftjs.native) Kreftjs.native.haptics.impact('medium')
+  send('click', e)
+}
+
+<view>
+  <button data-edge type="button" class={cls} :style="st" aria-label={label || icon} tabindex={hidden ? -1 : 0} @click="press($event)">
+    <edge-icon name={icon} size={size === 'lg' ? 30 : 24}></edge-icon><span k-if="extended && label" class="l">{label}</span>
+  </button>
+</view>
+
+<style scoped>
+.fab { position: fixed; z-index: 700; bottom: calc(var(--edge-bottom-height) + var(--edge-safe-bottom, 0px) + 16px); display: inline-flex; align-items: center; justify-content: center; gap: 10px; min-width: 56px; height: 56px; padding: 0 16px; border: 0; border-radius: 18px; background: var(--f-bg, var(--edge-accent)); color: var(--f-fg, var(--edge-on-accent)); font: inherit; font-size: 16px; font-weight: 600; box-shadow: 0 6px 18px rgba(0, 0, 0, .3); transition: transform .2s ease, opacity .2s ease; }
+.fab:active { transform: scale(.94); }
+.p-right { right: calc(16px + var(--edge-safe-right, 0px)); } .p-left { left: calc(16px + var(--edge-safe-left, 0px)); } .p-center { left: 50%; margin-left: -28px; }
+.s-lg { min-width: 72px; height: 72px; border-radius: 24px; }
+.ext { padding: 0 20px; border-radius: 28px; } .ext.p-center { margin-left: 0; transform: translateX(-50%); }
+.away { transform: translateY(140%); opacity: 0; pointer-events: none; }
+@media (prefers-reduced-motion: reduce) { .fab { transition: none; } }
+</style>

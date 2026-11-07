@@ -1,0 +1,28 @@
+<!-- <edge-progress-bar value={40}></edge-progress-bar>   <edge-progress-bar indeterminate></edge-progress-bar>
+     value out of max (100)      height (px)   color   label   showValue (adds 40%)      indeterminate: moving bar when the amount is unknown -->
+prop value = 0
+prop max = 100
+prop height = 6
+prop color = ''
+prop label = ''
+prop showValue = false
+prop indeterminate = false
+
+derive pct = Math.max(0, Math.min(100, max ? (value / max) * 100 : 0))
+derive st = ({ height: height + 'px', '--p-color': color || null, '--pct': pct + '%' })
+
+<view>
+  <div class="pb">
+    <div k-if="label || showValue" class="head"><span>{label}</span><b k-if="showValue && !indeterminate">{Math.round(pct)}%</b></div>
+    <div class="track {indeterminate ? 'ind' : ''}" :style="st" role="progressbar" aria-valuemin="0" aria-valuemax={max} aria-valuenow={indeterminate ? null : value} aria-label={label || 'Progress'}><span class="bar"></span></div>
+  </div>
+</view>
+
+<style scoped>
+.head { display: flex; justify-content: space-between; margin-bottom: 6px; font-size: 14px; color: var(--edge-muted); } .head b { color: var(--edge-fg); }
+.track { position: relative; overflow: hidden; border-radius: 999px; background: var(--edge-surface); }
+.bar { display: block; height: 100%; width: var(--pct); border-radius: inherit; background: var(--p-color, var(--edge-accent)); transition: width .25s ease; }
+.track.ind .bar { position: absolute; width: 40%; animation: edge-slide 1.2s ease-in-out infinite; transition: none; }
+@keyframes edge-slide { 0% { left: -40%; } 100% { left: 100%; } }
+@media (prefers-reduced-motion: reduce) { .bar { transition: none; } .track.ind .bar { animation-duration: 3s; } }
+</style>

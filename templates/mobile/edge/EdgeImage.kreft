@@ -1,0 +1,35 @@
+<!-- An image that loads when it is near the screen, keeps its shape and has a fallback colour.
+     <edge-image src="photo.jpg" alt="A cat" ratio="16/9" radius={12} fit="cover"></edge-image>
+     ratio (width/height)   radius (px)   round   fit: cover | contain   placeholder (colour or text shown while loading or when it fails) -->
+prop src = ''
+prop alt = ''
+prop ratio = ''
+prop radius = 0
+prop round = false
+prop fit = 'cover'
+prop placeholder = ''
+event load
+event error
+
+state failed = false
+state loaded = false
+
+derive st = ({ aspectRatio: ratio || null, borderRadius: round ? '999px' : (radius ? radius + 'px' : null), '--edge-img-bg': placeholder && placeholder.startsWith('#') ? placeholder : null })
+derive imgSt = ({ objectFit: fit })
+
+action ok() { loaded = true; send('load') }
+action bad() { failed = true; send('error') }
+
+<view>
+  <span class="img" :style="st" :class="{ ready: loaded }">
+    <img k-if="src && !failed" src={src} alt={alt} loading="lazy" decoding="async" :style="imgSt" @load="ok()" @error="bad()">
+    <span k-if="failed || !src" class="ph" role="img" aria-label={alt}>{placeholder && !placeholder.startsWith('#') ? placeholder : ''}</span>
+  </span>
+</view>
+
+<style scoped>
+.img { display: block; position: relative; overflow: hidden; background: var(--edge-img-bg, var(--edge-surface)); }
+.img img { display: block; width: 100%; height: 100%; opacity: 0; transition: opacity .25s ease; }
+.img.ready img { opacity: 1; }
+.ph { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; color: var(--edge-muted); font-size: 13px; }
+</style>

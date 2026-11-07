@@ -1,0 +1,24 @@
+<!-- Text with the usual choices. <edge-text size="lg" weight={700} muted lines={2}>Long text…</edge-text>   or   <edge-text value={name}></edge-text>
+     size: xs sm md lg xl 2xl or a number (px)   weight   color   muted   align   lines (cut after n lines with …)   mono -->
+prop value = ''
+prop size = 'md'
+prop weight = 400
+prop color = ''
+prop muted = false
+prop align = ''
+prop lines = 0
+prop mono = false
+
+const SIZES = { xs: 12, sm: 14, md: 16, lg: 20, xl: 26, '2xl': 34 }
+derive px = typeof size === 'number' ? size : (SIZES[size] || 16)
+derive st = ({ fontSize: px + 'px', fontWeight: weight, color: color || null, textAlign: align || null, '--lines': lines || null })
+derive cls = 'txt' + (muted ? ' faint' : '') + (lines ? ' clamp' : '') + (mono ? ' mono' : '')
+
+<view><span class={cls} :style="st">{value}<slot></slot></span></view>
+
+<style scoped>
+.txt { line-height: 1.4; }
+.txt.faint { color: var(--edge-muted); }
+.txt.mono { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; }
+.txt.clamp { display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: var(--lines); overflow: hidden; }
+</style>

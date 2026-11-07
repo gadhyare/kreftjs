@@ -1,0 +1,42 @@
+<!-- Sections that open and close. One section:   <edge-accordion title="Shipping" k-model="open">Text…</edge-accordion>
+     Many sections: <edge-accordion items={[{ title: 'Shipping', body: 'Free over 50' }, { title: 'Returns', body: '30 days' }]} single></edge-accordion>
+     (draw each body yourself with the `item` slot)      single: opening one closes the others      modelValue: open (one section) -->
+prop title = ''
+prop modelValue = false
+prop items = []
+prop single = false
+event update:modelValue
+
+state opened = []
+
+action isOpen(i) { return opened.includes(i) }
+action toggle(i) {
+  if (Kreftjs.native) Kreftjs.native.haptics.selection()
+  opened = opened.includes(i) ? opened.filter((x) => x !== i) : (single ? [i] : [...opened, i])
+}
+
+<view>
+  <div class="acc">
+    <section k-if="items.length === 0" class="sec">
+      <button data-edge type="button" class="head" aria-expanded={modelValue ? 'true' : 'false'} @click="send('update:modelValue', !modelValue)">
+        <span class="t">{title}</span><edge-icon class="chev {modelValue ? 'up' : ''}" name="chevron-down" size={20}></edge-icon>
+      </button>
+      <div k-show="modelValue" class="body"><slot></slot></div>
+    </section>
+    <section k-each="(it, i) in items" k-key="it.id || it.title" class="sec">
+      <button data-edge type="button" class="head" aria-expanded={isOpen(i) ? 'true' : 'false'} @click="toggle(i)">
+        <span class="t">{it.title}</span><edge-icon class="chev {isOpen(i) ? 'up' : ''}" name="chevron-down" size={20}></edge-icon>
+      </button>
+      <div k-show="isOpen(i)" class="body"><slot name="item" item={it}>{it.body}</slot></div>
+    </section>
+  </div>
+</view>
+
+<style scoped>
+.sec + .sec { border-top: 1px solid var(--edge-border); }
+.sec { border-bottom: 1px solid var(--edge-border); }
+.head { width: 100%; display: flex; align-items: center; justify-content: space-between; gap: 12px; min-height: 56px; padding: 0 4px; border: 0; background: transparent; color: var(--edge-fg); font: inherit; font-size: 16px; font-weight: 600; text-align: left; }
+.chev { color: var(--edge-muted); transition: transform .2s ease; } .chev.up { transform: rotate(180deg); }
+.body { padding: 0 4px 16px; color: var(--edge-muted); line-height: 1.5; }
+@media (prefers-reduced-motion: reduce) { .chev { transition: none; } }
+</style>

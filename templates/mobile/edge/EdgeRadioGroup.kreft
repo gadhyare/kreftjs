@@ -1,0 +1,32 @@
+<!-- One choice out of a few. <edge-radio-group k-model="plan" options={[{ label: 'Free', value: 'free', subtitle: '0 per month' }, { label: 'Pro', value: 'pro' }]}></edge-radio-group>
+     options: [{ label, value, subtitle, disabled }] or plain strings      horizontal -->
+prop modelValue = ''
+prop options = []
+prop horizontal = false
+event update:modelValue
+
+derive list = options.map((o) => (typeof o === 'object' ? o : { label: String(o), value: o }))
+
+action pick(o) {
+  if (o.disabled || o.value === modelValue) return
+  if (Kreftjs.native) Kreftjs.native.haptics.selection()
+  send('update:modelValue', o.value)
+}
+
+<view>
+  <div class="rg {horizontal ? 'h' : ''}" role="radiogroup">
+    <button data-edge k-each="o in list" k-key="o.value" type="button" class="opt" role="radio" aria-checked={o.value === modelValue ? 'true' : 'false'} disabled={o.disabled} @click="pick(o)">
+      <span class="dot" :class="{ on: o.value === modelValue }"></span>
+      <span class="txt"><span class="t">{o.label}</span><span k-if="o.subtitle" class="s">{o.subtitle}</span></span>
+    </button>
+  </div>
+</view>
+
+<style scoped>
+.rg { display: flex; flex-direction: column; gap: 2px; } .rg.h { flex-direction: row; flex-wrap: wrap; gap: 16px; }
+.opt { display: flex; align-items: center; gap: 12px; min-height: var(--edge-tap); padding: 0; border: 0; background: transparent; color: var(--edge-fg); font: inherit; font-size: 16px; text-align: left; }
+.opt:disabled { opacity: .5; }
+.dot { width: 22px; height: 22px; border: 2px solid var(--edge-border); border-radius: 50%; box-sizing: border-box; flex: none; transition: border .12s ease; }
+.dot.on { border: 7px solid var(--edge-accent); }
+.txt { display: flex; flex-direction: column; } .s { font-size: 13px; color: var(--edge-muted); }
+</style>

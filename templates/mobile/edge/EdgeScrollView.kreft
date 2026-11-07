@@ -1,0 +1,30 @@
+<!-- A box that scrolls on its own. <edge-scroll-view horizontal snap hideBar height={220}>…</edge-scroll-view>
+     horizontal   scrolls sideways      snap   children click into place      hideBar   no scroll bar      height (px)
+     @scroll sends { top, left } -->
+prop horizontal = false
+prop snap = false
+prop hideBar = false
+prop height = 0
+event scroll
+
+derive st = ({ height: height ? height + 'px' : null })
+derive cls = 'sv ' + (horizontal ? 'h' : 'v') + (snap ? ' snap' : '') + (hideBar ? ' nobar' : '')
+
+state box = null
+let mo = null
+action fit() { if (box && snap) for (const c of box.children) { c.style.scrollSnapAlign = 'start'; if (horizontal) c.style.flex = 'none' } }
+on ready { fit(); if (box && typeof MutationObserver !== 'undefined') { mo = new MutationObserver(fit); mo.observe(box, { childList: true }) } }
+on destroy { if (mo) mo.disconnect() }
+action onScroll(e) { send('scroll', { top: e.target.scrollTop, left: e.target.scrollLeft }) }
+
+<view><div k-ref="box" class={cls} :style="st" @scroll.passive="onScroll($event)"><slot></slot></div></view>
+
+<style scoped>
+.sv { overscroll-behavior: contain; -webkit-overflow-scrolling: touch; box-sizing: border-box; }
+.sv.v { overflow-y: auto; overflow-x: hidden; }
+.sv.h { display: flex; overflow-x: auto; overflow-y: hidden; }
+.sv.snap.h { scroll-snap-type: x mandatory; }
+.sv.snap.v { scroll-snap-type: y mandatory; }
+.sv.nobar { scrollbar-width: none; }
+.sv.nobar::-webkit-scrollbar { display: none; }
+</style>

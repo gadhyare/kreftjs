@@ -1,0 +1,30 @@
+<!-- A small pill: a filter, a tag, a choice. <edge-chip label="Open" selected @click={toggle}></edge-chip>   <edge-chip label="swift" closable @close={remove}></edge-chip>
+     icon   selected   closable (shows ×)   tone: neutral | accent | success | danger   -->
+prop label = ''
+prop icon = ''
+prop selected = false
+prop closable = false
+prop tone = 'neutral'
+event click
+event close
+
+derive cls = 'chip t-' + tone + (selected ? ' on' : '')
+
+<view>
+  <span class={cls}>
+    <button data-edge type="button" class="main" aria-pressed={selected ? 'true' : 'false'} @click="send('click')">
+      <edge-icon k-if="icon" name={icon} size={16}></edge-icon><span>{label}</span><slot></slot>
+    </button>
+    <button data-edge k-if="closable" type="button" class="x" aria-label="Remove" @click="send('close')"><edge-icon name="close" size={14}></edge-icon></button>
+  </span>
+</view>
+
+<style scoped>
+.chip { display: inline-flex; align-items: center; min-height: 34px; border-radius: 999px; background: var(--edge-surface); color: var(--edge-fg); border: 1px solid var(--edge-border); font-size: 14px; }
+.main { display: inline-flex; align-items: center; gap: 6px; min-height: 32px; padding: 0 12px; border: 0; background: transparent; color: inherit; font: inherit; }
+.x { display: inline-flex; align-items: center; justify-content: center; width: 30px; height: 32px; border: 0; background: transparent; color: var(--edge-muted); }
+.chip.on { background: var(--edge-accent); border-color: var(--edge-accent); color: var(--edge-on-accent); }
+.t-accent { background: color-mix(in srgb, var(--edge-accent) 14%, transparent); border-color: transparent; color: var(--edge-accent); }
+.t-success { background: color-mix(in srgb, var(--edge-success) 14%, transparent); border-color: transparent; color: var(--edge-success); }
+.t-danger { background: color-mix(in srgb, var(--edge-danger) 14%, transparent); border-color: transparent; color: var(--edge-danger); }
+</style>

@@ -515,3 +515,18 @@ tbody tr:hover {
     animation: none !important;
   }
 }
+
+/* ---- phones and tablets (also inside the Capacitor iOS / Android apps) ---- */
+body {
+  padding-top: env(safe-area-inset-top);
+  padding-right: env(safe-area-inset-right);
+  padding-bottom: env(safe-area-inset-bottom);
+  padding-left: env(safe-area-inset-left);
+  -webkit-tap-highlight-color: transparent;
+  -webkit-text-size-adjust: 100%;
+}
+button, a, [role="button"], input, select, textarea { touch-action: manipulation; } /* no 300ms click delay, no double-tap zoom */
+@media (pointer: coarse) {
+  button, .btn, input, select, textarea { min-height: 44px; }   /* a finger needs about 44px */
+  input, select, textarea { font-size: 16px; }                   /* iOS zooms into smaller fields */
+}

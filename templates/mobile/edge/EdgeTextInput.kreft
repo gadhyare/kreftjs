@@ -1,0 +1,59 @@
+<!-- A text field that does not make iOS zoom, with label, hint, error, clear button and icon.
+     <edge-text-input k-model="email" label="Email" type="email" placeholder="you@example.com" icon="mail" clearable error={errors.email}></edge-text-input>
+     type: text | email | password | number | search | tel | url    multiline + rows    maxlength    disabled    hint    error    @enter (send/submit key) -->
+prop modelValue = ''
+prop label = ''
+prop placeholder = ''
+prop type = 'text'
+prop icon = ''
+prop hint = ''
+prop error = ''
+prop clearable = false
+prop multiline = false
+prop rows = 3
+prop maxlength = 0
+prop disabled = false
+prop name = ''
+event update:modelValue
+event enter
+
+state focused = false
+state shownPw = false
+state box = null
+
+derive kind = type === 'password' && shownPw ? 'text' : type
+derive mode = type === 'number' ? 'decimal' : (type === 'tel' ? 'tel' : (type === 'email' ? 'email' : (type === 'url' ? 'url' : (type === 'search' ? 'search' : 'text'))))
+derive cls = 'fld' + (focused ? ' focus' : '') + (error ? ' bad' : '') + (disabled ? ' off' : '')
+
+action input(e) { send('update:modelValue', type === 'number' && e.target.value !== '' ? Number(e.target.value) : e.target.value) }
+action clear() { send('update:modelValue', ''); if (box) box.focus() }
+action key(e) { if (e.key === 'Enter' && !multiline) send('enter') }
+
+<view>
+  <label class="wrap">
+    <span k-if="label" class="flabel">{label}</span>
+    <span class={cls}>
+      <edge-icon k-if="icon" class="ldi" name={icon} size={20}></edge-icon>
+      <textarea data-edge k-if="multiline" k-ref="box" class="in" rows={rows} placeholder={placeholder} value={modelValue} maxlength={maxlength || null} disabled={disabled} name={name || null} @input="input($event)" @focus="focused = true" @blur="focused = false"></textarea>
+      <input data-edge k-else k-ref="box" class="in" type={kind} inputmode={mode} placeholder={placeholder} value={modelValue} maxlength={maxlength || null} disabled={disabled} name={name || null} @input="input($event)" @keydown="key($event)" @focus="focused = true" @blur="focused = false">
+      <button data-edge k-if="clearable && modelValue !== '' && !disabled" type="button" class="act" aria-label="Clear" @click="clear()"><edge-icon name="close" size={18}></edge-icon></button>
+      <button data-edge k-if="type === 'password'" type="button" class="act" aria-label="Show password" @click="shownPw = !shownPw"><edge-icon name="eye" size={18}></edge-icon></button>
+    </span>
+    <span k-if="error" class="msg err" role="alert">{error}</span>
+    <span k-elif="hint" class="msg">{hint}</span>
+  </label>
+</view>
+
+<style scoped>
+.wrap { display: flex; flex-direction: column; gap: 6px; }
+.flabel { font-size: 13px; font-weight: 600; color: var(--edge-muted); }
+.fld { display: flex; align-items: center; gap: 8px; min-height: 48px; padding: 0 12px; border: 1px solid var(--edge-border); border-radius: 12px; background: var(--edge-card); }
+.fld.focus { border-color: var(--edge-accent); box-shadow: 0 0 0 3px color-mix(in srgb, var(--edge-accent) 22%, transparent); }
+.fld.bad { border-color: var(--edge-danger); }
+.fld.off { opacity: .55; }
+.in { flex: 1; min-width: 0; padding: 12px 0; border: 0; outline: 0; background: transparent; color: var(--edge-fg); font: inherit; font-size: 16px; resize: none; }
+.ldi { color: var(--edge-muted); }
+.act { display: inline-flex; align-items: center; justify-content: center; width: 32px; height: 32px; border: 0; border-radius: 8px; background: transparent; color: var(--edge-muted); }
+.msg { font-size: 13px; color: var(--edge-muted); }
+.msg.err { color: var(--edge-danger); }
+</style>

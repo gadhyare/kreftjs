@@ -1,0 +1,29 @@
+<!-- <edge-checkbox k-model="agree" label="I agree to the terms"></edge-checkbox>      indeterminate   disabled -->
+prop modelValue = false
+prop label = ''
+prop disabled = false
+prop indeterminate = false
+event update:modelValue
+
+action flip() {
+  if (disabled) return
+  if (Kreftjs.native) Kreftjs.native.haptics.selection()
+  send('update:modelValue', !modelValue)
+}
+
+<view>
+  <button data-edge type="button" class="cb" role="checkbox" aria-checked={indeterminate ? 'mixed' : (modelValue ? 'true' : 'false')} disabled={disabled} @click="flip()">
+    <span class="box" :class="{ on: modelValue || indeterminate }">
+      <edge-icon k-if="indeterminate" name="minus" size={16} stroke={3}></edge-icon>
+      <edge-icon k-elif="modelValue" name="check" size={16} stroke={3}></edge-icon>
+    </span>
+    <span k-if="label" class="lbl">{label}</span><slot></slot>
+  </button>
+</view>
+
+<style scoped>
+.cb { display: inline-flex; align-items: center; gap: 12px; min-height: var(--edge-tap); padding: 0; border: 0; background: transparent; color: var(--edge-fg); font: inherit; font-size: 16px; text-align: left; }
+.cb:disabled { opacity: .5; }
+.box { display: inline-flex; align-items: center; justify-content: center; width: 24px; height: 24px; border: 2px solid var(--edge-border); border-radius: 7px; color: var(--edge-on-accent); transition: background .12s ease, border-color .12s ease; flex: none; }
+.box.on { background: var(--edge-accent); border-color: var(--edge-accent); }
+</style>

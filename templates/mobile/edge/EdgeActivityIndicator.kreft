@@ -1,0 +1,15 @@
+<!-- A spinner. <edge-activity-indicator size={32} color="#2563eb"></edge-activity-indicator>   label gives it a text for screen readers -->
+prop size = 28
+prop color = ''
+prop label = 'Loading'
+prop thickness = 3
+
+derive st = ({ width: size + 'px', height: size + 'px', borderWidth: thickness + 'px', color: color || null })
+
+<view><span class="spin" :style="st" role="progressbar" aria-label={label}></span></view>
+
+<style scoped>
+.spin { display: inline-block; box-sizing: border-box; border-style: solid; border-color: color-mix(in srgb, currentColor 22%, transparent); border-top-color: currentColor; border-radius: 50%; color: var(--edge-accent); animation: edge-spin .8s linear infinite; flex: none; }
+@keyframes edge-spin { to { transform: rotate(360deg); } }
+@media (prefers-reduced-motion: reduce) { .spin { animation-duration: 2.4s; } }
+</style>

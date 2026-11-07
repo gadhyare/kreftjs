@@ -1,0 +1,20 @@
+<!-- Children on top of each other (the last one is on top): an image with text over it, a badge on a button.
+     <edge-stack align="end"><img …><b>Caption</b></edge-stack>      align: start | center | end (where the children sit) -->
+prop align = 'center'
+prop height = 0
+
+state box = null
+let mo = null
+
+// children are put in the same grid cell from script: slotted elements can't be reached by scoped CSS
+action fit() { if (box) for (const c of box.children) c.style.gridArea = '1 / 1' }
+on ready { fit(); if (box && typeof MutationObserver !== 'undefined') { mo = new MutationObserver(fit); mo.observe(box, { childList: true }) } }
+on destroy { if (mo) mo.disconnect() }
+
+derive st = ({ placeItems: align === 'start' || align === 'end' ? align : 'center', height: height ? height + 'px' : null })
+
+<view><div k-ref="box" class="stack" :style="st"><slot></slot></div></view>
+
+<style scoped>
+.stack { display: grid; position: relative; }
+</style>

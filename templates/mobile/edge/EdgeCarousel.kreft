@@ -1,0 +1,55 @@
+<!-- Cards in a row you swipe sideways, with the next one peeking in. Give it items and draw each in the `item` slot.
+     <edge-carousel items={deals} peek={32} gap={12} autoplay={4000}><template k-slot:item="{ item }"><div class="card">{item.name}</div></template></edge-carousel>
+     peek (px of the next card)   gap   dots   autoplay (ms; stops when touched; not for people who asked for less motion)   @change sends the card number -->
+prop items = []
+prop peek = 28
+prop gap = 12
+prop dots = true
+prop autoplay = 0
+event change
+
+state track = null
+let timer = null
+
+state index = 0
+
+derive st = ({ gap: gap + 'px', paddingLeft: gap + 'px', paddingRight: gap + 'px', '--peek': peek + 'px', '--gap': gap + 'px' })
+
+action onScroll() {
+  if (!track || !track.children.length) return
+  const first = track.children[0]
+  const step = first.offsetWidth + gap
+  const i = Math.max(0, Math.min(items.length - 1, Math.round(track.scrollLeft / Math.max(1, step))))
+  if (i !== index) { index = i; send('change', i) }
+}
+action go(i) {
+  if (!track || !track.children[i]) return
+  track.scrollTo({ left: track.children[i].offsetLeft - gap, behavior: 'smooth' })
+}
+action stop() { if (timer) { clearInterval(timer); timer = null } }
+on ready {
+  const calm = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches
+  if (autoplay && !calm) timer = setInterval(() => go((index + 1) % Math.max(1, items.length)), autoplay)
+}
+on destroy { stop() }
+
+<view>
+  <div class="car">
+    <div k-ref="track" class="track" :style="st" @scroll.passive="onScroll()" @pointerdown="stop()">
+      <div k-each="item in items" class="slide"><slot name="item" item={item}>{item}</slot></div>
+    </div>
+    <div k-if="dots && items.length > 1" class="dots">
+      <button data-edge k-each="(it, i) in items" type="button" class="dot" :class="{ on: i === index }" aria-label="Card" @click="go(i)"></button>
+    </div>
+  </div>
+</view>
+
+<style scoped>
+.track { display: flex; overflow-x: auto; scroll-snap-type: x mandatory; scrollbar-width: none; overscroll-behavior-x: contain; -webkit-overflow-scrolling: touch; box-sizing: border-box; }
+.track::-webkit-scrollbar { display: none; }
+.slide { flex: 0 0 calc(100% - var(--peek) - var(--gap)); min-width: 0; scroll-snap-align: start; }
+.dots { display: flex; justify-content: center; gap: 4px; padding: 8px 0 0; }
+.dot { width: 22px; height: 22px; padding: 0; border: 0; background: transparent; position: relative; }
+.dot::after { content: ''; position: absolute; left: 7px; top: 7px; width: 8px; height: 8px; border-radius: 50%; background: var(--edge-border); }
+.dot.on::after { background: var(--edge-accent); }
+</style>

@@ -1,5 +1,5 @@
 /*!
- * Kreft v0.0.22-beta — reactive by nature
+ * Kreft v0.0.24-beta — reactive by nature
  * The .kreft component language (state · derive · action · when · watch · on),
  * { } views with k-if / k-each / k-model, components, slots, router, stores,
  * share / receive, event bus and a template engine.
@@ -1630,7 +1630,54 @@
       if (mods.includes('stop')) e.stopPropagation();
       invokeHandler(scope, expr, [e]);
     };
+    if (gestureTypes.has(type)) return bindGesture(el, type, mods, scope, expr);
     el.addEventListener(type, handler, options);
+  }
+
+  /* ---------- touch gestures: @tap, @longpress, @swipe, @swipeleft/right/up/down ----------
+   * Built on pointer events, so they work with a finger, a pen and a mouse. The handler gets
+   * { type, target, currentTarget, direction, dx, dy, duration, originalEvent, preventDefault(), stopPropagation() }.
+   * A swipe needs 40px of travel (more along one axis than the other) in under 800ms; a tap moves less than 10px and
+   * ends before 500ms; a longpress is held 500ms without moving. Modifiers: .prevent .stop .once. */
+  const gestureTypes = new Set(['tap', 'longpress', 'swipe', 'swipeleft', 'swiperight', 'swipeup', 'swipedown']);
+  function bindGesture(el, type, mods, scope, expr) {
+    let start = null, timer = null, done = false;
+    const fire = (extra, orig) => {
+      if (done) return;
+      if (mods.includes('once')) done = true;
+      if (mods.includes('prevent')) orig.preventDefault();
+      if (mods.includes('stop')) orig.stopPropagation();
+      invokeHandler(scope, expr, [Object.assign({
+        type, target: orig.target, currentTarget: el, originalEvent: orig,
+        preventDefault: () => orig.preventDefault(), stopPropagation: () => orig.stopPropagation(),
+      }, extra)]);
+    };
+    const clear = () => { if (timer) clearTimeout(timer); timer = null; };
+    // let a vertical scroll keep working, while a horizontal swipe is ours
+    if (type.startsWith('swipe') && el.style) el.style.touchAction = el.style.touchAction || (type === 'swipeup' || type === 'swipedown' ? 'pan-x' : 'pan-y');
+    el.addEventListener('pointerdown', (e) => {
+      if (e.pointerType === 'mouse' && e.button !== 0) return;
+      start = { x: e.clientX, y: e.clientY, t: Date.now(), moved: false };
+      clear();
+      if (type === 'longpress') timer = setTimeout(() => { if (start && !start.moved) { const s = start; start = null; fire({ dx: 0, dy: 0, duration: Date.now() - s.t }, e); } }, 500);
+    });
+    el.addEventListener('pointermove', (e) => {
+      if (!start) return;
+      if (Math.abs(e.clientX - start.x) > 10 || Math.abs(e.clientY - start.y) > 10) { start.moved = true; if (type === 'longpress') clear(); }
+    });
+    el.addEventListener('pointercancel', () => { start = null; clear(); });
+    el.addEventListener('pointerup', (e) => {
+      clear();
+      if (!start) return;
+      const s = start; start = null;
+      const dx = e.clientX - s.x, dy = e.clientY - s.y, duration = Date.now() - s.t;
+      if (type === 'tap') { if (!s.moved && duration < 500) fire({ dx, dy, duration }, e); return; }
+      if (type === 'longpress') return;
+      const horizontal = Math.abs(dx) >= Math.abs(dy);
+      if (duration > 800 || Math.max(Math.abs(dx), Math.abs(dy)) < 40) return;
+      const direction = horizontal ? (dx > 0 ? 'right' : 'left') : (dy > 0 ? 'down' : 'up');
+      if (type === 'swipe' || type === 'swipe' + direction) fire({ direction, dx, dy, duration }, e);
+    });
   }
 
   /* ---------- k-model on native elements ---------- */
@@ -5601,7 +5648,7 @@
     stores, storeLog, busLog,
   };
 
-  const VERSION = '0.0.22-beta';
+  const VERSION = '0.0.24-beta';
   const Kreftjs = {
     version: VERSION,
     // PUBLIC_ values from .env (kreft dev and kreft build put them here); never secrets
@@ -5669,7 +5716,7 @@
 
   // the text-only helpers the build tool reuses, so built code matches the browser exactly
   Object.defineProperty(Kreftjs, '__internal', {
-    value: { expandBlocks, prepareTemplate, splitKreft, splitInterp, exactBrace, stripBrace, interpToExpr, quoteBraceAttrs, expandSelfClosing, scopeCss, hashString, propType, typeCheck, caseCond, simplePathRE, fnExpRE, forAliasRE, makeKreftDef, compileFn, evaluate, stripTypeScript, stripTsParams },
+    value: { expandBlocks, prepareTemplate, splitKreft, splitInterp, exactBrace, stripBrace, interpToExpr, quoteBraceAttrs, expandSelfClosing, scopeCss, hashString, propType, typeCheck, caseCond, simplePathRE, fnExpRE, forAliasRE, makeKreftDef, compileFn, evaluate, stripTypeScript, stripTsParams, bindEvent },
   });
 
   if (typeof module !== 'undefined' && module.exports) module.exports = Kreftjs;

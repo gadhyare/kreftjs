@@ -2221,6 +2221,204 @@ Do not turn these off to make something work. Add a bridge function instead.
 | The window opens before the server is ready | It waits up to 15 seconds. Check the terminal for a dev server error. |
 | Port 8000 is taken | Nothing to do: the hidden server picks the next free port. |
 
+## Mobile apps (iOS and Android)
+
+Kreft apps run on phones in two ways. Both start from the same `.kreft` code.
+
+**1. An installable website (PWA).** `kreft build --pwa` also writes `manifest.webmanifest`, a service worker `sw.js` and `pwa-register.js`. Visitors can add the site to their home screen, and pages they have seen open without a connection. Requests to `/api/` are never cached. Put a 512x512 `icon.png` next to `index.html` for the home screen icon.
+
+**2. A real app with Capacitor.** The built site runs inside a native WebView and goes to the App Store or Google Play.
+
+```bash
+kreft new my-app --mobile        # or: kreft mobile:init in an existing app
+npm install
+kreft mobile:build --android --api-url https://api.example.com
+kreft mobile:open --android      # Android Studio (--ios: Xcode, needs a Mac)
+```
+
+| Command | What it does |
+|---|---|
+| `kreft mobile:init` | Adds `capacitor.config.json`, the Capacitor packages and the `mobile:*` scripts |
+| `kreft mobile:build [--android] [--ios]` | Builds the site with a relative base and PWA files, adds the platform the first time, then runs `cap sync`. Without a flag it syncs the platforms that exist |
+| `kreft mobile:open` | Opens the native project |
+| `kreft mobile:dev` | Runs on a device or emulator with live reload from your dev server (same Wi-Fi) |
+| `kreft mobile:ui [--layout] [--gallery]` | Adds the [phone UI kit](#the-phone-ui-kit) to an app |
+| `kreft mobile:icons` / `kreft mobile:splash` | Makes the [app icon and splash screens](#app-icon-and-splash-screen) |
+
+**Building the Android app needs Java 21** (Capacitor 7); an older Java fails with `invalid source release: 21`. The `kreft mobile:*` commands use the Java that comes with Android Studio (or any installed JDK 21+) by themselves when your default Java is older. If none is found, set `JAVA_HOME` yourself, for example on a Mac `export JAVA_HOME="/Applications/Android Studio.app/Contents/jbr/Contents/Home"`. Running from Android Studio ( `kreft mobile:open --android` ) needs no extra setup. The iOS Simulator needs a full Xcode install, not only the command line tools.
+
+**The backend does not run inside the phone.** Run it on a server and give the app its address with `--api-url` (written to `.env` as `PUBLIC_API_URL`), then in your code:
+
+```js
+Kreftjs.api.setup({ base: Kreftjs.env.PUBLIC_API_URL, token: () => Kreftjs.storage.get('token') })
+```
+
+Use API tokens for sign-in in the app, not cookie sessions.
+
+### Home pages made for apps
+
+A website's welcome page is not what an app should open on. `kreft new my-app --mobile` writes a **phone home screen** (top bar, shortcut cards, a bottom tab bar, a card that shows the touch events), and `kreft new my-app --electron` writes a **desktop workspace** (sidebar, toolbar with search, info cards, shortcuts). With both flags, `pages/Home.kreft` shows the desktop one inside the Electron window and the phone one everywhere else.
+
+```bash
+kreft make:home --mobile      # in an existing project: phone home screen (replaces pages/Home.kreft)
+kreft make:home --desktop     # desktop workspace
+```
+
+They are normal files (`components/HomeMobile.kreft`, `components/HomeDesktop.kreft`), so change them freely. Preview either in a browser with `?platform=mobile` or `?platform=desktop`. Links to the dashboard, users and profile appear only when the project has them (not with `--no-auth`).
+
+### Touch events
+
+```html
+<div @tap={open}>Open</div>
+<li @swipeleft={remove($event)} @longpress={select}>Row</li>
+<section @swipe={go($event)}>…</section>   <!-- $event.direction: left | right | up | down -->
+```
+
+`@tap` (moves less than 10px, under 500ms), `@longpress` (held still for 500ms), `@swipe` and `@swipeleft`, `@swiperight`, `@swipeup`, `@swipedown` (40px or more in under 800ms). They use pointer events, so they work with a finger, a pen and a mouse. `.once`, `.prevent` and `.stop` work. A horizontal swipe keeps vertical scrolling working.
+
+The starter `ui.css` already pads the page for the notch (`env(safe-area-inset-*)`), removes the tap delay and makes buttons and fields at least 44px high on touch screens. New projects have `viewport-fit=cover` set by `kreft build --pwa`.
+
+### The phone UI kit
+
+`kreft new my-app --mobile` also installs a kit made for phones: **42 components** (`edge-` tags), a native API (`Kreftjs.native`), a stylesheet (`edge.css`), a layout whose bars never move, and a page that shows everything live. In an existing app: `kreft mobile:ui` adds the components, the native API and the stylesheet; `kreft mobile:ui --layout` also uses the phone layout for every page; `kreft mobile:ui --gallery` adds the `/edge` page.
+
+The files are copied into your project (`components/edge/`, `kreftjs-native.js`, `edge.css`, `layouts/mobile.kreft`), so you can change any of them. Running the command again only adds what is missing; it never overwrites your edits.
+
+#### Top bar and bottom bar that never move
+
+`layouts/mobile.kreft` puts the page between a top bar and a bottom bar. Only the page scrolls: the bars stay exactly where they are, the document itself does not scroll and does not bounce. They keep clear of the notch and the home bar by themselves.
+
+The starting look is the `base` block at the top of that file. Any page can change it, and it goes back to the base on the next page:
+
+```html
+use edge
+
+on ready {
+  edge.setTop({ title: 'Cart', center: true, bg: '#111827', color: '#ffffff',
+    right: [{ icon: 'search', id: 'search', onTap: () => openSearch() }, { icon: 'bell', badge: 3 }] })
+  edge.setBottom({ labels: 'active', indicator: 'line', floating: true, activeColor: '#38bdf8' })
+}
+```
+
+| `edge.setTop({ … })` | |
+|---|---|
+| `title`, `subtitle` | The text. Without a title the page's `.title('…')` from the routes is used. |
+| `back` | `'auto'` (default: an arrow on pages that are not a bottom button), `true` or `false`. |
+| `bg`, `color`, `height` | Colours and the height in px (the notch area is added). |
+| `center`, `border`, `elevated`, `blur` | Centre the title, the line under the bar, a shadow, frosted glass. |
+| `left`, `right` | Buttons: `[{ icon \| text \| src, label, id, badge, onTap }]`. |
+| `show` | `false` hides the bar. `edge.hideBars()` and `edge.showBars()` do both bars. |
+
+| `edge.setBottom({ … })` | |
+|---|---|
+| `items` | The buttons: `[{ label, icon \| text \| src, to, badge, disabled, onTap }]`. An item with `to` opens that page and is active on it. |
+| `labels` | `'always'`, `'active'` or `'never'`. |
+| `indicator` | `'pill'`, `'line'` or `'none'`: what shows the active button. |
+| `bg`, `color`, `activeColor`, `height` | Colours and height. |
+| `border`, `floating`, `blur`, `haptics` | The line above, a rounded floating bar, frosted glass, a small buzz on tap. |
+
+`edge.reset()` goes back to the defaults. The two bars are also ordinary components you can use anywhere: `<edge-top-bar title="Cart" back bg="#111" color="#fff">` and `<edge-bottom-nav items={tabs} labels="active">`, with the same names as props. Colours for the whole app are the variables at the top of `edge.css` (`--edge-top-bg`, `--edge-bottom-active`, `--edge-accent`, `--edge-radius` …); they follow your `ui.css` colours, so dark mode works by itself.
+
+Putting the bars in your own layout:
+
+```html
+<edge-shell>
+  <template k-slot:top><edge-top-bar title="Home"></edge-top-bar></template>
+  …the page…
+  <template k-slot:bottom><edge-bottom-nav items={tabs}></edge-bottom-nav></template>
+</edge-shell>
+```
+
+#### Components
+
+Every component has a comment at the top of its file listing its props. Values that change come back with `k-model` (`prop modelValue` and `event update:modelValue`), the way [k-model on a component](#k-model-on-a-component) works. Open `/edge` in your app (or run it in a browser) to see and try all of them.
+
+| Component | What it is |
+|---|---|
+| `edge-shell` | The frame: top slot, page that scrolls, bottom slot. |
+| `edge-top-bar` | The bar at the top: title, back arrow, buttons, colours. |
+| `edge-bottom-nav` | The row of buttons at the bottom: icons, labels, badges, indicator. |
+| `edge-side-nav` | A drawer from the side (`k-model`, `side`, `items`). |
+| `edge-tab-row` | Tabs in a row that scrolls sideways, with badges. |
+| `edge-row`, `edge-column` | Children side by side or one under another (`gap`, `align`, `justify`, `wrap`, `pad`). |
+| `edge-stack` | Children on top of each other (`align`). |
+| `edge-spacer`, `edge-divider` | Space (flexible or `size`), a line (`label`, `vertical`, `inset`). |
+| `edge-scroll-view` | A box that scrolls on its own (`horizontal`, `snap`, `hideBar`). |
+| `edge-list` | Rows like a settings screen (`items`, `inset`, or the `item` slot). |
+| `edge-lazy-grid` | A grid that draws more items as you scroll (`columns` or `min`, `step`). |
+| `edge-virtual-list` | Thousands of equal rows, only the visible ones exist (`itemHeight`). |
+| `edge-carousel` | Cards you swipe sideways with the next one peeking (`peek`, `autoplay`). |
+| `edge-pager` | Full pages you swipe between, with dots (`k-model` is the page). |
+| `edge-text` | Text: `size`, `weight`, `color`, `muted`, `lines` (cut with …), `mono`. |
+| `edge-icon` | 55 built-in icons (`name`), your own picture (`src`) or a glyph (`text`). |
+| `edge-image` | Loads near the screen, keeps its shape (`ratio`, `radius`, `fit`, `placeholder`). |
+| `edge-badge` | A small number or a dot (`value`, `dot`, `max`, `tone`). |
+| `edge-chip` | A pill: a filter or tag (`selected`, `closable`, `tone`). |
+| `edge-shape` | A coloured shape: circle, rect, rounded, pill, triangle, diamond, hexagon, star. |
+| `edge-canvas` | A drawing surface with a sharp 2D context (`@draw`, `@pointer`). |
+| `edge-progress-bar` | A progress bar, or a moving one when the amount is unknown (`indeterminate`). |
+| `edge-activity-indicator` | A spinner (`size`, `color`). |
+| `edge-accordion` | Sections that open and close (`items`, `single`). |
+| `edge-button` | A button made for thumbs: `variant`, `size`, `icon`, `full`, `loading`. |
+| `edge-button-group` | A segmented control: one choice out of a few (`options`, `k-model`). |
+| `edge-text-input` | A field with label, icon, hint, error, clear button; no zoom on iPhone. |
+| `edge-checkbox`, `edge-toggle` | A checkbox and a switch (`k-model`, `label`). |
+| `edge-radio-group`, `edge-select` | One choice out of a few; a dropdown that opens the phone's own picker. |
+| `edge-slider` | A range slider (`min`, `max`, `step`, `showValue`). |
+| `edge-modal` | A dialog over the page (`k-model`, `title`, `fullscreen`, footer slot). |
+| `edge-bottom-sheet` | A panel from the bottom you drag down to close (`size`: auto, half, full). |
+| `edge-menu` | A small menu from a button; `sheet` opens it as an action sheet. |
+| `edge-fab` | The round floating button, `extended` with a label. |
+| `edge-pressable` | Anything pressable with the feeling you choose: `@press`, `@longpress`. |
+| `edge-gesture-area` | `@tap`, `@doubletap`, `@longpress`, `@swipe`, `@swipeleft` … on an area. |
+| `edge-refreshable` | Pull down to refresh (`refreshing`, `@refresh`). |
+| `edge-web-view` | A web page inside the app (http(s) only, sandboxed). |
+
+Layout helpers: classes in `edge.css` such as `edge-row`, `edge-col`, `edge-center`, `edge-between`, `edge-grow`, `edge-pad`, `edge-card`, `edge-round`, `edge-muted`, `edge-ellipsis`. Positioning: `edge-rel` on the parent, then `edge-abs` or `edge-fixed` with `edge-top`, `edge-bottom-right`, `edge-cover` and `edge-z1` … `edge-z3`; `edge-safe-top` and `edge-safe-bottom` pad for the notch and the home bar. Add your own icon with `Kreftjs.edgeIcons.add('logo', 'M2 2h20v20H2z')` (a 24x24 path).
+
+#### Native features: `Kreftjs.native`
+
+`kreftjs-native.js` works in the phone app (through Capacitor plugins that `kreft mobile:init` adds), in Electron and in a plain browser (with what the browser has), so you can build the whole app in the browser first. Calls return a Promise and give a sensible default instead of failing when something is not available.
+
+| Area | Calls |
+|---|---|
+| Platform | `native.platform()` is `'android'`, `'ios'`, `'electron'` or `'web'`; `isNative()`, `isDesktop()`, `isWeb()`. |
+| Device | `device.info()` (platform, OS, model, screen), `device.id()`, `device.battery()`, `device.language()`. |
+| Haptics | `haptics.impact('light' \| 'medium' \| 'heavy')`, `haptics.notification('success' \| 'warning' \| 'error')`, `haptics.selection()`, `haptics.vibrate(ms)`. |
+| File | `file.pick({ accept, multiple })`, `file.readText(f)`, `file.readDataUrl(f)`, `file.write(path, data)`, `file.read(path)`, `file.list(dir)`, `file.remove(path)`, `file.save(name, data, mime)`. |
+| System | `system.openUrl(url)` (http, https, mailto, tel only), `system.share({ title, text, url })`, `system.copy(text)`, `system.paste()`, `system.network()`, `system.app()`, `system.statusBar({ color, style, overlay })`, `system.keyboard.show()` and `.hide()`, `system.hideSplash()`, `system.exit()`. |
+| Dialogs | `dialog.alert(text, { title })`, `dialog.confirm(text, { ok, cancel, danger })` gives `true` or `false`, `dialog.prompt(text, { value })` gives the text or `null`, `dialog.actionSheet({ title, options })`, `dialog.toast(text, { tone, position, duration })`. |
+| Safe area | `safeArea()` gives `{ top, right, bottom, left }` and sets the CSS variables `--edge-safe-top` … for you. |
+| Positioning | `position.get()` (latitude, longitude), `position.watch(fn)` gives a stop function. |
+| Events | `on('pause' \| 'resume' \| 'network' \| 'urlOpen' \| 'keyboardShow' \| 'keyboardHide', fn)` gives a stop function. |
+| Back button | `pushBack(fn)`: the newest handler gets the Android back button first (return `false` to pass it on); then the page goes back, then the app closes. Modals, sheets and drawers do this by themselves. |
+| Assets | `asset('img/logo.png')` gives the right address inside the app, whatever the base. |
+
+On iPhone, camera, location and photo access need a usage text in `ios/App/App/Info.plist` (Apple asks for it); on Android the plugins add their permissions.
+
+#### App icon and splash screen
+
+```bash
+kreft mobile:icons logo.png --bg "#ffffff"                         # a 1024x1024 PNG: every icon size for android/ and ios/
+kreft mobile:splash splash.png --bg "#ffffff" --dark-bg "#000000"   # a 2732x2732 PNG, with a dark version
+```
+
+They copy the picture to `assets/` and use Capacitor's asset tool (the first run needs the internet). Then build again with `kreft mobile:build --android`.
+
+#### Coming from NativePHP Mobile
+
+| NativePHP Mobile | Kreft |
+|---|---|
+| Device, File, System | `Kreftjs.native.device`, `.file`, `.system` |
+| Native UI, Edge components | the `edge-` components above |
+| Routing, Middleware | [the router](#router-and-layouts) and its guards, as in a web app |
+| Layouts, Nested components | `layouts/mobile.kreft`, and components with slots |
+| Dialogs | `Kreftjs.native.dialog` and `edge-modal`, `edge-bottom-sheet` |
+| Safe area, Positioning | `Kreftjs.native.safeArea()`, the `edge-safe-*` and `edge-abs` classes, `Kreftjs.native.position` |
+| Events | `Kreftjs.native.on(…)`, and component `event` / `send()` |
+| App icons, Splash screens | `kreft mobile:icons`, `kreft mobile:splash` |
+| Assets | `Kreftjs.native.asset(…)` |
+
 ## Packages
 
 `kreft add` is a safer `npm install`:

@@ -1,0 +1,33 @@
+<!-- A row of choices where one is picked (a segmented control). <edge-button-group k-model="view" options={[{ label: 'Day', value: 'day' }, { label: 'Week', value: 'week' }]}></edge-button-group>
+     options: [{ label, value, icon }] or plain strings      modelValue: the picked value      full (stretch)      bg / activeColor -->
+prop modelValue = ''
+prop options = []
+prop full = true
+prop bg = ''
+prop activeColor = ''
+event update:modelValue
+
+derive list = options.map((o) => (typeof o === 'object' ? o : { label: String(o), value: o }))
+derive st = ({ '--g-bg': bg || null, '--g-active': activeColor || null })
+
+action pick(o) {
+  if (o.disabled || o.value === modelValue) return
+  if (Kreftjs.native) Kreftjs.native.haptics.selection()
+  send('update:modelValue', o.value)
+}
+
+<view>
+  <div class="group {full ? 'full' : ''}" :style="st" role="radiogroup">
+    <button data-edge k-each="o in list" k-key="o.value" type="button" class="seg" :class="{ on: o.value === modelValue }" role="radio" aria-checked={o.value === modelValue ? 'true' : 'false'} disabled={o.disabled} @click="pick(o)">
+      <edge-icon k-if="o.icon" name={o.icon} size={18}></edge-icon>{o.label}
+    </button>
+  </div>
+</view>
+
+<style scoped>
+.group { display: inline-flex; padding: 3px; gap: 2px; border-radius: 12px; background: var(--g-bg, var(--edge-surface)); }
+.group.full { display: flex; }
+.seg { flex: 1 1 0; min-height: 38px; display: inline-flex; align-items: center; justify-content: center; gap: 6px; padding: 0 12px; border: 0; border-radius: 9px; background: transparent; color: var(--edge-muted); font: inherit; font-size: 14px; font-weight: 600; }
+.seg.on { background: var(--g-active, var(--edge-card)); color: var(--edge-fg); box-shadow: 0 1px 3px rgba(0, 0, 0, .15); }
+.seg:disabled { opacity: .4; }
+</style>

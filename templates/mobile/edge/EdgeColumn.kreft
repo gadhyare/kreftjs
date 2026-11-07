@@ -1,0 +1,15 @@
+<!-- Children one under another. <edge-column gap={12} align="stretch">…</edge-column>
+     gap (px)   align: start | center | end | stretch   justify: start | center | end | between | around   pad (px)   grow: fill the space -->
+prop gap = 8
+prop align = 'stretch'
+prop justify = 'start'
+prop pad = 0
+prop grow = false
+
+derive st = ({ gap: gap + 'px', alignItems: align === 'start' || align === 'end' ? 'flex-' + align : align, justifyContent: justify === 'between' || justify === 'around' ? 'space-' + justify : (justify === 'start' || justify === 'end' ? 'flex-' + justify : justify), padding: pad ? pad + 'px' : null, flex: grow ? '1 1 0' : null })
+
+<view><div class="col" :style="st"><slot></slot></div></view>
+
+<style scoped>
+.col { display: flex; flex-direction: column; min-width: 0; box-sizing: border-box; }
+</style>

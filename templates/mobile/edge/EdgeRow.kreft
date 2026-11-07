@@ -1,0 +1,16 @@
+<!-- Children side by side. <edge-row gap={12} justify="between" wrap>…</edge-row>
+     gap (px)   align: start | center | end | stretch   justify: start | center | end | between | around   wrap   pad (px)   grow: fill the space -->
+prop gap = 8
+prop align = 'center'
+prop justify = 'start'
+prop wrap = false
+prop pad = 0
+prop grow = false
+
+derive st = ({ gap: gap + 'px', alignItems: align === 'start' || align === 'end' ? 'flex-' + align : align, justifyContent: justify === 'between' || justify === 'around' ? 'space-' + justify : (justify === 'start' || justify === 'end' ? 'flex-' + justify : justify), flexWrap: wrap ? 'wrap' : 'nowrap', padding: pad ? pad + 'px' : null, flex: grow ? '1 1 0' : null })
+
+<view><div class="row" :style="st"><slot></slot></div></view>
+
+<style scoped>
+.row { display: flex; flex-direction: row; min-width: 0; box-sizing: border-box; }
+</style>

@@ -1,0 +1,49 @@
+<!-- A drawing surface. You get a 2D context scaled for sharp screens and called again when the size or `redraw` changes.
+     <edge-canvas height={200} redraw={points.length} @draw="paint($event)" @pointer="touch($event)"></edge-canvas>
+     action paint({ ctx, width, height }) { ctx.fillRect(10, 10, 50, 50) }
+     @pointer sends { type: 'down' | 'move' | 'up', x, y } in canvas pixels (a finger or a mouse). -->
+prop width = 0
+prop height = 200
+prop redraw = 0
+event draw
+event pointer
+
+state cv = null
+let ro = null
+let down = false
+
+action paint() {
+  if (!cv) return
+  const w = width || cv.parentElement.clientWidth || 300
+  const dpr = window.devicePixelRatio || 1
+  cv.width = Math.round(w * dpr)
+  cv.height = Math.round(height * dpr)
+  const ctx = cv.getContext('2d')
+  ctx.setTransform(dpr, 0, 0, dpr, 0, 0)
+  ctx.clearRect(0, 0, w, height)
+  send('draw', { ctx, width: w, height, canvas: cv })
+}
+action point(type, e) {
+  const r = cv.getBoundingClientRect()
+  send('pointer', { type, x: e.clientX - r.left, y: e.clientY - r.top })
+}
+action onDown(e) { down = true; if (cv.setPointerCapture) cv.setPointerCapture(e.pointerId); point('down', e) }
+action onMove(e) { if (down) point('move', e) }
+action onUp(e) { if (down) { down = false; point('up', e) } }
+
+on ready {
+  paint()
+  if (typeof ResizeObserver !== 'undefined' && cv) { ro = new ResizeObserver(() => paint()); ro.observe(cv.parentElement) }
+}
+on destroy { if (ro) ro.disconnect() }
+watch redraw { paint() }
+watch height { paint() }
+
+<view>
+  <div class="host"><canvas k-ref="cv" class="cv" @pointerdown="onDown($event)" @pointermove="onMove($event)" @pointerup="onUp($event)" @pointercancel="onUp($event)"></canvas></div>
+</view>
+
+<style scoped>
+.host { width: 100%; }
+.cv { display: block; width: 100%; touch-action: none; }
+</style>

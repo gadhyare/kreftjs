@@ -1,0 +1,49 @@
+<!-- A button made for thumbs. <edge-button label="Save" icon="check" variant="filled" full @click={save}></edge-button>
+     variant: filled | tonal | outline | text | danger     size: sm | md | lg     full (whole width)   round (pill)   loading   disabled
+     bg / color change the colours. The default slot can replace the label. @click is sent unless it is disabled or loading. -->
+prop label = ''
+prop icon = ''
+prop variant = 'filled'
+prop size = 'md'
+prop full = false
+prop round = false
+prop loading = false
+prop disabled = false
+prop bg = ''
+prop color = ''
+prop haptics = true
+event click
+
+derive st = ({ '--b-bg': bg || null, '--b-fg': color || null })
+derive cls = 'eb v-' + variant + ' s-' + size + (full ? ' full' : '') + (round ? ' round' : '') + (loading ? ' loading' : '')
+
+action press(e) {
+  if (disabled || loading) return
+  if (haptics && Kreftjs.native) Kreftjs.native.haptics.impact('light')
+  send('click', e)
+}
+
+<view>
+  <button data-edge type="button" class={cls} :style="st" disabled={disabled || loading} aria-busy={loading ? 'true' : 'false'} @click="press($event)">
+    <edge-activity-indicator k-if="loading" size={18}></edge-activity-indicator>
+    <edge-icon k-elif="icon" name={icon} size={20}></edge-icon>
+    <span k-if="label" class="lbl">{label}</span>
+    <slot></slot>
+  </button>
+</view>
+
+<style scoped>
+.eb { display: inline-flex; align-items: center; justify-content: center; gap: 8px; min-height: var(--edge-tap); padding: 0 20px; border: 1px solid transparent; border-radius: 12px; font: inherit; font-size: 16px; font-weight: 600; cursor: pointer; transition: transform .08s ease, opacity .15s ease; box-sizing: border-box; }
+.eb:active { transform: scale(.97); }
+.eb:disabled { opacity: .5; cursor: default; transform: none; }
+.s-sm { min-height: 36px; padding: 0 14px; font-size: 14px; border-radius: 10px; }
+.s-lg { min-height: 54px; padding: 0 28px; font-size: 18px; border-radius: 14px; }
+.full { display: flex; width: 100%; }
+.round { border-radius: 999px; }
+.v-filled { background: var(--b-bg, var(--edge-accent)); color: var(--b-fg, var(--edge-on-accent)); }
+.v-danger { background: var(--b-bg, var(--edge-danger)); color: var(--b-fg, #fff); }
+.v-tonal { background: var(--b-bg, var(--edge-surface)); color: var(--b-fg, var(--edge-fg)); }
+.v-outline { background: var(--b-bg, transparent); color: var(--b-fg, var(--edge-fg)); border-color: var(--edge-border); }
+.v-text { background: var(--b-bg, transparent); color: var(--b-fg, var(--edge-accent)); padding: 0 12px; }
+@media (prefers-reduced-motion: reduce) { .eb { transition: none; } }
+</style>

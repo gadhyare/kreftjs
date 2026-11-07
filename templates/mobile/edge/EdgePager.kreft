@@ -1,0 +1,59 @@
+<!-- Full pages you swipe between (onboarding, photo viewer). Each child is one page. Dots show where you are.
+     <edge-pager k-model="page"><div>One</div><div>Two</div><div>Three</div></edge-pager>
+     modelValue: the page number (0 is the first)      dots (default on)      count: how many pages there are (for the dots)
+     height (px, default: fills its parent) -->
+prop modelValue = 0
+prop count = 0
+prop dots = true
+prop height = 0
+event update:modelValue
+
+state track = null
+let settling = false
+
+state total = 0
+derive st = ({ height: height ? height + 'px' : null })
+derive n = count || total
+
+action measure() {
+  if (!track) return
+  total = track.children.length
+  for (const c of track.children) { c.style.flex = '0 0 100%'; c.style.minWidth = '0'; c.style.scrollSnapAlign = 'start'; c.style.boxSizing = 'border-box' }
+}
+action onScroll() {
+  if (!track || settling) return
+  const i = Math.round(track.scrollLeft / Math.max(1, track.clientWidth))
+  if (i !== modelValue) send('update:modelValue', i)
+}
+action go(i) {
+  if (!track) return
+  settling = true
+  track.scrollTo({ left: i * track.clientWidth, behavior: 'smooth' })
+  setTimeout(() => { settling = false }, 350)
+  send('update:modelValue', i)
+}
+let mo = null
+on ready { measure(); if (track && typeof MutationObserver !== 'undefined') { mo = new MutationObserver(measure); mo.observe(track, { childList: true }) } if (track && modelValue) track.scrollTo({ left: modelValue * track.clientWidth }) }
+on destroy { if (mo) mo.disconnect() }
+watch modelValue {
+  if (track && Math.round(track.scrollLeft / Math.max(1, track.clientWidth)) !== modelValue) go(modelValue)
+}
+
+<view>
+  <div class="pager" :style="st">
+    <div k-ref="track" class="track" @scroll.passive="onScroll()"><slot></slot></div>
+    <div k-if="dots && n > 1" class="dots" role="tablist">
+      <button data-edge k-each="i in n" type="button" class="dot" :class="{ on: i - 1 === modelValue }" aria-label="Page" role="tab" @click="go(i - 1)"></button>
+    </div>
+  </div>
+</view>
+
+<style scoped>
+.pager { position: relative; display: flex; flex-direction: column; min-height: 0; }
+.track { flex: 1; display: flex; overflow-x: auto; overflow-y: hidden; scroll-snap-type: x mandatory; scrollbar-width: none; overscroll-behavior-x: contain; -webkit-overflow-scrolling: touch; }
+.track::-webkit-scrollbar { display: none; }
+.dots { display: flex; justify-content: center; gap: 4px; padding: 10px 0; }
+.dot { width: 22px; height: 22px; padding: 0; border: 0; background: transparent; position: relative; }
+.dot::after { content: ''; position: absolute; left: 7px; top: 7px; width: 8px; height: 8px; border-radius: 50%; background: var(--edge-border); transition: transform .15s ease, background .15s ease; }
+.dot.on::after { background: var(--edge-accent); transform: scale(1.3); }
+</style>

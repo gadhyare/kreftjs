@@ -1,0 +1,57 @@
+<!-- A dialog over the page. <edge-modal k-model="show" title="Delete?"> Text… <template k-slot:footer><edge-button label="Delete" variant="danger" @click={remove}></edge-button></template></edge-modal>
+     modelValue (open)      title      fullscreen      dismissible (tap outside / Esc / back button close it; default yes)      closeButton (× in the corner) -->
+prop modelValue = false
+prop title = ''
+prop fullscreen = false
+prop dismissible = true
+prop closeButton = true
+event update:modelValue
+event close
+
+state box = null
+let offBack = null
+
+derive cls = 'modal' + (fullscreen ? ' full' : '')
+
+action close() {
+  send('update:modelValue', false)
+  send('close')
+}
+action outside(e) { if (dismissible && e.target === e.currentTarget) close() }
+action key(e) { if (e.key === 'Escape' && dismissible) close() }
+
+watch modelValue {
+  if (offBack) { offBack(); offBack = null }
+  if (modelValue) {
+    if (Kreftjs.native && dismissible) offBack = Kreftjs.native.pushBack(() => { close(); return true })
+    setTimeout(() => { if (box) box.focus() }, 30)
+  }
+}
+on destroy { if (offBack) offBack() }
+
+<view>
+  <kreft-portal to="body">
+    <div k-if="modelValue" class="scrim" k-animate="fade" @click="outside($event)">
+      <div k-ref="box" class={cls} role="dialog" aria-modal="true" aria-label={title} tabindex="-1" @keydown="key($event)">
+        <header k-if="title || closeButton" class="head">
+          <h2 class="t">{title}</h2>
+          <button data-edge k-if="closeButton && dismissible" type="button" class="x" aria-label="Close" @click="close()"><edge-icon name="close" size={22}></edge-icon></button>
+        </header>
+        <div class="body"><slot></slot></div>
+        <footer class="foot"><slot name="footer"></slot></footer>
+      </div>
+    </div>
+  </kreft-portal>
+</view>
+
+<style scoped>
+.scrim { position: fixed; inset: 0; z-index: 900; display: flex; align-items: center; justify-content: center; padding: 24px; background: rgba(0, 0, 0, .45); }
+.modal { display: flex; flex-direction: column; width: 100%; max-width: 420px; max-height: 100%; background: var(--edge-card); color: var(--edge-fg); border-radius: 20px; outline: 0; overflow: hidden; }
+.modal.full { max-width: none; height: 100%; border-radius: 0; margin: -24px; padding-top: var(--edge-safe-top, 0px); padding-bottom: var(--edge-safe-bottom, 0px); }
+.head { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 16px 8px 0 20px; }
+.t { margin: 0; font-size: 18px; }
+.x { display: inline-flex; align-items: center; justify-content: center; min-width: var(--edge-tap); min-height: var(--edge-tap); border: 0; background: transparent; color: var(--edge-muted); border-radius: 12px; margin-left: auto; }
+.body { padding: 12px 20px; overflow-y: auto; overscroll-behavior: contain; line-height: 1.5; }
+.foot { display: flex; justify-content: flex-end; gap: 8px; padding: 0 20px 16px; } .foot:empty { display: none; }
+.fade-in, .fade-out { transition: opacity .18s ease; } .fade-in-from, .fade-out-to { opacity: 0; }
+</style>

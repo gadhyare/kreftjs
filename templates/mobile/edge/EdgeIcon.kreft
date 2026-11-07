@@ -1,0 +1,25 @@
+<!-- An icon: a built-in name (home, search, user …), your own image (src), or a glyph / emoji (text).
+     <edge-icon name="home" size={24} color="#2563eb"></edge-icon>   Add your own: Kreftjs.edgeIcons.add('logo', 'M2 2h20v20H2z') -->
+prop name = ''
+prop size = 24
+prop color = ''
+prop src = ''
+prop text = ''
+prop stroke = 2
+
+derive d = (Kreftjs.edgeIcons && Kreftjs.edgeIcons.paths[name]) || ''
+derive box = ({ width: size + 'px', height: size + 'px', fontSize: Math.round(size * 0.85) + 'px', color: color || null })
+
+<view>
+  <span class="ico" :style="box" aria-hidden="true">
+    <img k-if="src" src={src} alt="">
+    <svg k-elif="d" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width={stroke} stroke-linecap="round" stroke-linejoin="round"><path d={d}></path></svg>
+    <b k-elif="text">{text}</b>
+  </span>
+</view>
+
+<style scoped>
+.ico { display: inline-flex; align-items: center; justify-content: center; flex: none; line-height: 1; }
+.ico svg, .ico img { width: 100%; height: 100%; display: block; object-fit: contain; }
+.ico b { font-weight: 600; }
+</style>
