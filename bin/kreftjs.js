@@ -54,6 +54,7 @@ const commands = {
   'make:home': (a) => require('./home-variants.js').make(a),
   'mobile:init': (a) => require('./mobile.js').init(a.find((x) => !x.startsWith('-'))),
   'mobile:build': (a) => require('./mobile.js').build(a),
+  'mobile:run': (a) => require('./mobile.js').run(a),
   'mobile:open': (a) => require('./mobile.js').open(a),
   'mobile:dev': (a) => require('./mobile.js').dev(a),
   'mobile:help': () => require('./mobile.js').help(),
@@ -133,6 +134,7 @@ function help() {
     kreft electron:build    Build and make installers (--mac, --win, --linux; or npm run electron:build:all)
     kreft electron:init     Add Electron support to an existing project (alias: kreft make:electron)
     kreft make:home         Write an app-style home page: --mobile (phone screen) or --desktop (sidebar workspace)
+    kreft mobile:run        Build and start the app on an emulator or phone (--android, --ios, --target; see kreft mobile:help)
     kreft mobile:build      Build for iOS / Android with Capacitor (--android, --ios, --api-url; see kreft mobile:help)
     kreft electron:help     Everything about desktop apps: menu, icon, installers, errors
 

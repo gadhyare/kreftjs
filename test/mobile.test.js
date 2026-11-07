@@ -74,7 +74,7 @@ test('Android builds find a Java 21 when the default Java is older (or say so)',
 test('mobile commands refuse to run outside a Kreft app and change nothing', () => {
   const empty = fs.mkdtempSync(path.join(os.tmpdir(), 'kreft-notapp-'));
   fs.writeFileSync(path.join(empty, 'package.json'), '{"name":"x"}\n');
-  for (const cmd of ['mobile:init', 'mobile:build', 'mobile:open', 'mobile:dev']) {
+  for (const cmd of ['mobile:init', 'mobile:build', 'mobile:run', 'mobile:open', 'mobile:dev']) {
     const r = run([cmd, '--android'], empty);
     assert.notStrictEqual(r.status, 0, cmd);
     assert.match(r.stdout + r.stderr, /not a Kreft app/, cmd);
@@ -88,4 +88,28 @@ test('mobile commands refuse to run outside a Kreft app and change nothing', () 
   assert.match(r.stdout + r.stderr, /Kreft framework itself/);
   assert.strictEqual(fs.readFileSync(path.join(__dirname, '..', 'package.json'), 'utf8'), before);
   assert.ok(!fs.existsSync(path.join(__dirname, '..', 'capacitor.config.json')));
+});
+
+const tmp = () => fs.mkdtempSync(path.join(os.tmpdir(), 'kreft-pin-'));
+
+test('Gradle is pinned to a fitting Java in android/gradle.properties, once, and never over a line the person wrote', () => {
+  const m = require('../bin/mobile.js');
+  const dir = tmp();
+  fs.mkdirSync(path.join(dir, 'android'));
+  const file = path.join(dir, 'android', 'gradle.properties');
+  fs.writeFileSync(file, 'org.gradle.jvmargs=-Xmx1536m');
+  assert.strictEqual(m.pinGradleJava(dir, '/jdks/jdk-21/Contents/Home'), true);
+  const once = fs.readFileSync(file, 'utf8');
+  assert.match(once, /^org\.gradle\.jvmargs=-Xmx1536m$/m, 'the existing lines stay');
+  assert.match(once, /^org\.gradle\.java\.home=\/jdks\/jdk-21\/Contents\/Home$/m);
+  assert.strictEqual(m.pinGradleJava(dir, '/other/jdk-22'), false, 'a second run changes nothing');
+  assert.strictEqual(fs.readFileSync(file, 'utf8'), once);
+  fs.writeFileSync(file, 'org.gradle.java.home=/mine/jdk-23\n');
+  assert.strictEqual(m.pinGradleJava(dir, '/jdks/jdk-21'), false, 'never over the person\'s own line');
+  assert.strictEqual(fs.readFileSync(file, 'utf8'), 'org.gradle.java.home=/mine/jdk-23\n');
+  assert.strictEqual(m.pinGradleJava(dir, null), false, 'no Java found: nothing written');
+  assert.strictEqual(m.pinGradleJava(path.join(dir, 'nowhere'), '/jdks/jdk-21'), false, 'no android folder: nothing written');
+  fs.writeFileSync(file, '');
+  m.pinGradleJava(dir, 'C:\\Java\\jdk-21');
+  assert.match(fs.readFileSync(file, 'utf8'), /^org\.gradle\.java\.home=C:\/Java\/jdk-21$/m, 'Windows paths use forward slashes');
 });

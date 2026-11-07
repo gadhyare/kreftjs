@@ -1747,12 +1747,17 @@ Run `kreft list` to see every command your installed version has, and `kreft hel
 | `kreft about`, `kreft env`, `kreft log`, `kreft tinker` | Versions and folders, environment, logs, a console with your models (`await User.count()`). |
 | `kreft down --secret=x` / `kreft up` | Maintenance mode: visitors get `503`, and `/x` lets you in. |
 | `kreft vscode` | Installs colors, snippets and folding for `.kreft` files in VS Code, Cursor and VSCodium. |
+| `kreft electron:dev`, `kreft electron:build` | A desktop window, and installers: [Desktop apps](#desktop-apps-with-electron). |
+| `kreft mobile:init`, `mobile:build`, `mobile:open`, `mobile:dev` | iOS and Android apps with Capacitor: [Mobile apps](#mobile-apps-ios-and-android). |
+| `kreft mobile:ui`, `mobile:icons`, `mobile:splash` | The phone UI kit, the app icon and the splash screen: [The phone UI kit](#the-phone-ui-kit). |
+| `kreft make:home --mobile` / `--desktop` | An app-style home page: [Home pages made for apps](#home-pages-made-for-apps). |
+| `kreft build --pwa` | Also writes a manifest and a service worker (an installable site that works offline). |
 
 ### Generators and database
 
 | Group | Commands |
 |---|---|
-| `make:` | `model`, `controller`, `page`, `routes`, `migration`, `seeder`, `factory`, `middleware`, `request`, `resource`, `policy`, `rule`, `job`, `event`, `listener`, `mail`, `notification`, `observer`, `command`, `lang`, `errors`, `admin`, `electron`, `vite` |
+| `make:` | `model`, `controller`, `page`, `routes`, `migration`, `seeder`, `factory`, `middleware`, `request`, `resource`, `policy`, `rule`, `job`, `event`, `listener`, `mail`, `notification`, `observer`, `command`, `lang`, `errors`, `admin`, `electron`, `mobile`, `home`, `vite` |
 | `migrate` | `migrate`, `:rollback`, `:fresh`, `:refresh`, `:reset`, `:status`, `:file`, `:undo` |
 | `db:` | `db:seed`, `db:wipe` |
 | `queue:` | `work`, `start`, `stop`, `pause`, `resume`, `restart`, `status`, `failed`, `retry`, `flush`, `clear`, `table` |
@@ -1906,6 +1911,17 @@ npm run build                  # then upload dist/kreftjs-com as above
 ```
 
 Check that people get it with `npm view kreftjs version` and a fresh `npm install -g kreftjs@latest`.
+
+**Trying a version before everyone gets it.** Publish it under another tag. `latest` and `beta` stay on the old version, so nobody gets it by accident:
+
+```bash
+npm publish --tag mobile-test --access public     # npm asks you to approve in the browser
+npm install -g kreftjs@mobile-test                  # you, on any computer
+kreft --version                                     # shows the new number
+npm dist-tag add kreftjs@0.0.25-beta beta           # when it is good: the tag everyone uses moves
+```
+
+`--access public` is needed because this package's `package.json` has `publishConfig.access` set to `restricted` (left from an old scoped package), which npm refuses for a plain package name. A version number can be published only once, so the next try is the next number. To test the folder you are in without publishing anything, run `npm link` (undo with `npm unlink -g kreftjs`). `kreft --version` after `npm install -g` reads the globally installed package, not the repository.
 
 ### Ready HTML for every page: `--prerender`
 
@@ -2238,14 +2254,16 @@ kreft mobile:open --android      # Android Studio (--ios: Xcode, needs a Mac)
 
 | Command | What it does |
 |---|---|
-| `kreft mobile:init` | Adds `capacitor.config.json`, the Capacitor packages and the `mobile:*` scripts |
+| `kreft mobile:init` (alias `kreft make:mobile`) | Adds `capacitor.config.json`, the Capacitor packages, the native plugins, the `mobile:*` scripts and the [phone UI kit](#the-phone-ui-kit) |
 | `kreft mobile:build [--android] [--ios]` | Builds the site with a relative base and PWA files, adds the platform the first time, then runs `cap sync`. Without a flag it syncs the platforms that exist |
+| `kreft mobile:run [--android] [--ios] [--target id]` | The one command to see your app: builds, then installs and starts it on an emulator or phone (Capacitor lists the devices and starts the one you choose). Run it again after every change |
 | `kreft mobile:open` | Opens the native project |
 | `kreft mobile:dev` | Runs on a device or emulator with live reload from your dev server (same Wi-Fi) |
 | `kreft mobile:ui [--layout] [--gallery]` | Adds the [phone UI kit](#the-phone-ui-kit) to an app |
 | `kreft mobile:icons` / `kreft mobile:splash` | Makes the [app icon and splash screens](#app-icon-and-splash-screen) |
+| `kreft mobile:help` | Lists these commands in the terminal |
 
-**Building the Android app needs Java 21** (Capacitor 7); an older Java fails with `invalid source release: 21`. The `kreft mobile:*` commands use the Java that comes with Android Studio (or any installed JDK 21+) by themselves when your default Java is older. If none is found, set `JAVA_HOME` yourself, for example on a Mac `export JAVA_HOME="/Applications/Android Studio.app/Contents/jbr/Contents/Home"`. Running from Android Studio ( `kreft mobile:open --android` ) needs no extra setup. The iOS Simulator needs a full Xcode install, not only the command line tools.
+**Building the Android app needs Java 21, 22 or 23** (Capacitor 7 uses Gradle 8.11). An older Java fails with `invalid source release: 21`, and a newer one (24, 25, 26) fails with `Unsupported class file major version`. The `kreft mobile:*` commands pick a fitting Java by themselves: the one Gradle already downloaded, an installed JDK, or the one inside Android Studio (they print `Using Java 21 from …`). If none is found they say so; install one with `brew install --cask temurin@21` (or from adoptium.net), or point to it yourself: `export JAVA_HOME="/path/to/jdk-21"`. Running from Android Studio (`kreft mobile:open --android`) needs no extra setup. The iOS Simulator needs a full Xcode install, not only the command line tools.
 
 **The backend does not run inside the phone.** Run it on a server and give the app its address with `--api-url` (written to `.env` as `PUBLIC_API_URL`), then in your code:
 
@@ -2254,6 +2272,44 @@ Kreftjs.api.setup({ base: Kreftjs.env.PUBLIC_API_URL, token: () => Kreftjs.stora
 ```
 
 Use API tokens for sign-in in the app, not cookie sessions.
+
+### Run it on an emulator, a simulator or a phone
+
+`kreft mobile:build` only prepares the native project: it builds the site and copies it into `android/` or `ios/`. **To see the app, run `kreft mobile:run --android` (or `--ios`) inside your app folder**: it builds, installs the app on the emulator or phone and starts it. Or open the project yourself in Android Studio or Xcode, or use `kreft mobile:dev` for live reload.
+
+**Android emulator** (Mac, Windows, Linux):
+
+1. Install [Android Studio](https://developer.android.com/studio). In **Device Manager** choose **Create Device**, pick a Pixel phone and a recent system image, and start it.
+2. In your app folder: `kreft mobile:run --android`. After each change to your code, run it again.
+3. Prefer Android Studio? `kreft mobile:build --android`, then `kreft mobile:open --android` and press the green **Run** button.
+
+**iOS Simulator** (Mac only):
+
+1. Install **Xcode** from the App Store and open it once to accept the license. Then run `sudo xcode-select -s /Applications/Xcode.app/Contents/Developer`.
+2. In your app folder: `kreft mobile:run --ios`. Or `kreft mobile:build --ios`, then `kreft mobile:open --ios`; in Xcode choose a simulator (for example an iPhone) at the top and press **Run**. The first build may ask you to install CocoaPods.
+
+**A real phone.** Android: turn on *Developer options* and *USB debugging*, plug it in, and choose it in Android Studio's device list. iPhone: plug it in, trust the computer, choose it in Xcode and pick a signing team (a free Apple ID works for testing).
+
+**Live reload.** `kreft mobile:dev --android` (or `--ios`) starts your dev server on the network and runs the app on the emulator or phone, so a saved change shows up without building again. The phone must reach your computer, so use the same Wi-Fi. It needs the Capacitor tools from `npm install`.
+
+**Where is the backend?** The backend runs on your computer or a server, never inside the phone. Give the app the address the phone can reach:
+
+| The app runs on | Address of the server on your computer |
+|---|---|
+| Android emulator | `http://10.0.2.2:8000` |
+| iOS Simulator | `http://localhost:8000` |
+| A real phone on the same Wi-Fi | `http://192.168.x.x:8000` (your computer's address; start the server with `kreft dev --host 0.0.0.0`) |
+| After you publish | `https://api.your-site.com` |
+
+```bash
+kreft mobile:build --android --api-url http://10.0.2.2:8000
+```
+
+Plain `http://` is for testing; a published app should always use `https://`.
+
+### Mobile and desktop in one app
+
+`kreft new my-app --mobile --electron` makes one project for both. Pages use the dashboard layout (`layouts/app.kreft`) as in a web app, and `pages/Home.kreft` shows the desktop workspace inside the Electron window and the phone screen everywhere else (the phone one draws its own top bar and bottom bar). With only `--mobile`, every page uses `layouts/mobile.kreft`. To use the phone layout in a project that has both, run `kreft mobile:ui --layout`.
 
 ### Home pages made for apps
 
@@ -2418,6 +2474,42 @@ They copy the picture to `assets/` and use Capacitor's asset tool (the first run
 | Events | `Kreftjs.native.on(…)`, and component `event` / `send()` |
 | App icons, Splash screens | `kreft mobile:icons`, `kreft mobile:splash` |
 | Assets | `Kreftjs.native.asset(…)` |
+
+### Writing your own edge components
+
+The components in `components/edge/` are plain `.kreft` files, so copy one and change it. The ones that came with the kit follow a few rules, because each one was a real bug once. A test in the framework checks them for every kit component:
+
+- **Props for what people customize, CSS variables for the look.** Colours come from the `--edge-*` variables in `edge.css`; a prop such as `bg` only sets a variable on the root.
+- **Put `data-edge` on every `<button>`, `<input>`, `<select>` and `<textarea>`.** The starter `ui.css` styles all of them (height, border, hover colour); `data-edge` switches that off so your own CSS decides.
+- **Do not name a class like one in `ui.css`** (`btn`, `field`, `label`, `card`, `muted`, `badge`, `danger`, `lead`): the global rule leaks into your component.
+- **`k-ref` needs `state`**, not `let`: `state box = null`, then `k-ref="box"`.
+- **Do not write `class="a {x}"` and `:class` on the same element**; the static part is lost. Build one text with `derive cls = 'a ' + x` and use `class={cls}`.
+- **Scoped CSS cannot reach slotted children** (and `> :deep(*)` compiles to broken CSS). Set what you need on `box.children` from `on ready` and a `MutationObserver`, as `edge-stack` and `edge-pager` do.
+- **No `style="…"` in the view** (a strict Content-Security-Policy blocks it): bind `:style="vars"`.
+- Use `$router.go(path)` to navigate (there is no `push`), `k-elif` (not `k-else-if`), and give the component a comment at the top that lists its props.
+
+### Mobile troubleshooting
+
+| What you see | Why, and what to do |
+|---|---|
+| `invalid source release: 21` | Gradle runs on a Java older than 21. `kreft mobile:build`, `mobile:run` and `mobile:dev` fix this for good: they write `org.gradle.java.home=…` into `android/gradle.properties`, so Gradle uses a fitting Java from any terminal and from Android Studio (they never change a line you wrote there). In an app made before that, run `kreft mobile:build --android` once, or add the line yourself. |
+| `Unsupported class file major version 69` (or 68, 70) | Gradle runs on a Java newer than 23. Use Java 21 (see above). |
+| `This folder is not a Kreft app` | You ran a `mobile:` command outside an app, for example in the folder of the framework itself. Go into your app first: `cd my-app`. The command changes nothing when it refuses. |
+| `Capacitor is not installed. Run: npm install` | Run `npm install` in the app. |
+| The simulator needs a full Xcode install | Install Xcode, then `sudo xcode-select -s /Applications/Xcode.app/Contents/Developer`. |
+| Nothing opens after `kreft mobile:build` | It only prepares the project. Run `kreft mobile:open --android` and press **Run**, or use `kreft mobile:dev`. |
+| The page loads but data and sign-in fail | The app is calling an address the phone cannot reach. Build with `--api-url` and read the table in [Run it on an emulator, a simulator or a phone](#run-it-on-an-emulator-a-simulator-or-a-phone). |
+| Content sits under the status bar | Android 15 and newer draw apps edge to edge. `capacitor.config.json` from `kreft mobile:init` has `android.adjustMarginsForEdgeToEdge: "force"`; add it to an older config. |
+| `kreft mobile:icons` fails | The tool downloads itself the first time and needs the internet. The picture must be a PNG (1024x1024 for icons, 2732x2732 for the splash screen). |
+| `kreft --version` shows an old number | The `kreft` command is the globally installed one. Update it: `npm install -g kreftjs@latest` (or the tag you published). |
+
+### Mobile: what to know
+
+- The app is your web app in the phone's WebView. It is not a second, native renderer, so very heavy animation or huge lists need care (use `edge-virtual-list` and `edge-lazy-grid`).
+- The backend never runs inside the phone. Use `--api-url`, API tokens for sign-in (not cookie sessions) and CORS on your server for the app.
+- Android builds work on Mac, Windows and Linux. iOS builds need a Mac with Xcode.
+- Camera, location and photo library on iPhone need a usage text in `ios/App/App/Info.plist`.
+- The native plugins are checked in the Android emulator; iOS has not been run in a simulator by the framework's own tests.
 
 ## Packages
 
@@ -2755,6 +2847,7 @@ Set these in `.env` (never commit it). Variables that start with `PUBLIC_` are c
 | Languages | `$t` `$choice` `$locale` `$dir`, `Kreftjs.locale()` `Kreftjs.translations()` |
 | Router | `Kreftjs.router()` with `.go` `.replace` `.back` `.before` `.after` `.route`, and `children` for nested routes |
 | Engine | `Kreftjs.render(view, data, options)` |
+| Phone apps | `Kreftjs.native` (`device` `haptics` `file` `system` `position` `dialog` `on` `pushBack` `safeArea` `asset`), the `edge` store (`setTop` `setBottom` `reset` `hideBars`), `Kreftjs.edgeIcons`, the `edge-` components, and the touch events `@tap` `@longpress` `@swipe` `@swipeleft` `@swiperight` `@swipeup` `@swipedown` |
 | Server | `Route` `Model` `DB` `Seeder` `Hash` `Str` `Url` `Mail` `Crypt` `Cache` `Storage` `Schedule` `config` `response` `abort` and the helpers in `require('kreftjs/server')` |
 
 ## Compared with other frameworks

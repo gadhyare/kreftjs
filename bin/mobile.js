@@ -142,6 +142,17 @@ function javaHomes() {
 function findJava21() {
   return javaHomes().find((c) => fs.existsSync(path.join(c, 'bin')) && javaFits(javaMajor(c))) || null;
 }
+// Write org.gradle.java.home into android/gradle.properties, so Gradle uses a fitting Java from any terminal and from Android Studio,
+// whatever JAVA_HOME says. Never changes a line the person wrote.
+function pinGradleJava(root, home) {
+  const file = path.join(root, 'android', 'gradle.properties');
+  if (!home || !fs.existsSync(file)) return false;
+  const txt = fs.readFileSync(file, 'utf8');
+  if (/^\s*org\.gradle\.java\.home\s*=/m.test(txt)) return false;
+  fs.appendFileSync(file, `${txt.endsWith('\n') ? '' : '\n'}\n# Gradle runs on Java ${javaMajor(home) || 21} (Capacitor 7 needs 21 to 23). Added by kreft; change it if you like.\norg.gradle.java.home=${home.replace(/\\/g, '/')}\n`);
+  console.log('  Gradle will use Java ' + (javaMajor(home) || 21) + ' (written to android/gradle.properties)');
+  return true;
+}
 let javaEnv = null;
 function androidEnv() {
   if (javaEnv) return javaEnv;
@@ -171,7 +182,7 @@ function capBin(root) {
   return fs.existsSync(bin) ? bin : null;
 }
 
-async function build(args = []) {
+async function build(args = [], opts = {}) {
   const root = projectRoot();
   requireApp(root);
   if (!fs.existsSync(path.join(root, 'capacitor.config.json'))) { console.log('  Capacitor is not set up yet. Initializing…'); init(root); }
@@ -194,10 +205,28 @@ async function build(args = []) {
       if (c) process.exit(c);
     }
   }
+  if (fs.existsSync(path.join(root, 'android'))) pinGradleJava(root, androidEnv().JAVA_HOME);
   console.log('\n  Step 2: Copying the build into the native projects…');
   const c = await run(cap, ['sync', ...plats], root);
   if (c) process.exit(c);
-  console.log('\n  Done. Open the native project:  kreft mobile:open --android   (or --ios)\n');
+  if (!opts.quiet) console.log('\n  Done. Open the native project:  kreft mobile:open --android   (or --ios)\n');
+}
+
+// kreft mobile:run [--android|--ios] [--target id] [--api-url …]: build, then install and start the app on an emulator or phone
+async function runApp(args = []) {
+  const root = projectRoot();
+  requireApp(root);
+  const plat = platforms(args)[0] || 'android';
+  const t = args.indexOf('--target');
+  const flags = args.filter((a, i) => a !== '--target' && args[i - 1] !== '--target' && !['--android', '--ios'].includes(a));
+  await build([...flags, '--' + plat], { quiet: true });
+  const cap = capBin(root);
+  if (!cap) { console.error('\n  Capacitor is not installed. Run:  npm install\n'); process.exit(1); }
+  console.log(`\n  Step 3: Installing and starting the app (${plat === 'ios' ? 'iOS Simulator or iPhone' : 'Android emulator or phone'})…`);
+  if (plat === 'android') console.log('  (No emulator running? Capacitor lists them and starts the one you choose.)');
+  const c = await run(cap, ['run', plat, ...(t >= 0 && args[t + 1] ? ['--target', args[t + 1]] : [])], root);
+  if (c) { console.error('\n  The app did not start. If the error mentions Java, run:  kreft mobile:help   and read the Java note in the docs.\n'); process.exit(c); }
+  console.log('\n  The app is running. After you change your code, run the same command again (or use kreft mobile:dev for live reload).\n');
 }
 
 async function open(args = []) {
@@ -214,11 +243,14 @@ async function dev(args = []) {
   const cap = capBin(root);
   if (!cap) { console.error('\n  Capacitor is not installed. Run:  npm install\n'); process.exit(1); }
   const plat = platforms(args)[0] || 'android';
+  if (fs.existsSync(path.join(root, 'android'))) pinGradleJava(root, androidEnv().JAVA_HOME);
   const port = process.env.PORT || '8000';
   const ip = Object.values(require('os').networkInterfaces()).flat().find((n) => n && n.family === 'IPv4' && !n.internal);
   const url = `http://${ip ? ip.address : 'localhost'}:${port}`;
   console.log(`  Dev server: ${url}  (the phone must be on the same network)`);
-  const server = spawn(process.execPath, [path.join(__dirname, 'kreftjs.js'), 'dev'], { cwd: root, stdio: 'inherit', env: { ...process.env, PORT: port, HOST: '0.0.0.0' } });
+  // the dev server answers only this computer by default: share it on the network (--host) and allow the names the phone uses to reach it
+  const allowed = [ip && ip.address, '10.0.2.2', process.env.KREFT_ALLOWED_HOSTS].filter(Boolean).join(','); // 10.0.2.2 is how the Android emulator names this computer
+  const server = spawn(process.execPath, [path.join(__dirname, 'kreftjs.js'), 'dev', '--host', '0.0.0.0', '--port', port], { cwd: root, stdio: 'inherit', env: { ...process.env, PORT: port, KREFT_ALLOWED_HOSTS: allowed } });
   const stop = () => { try { server.kill('SIGTERM'); } catch (_) {} process.exit(0); };
   process.on('SIGINT', stop); process.on('SIGTERM', stop);
   const c = await run(cap, ['run', plat, '--live-reload', '--host', ip ? ip.address : 'localhost', '--port', port], root);
@@ -280,6 +312,7 @@ function help() {
     kreft mobile:build --android       build the site and sync it into android/   (--ios for iOS; no flag: both that exist)
     kreft mobile:build --api-url https://api.example.com
                                        the address of your server (the backend does not run inside the phone)
+    kreft mobile:run --android         build, then install and start the app on an emulator or phone (--ios; --target <id> picks the device)
     kreft mobile:open --android        open Android Studio (--ios: Xcode)
     kreft mobile:icons logo.png --bg "#ffffff"     make the app icon in every size (a 1024x1024 PNG)
     kreft mobile:splash splash.png --bg "#ffffff" --dark-bg "#000000"     make the splash screen (a 2732x2732 PNG)
@@ -290,4 +323,4 @@ function help() {
 `);
 }
 
-module.exports = { PLUGINS, pngSize, assetPlan, init, icons: (a) => assetsCmd('icons', a), splash: (a) => assetsCmd('splash', a), build, open, dev, help, appId, configFor, androidEnv, javaMajor, findJava21 };
+module.exports = { PLUGINS, pinGradleJava, run: runApp, pngSize, assetPlan, init, icons: (a) => assetsCmd('icons', a), splash: (a) => assetsCmd('splash', a), build, open, dev, help, appId, configFor, androidEnv, javaMajor, findJava21 };
