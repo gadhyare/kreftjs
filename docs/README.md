@@ -1740,7 +1740,7 @@ Run `kreft list` to see every command your installed version has, and `kreft hel
 
 | Command | What it does |
 |---|---|
-| `kreft new my-app` | Makes a project (`--js`, `--ts`, `--db sqlite`, `--ui tailwind`, `--no-auth`). |
+| `kreft new my-app` | Makes a project (`--js`, `--ts`, `--db sqlite`, `--ui tailwind`, `--no-auth`, `--mobile` for iOS and Android, `--electron` for a desktop app, `--vite`, `--redis`). |
 | `kreft dev` | Development server with hot reload (`--port`, `--host`, `--db`, `--api`, `--server`, `--backend`, `--seed`, `--no-hot`, `--gc`). |
 | `kreft build` | Compiles the app into plain files in `dist/` (`--out`, `--base`, `--prerender`). |
 | `kreft serve [dist]` | Runs a built app for real users. Answers everyone, serves only the tables you list. |
@@ -2258,10 +2258,10 @@ kreft mobile:open --android      # Android Studio (--ios: Xcode, needs a Mac)
 |---|---|
 | `kreft mobile:init` (alias `kreft make:mobile`) | Adds `capacitor.config.json`, the Capacitor packages, the native plugins, the `mobile:*` scripts and the [phone UI kit](#the-phone-ui-kit) |
 | `kreft mobile:build [--android] [--ios]` | Builds the site with a relative base, adds the platform the first time, then runs `cap sync`. Without a flag it syncs the platforms that exist. (No service worker goes into a phone app: its files are inside the app.) |
-| `kreft mobile:run [--android] [--ios] [--target id]` | The one command to see your app: builds, then installs and starts it on an emulator or phone (Capacitor lists the devices and starts the one you choose). Run it again after every change |
+| `kreft mobile:run [--android] [--ios] [--target id]` | The one command to see your app: builds, then installs and starts it on an emulator or phone. With one running Android device it uses that one; with several (or none) Capacitor asks, or pass `--target emulator-5554`. Run it again after every change |
 | `kreft mobile:setup` | First-run setup: `key:generate` (only when `APP_KEY` is missing), `storage:link` and `migrate`. Safe to run again. `mobile:dev` runs it for you |
 | `kreft mobile:open` | Opens the native project |
-| `kreft mobile:dev` | Runs on a device or emulator with live reload from your dev server (same Wi-Fi) |
+| `kreft mobile:dev [--android] [--ios] [--target id] [--no-setup]` | Runs the first-run setup, starts your dev server and runs the app with live reload: a saved change shows on the phone within a second or two, without building again |
 | `kreft mobile:ui [--layout] [--gallery]` | Adds the [phone UI kit](#the-phone-ui-kit) to an app |
 | `kreft mobile:icons` / `kreft mobile:splash` | Makes the [app icon and splash screens](#app-icon-and-splash-screen) |
 | `kreft mobile:help` | Lists these commands in the terminal |
@@ -2293,7 +2293,9 @@ Use API tokens for sign-in in the app, not cookie sessions.
 
 **A real phone.** Android: turn on *Developer options* and *USB debugging*, plug it in, and choose it in Android Studio's device list. iPhone: plug it in, trust the computer, choose it in Xcode and pick a signing team (a free Apple ID works for testing).
 
-**Live reload.** `kreft mobile:dev --android` (or `--ios`) starts your dev server on the network and runs the app on the emulator or phone, so a saved change shows up without building again. The phone must reach your computer, so use the same Wi-Fi. It needs the Capacitor tools from `npm install`.
+**Live reload.** `kreft mobile:dev --android` (or `--ios`) starts your dev server on the network and runs the app on the emulator or phone, so a saved change shows up without building again. It picks the running emulator by itself, uses `10.0.2.2` (how the emulator reaches your computer) or your Wi-Fi address for a real phone, and takes the next free port if 8000 is busy, telling the app the right one. A real phone must reach your computer, so use the same Wi-Fi. It needs the Capacitor tools from `npm install`.
+
+**Use a network you trust.** For live reload the dev server listens on your whole network (`--host 0.0.0.0`), so anyone on the same Wi-Fi can open it. Do it at home or on a private network, never on a public one, and stop it when you are done.
 
 **First-run setup.** Before it starts the server, `mobile:dev` runs `kreft mobile:setup` (skip it with `--no-setup`): it creates `.env` and a new `APP_KEY` when they are missing (a fresh checkout from git has no `.env`), links `storage` for public files, and runs the database migrations. A new database is also seeded, so the test user exists. Every step only does something when it is needed, so running it again is harmless. A good `APP_KEY` is never replaced (that would log every user out), and the key is never printed.
 
@@ -2334,7 +2336,7 @@ To turn it off, delete the `#edge-splash` element and set `"launchAutoHide": tru
 
 ### Home pages made for apps
 
-A website's welcome page is not what an app should open on. `kreft new my-app --mobile` writes a **phone home screen** (top bar, shortcut cards, a bottom tab bar, a card that shows the touch events), and `kreft new my-app --electron` writes a **desktop workspace** (sidebar, toolbar with search, info cards, shortcuts). With both flags, `pages/Home.kreft` shows the desktop one inside the Electron window and the phone one everywhere else.
+A website's welcome page is not what an app should open on. `kreft new my-app --mobile` writes a **phone home screen** (a gradient greeting card with a time-of-day hello and the signed-in user's name, shortcut tiles that animate in one after another, a card that shows the touch events; the top bar and bottom tab bar come from the layout), and `kreft new my-app --electron` writes a **desktop workspace** (sidebar, toolbar with search, info cards, shortcuts). With both flags, `pages/Home.kreft` shows the desktop one inside the Electron window and the phone one everywhere else.
 
 ```bash
 kreft make:home --mobile      # in an existing project: phone home screen (replaces pages/Home.kreft)
@@ -2470,6 +2472,7 @@ Layout helpers: classes in `edge.css` such as `edge-row`, `edge-col`, `edge-cent
 | Events | `on('pause' \| 'resume' \| 'network' \| 'urlOpen' \| 'keyboardShow' \| 'keyboardHide', fn)` gives a stop function. |
 | Back button | `pushBack(fn)`: the newest handler gets the Android back button first (return `false` to pass it on); then the page goes back, then the app closes. Modals, sheets and drawers do this by themselves. |
 | Assets | `asset('img/logo.png')` gives the right address inside the app, whatever the base. |
+| Splash screen | `splash.set({ minTime, anim })` and `splash.hide()` control the [animated splash screen](#the-animated-splash-screen); it hides itself once the app is ready. |
 
 On iPhone, camera, location and photo access need a usage text in `ios/App/App/Info.plist` (Apple asks for it); on Android the plugins add their permissions.
 
@@ -2496,6 +2499,18 @@ They copy the picture to `assets/` and use Capacitor's asset tool (the first run
 | App icons, Splash screens | `kreft mobile:icons`, `kreft mobile:splash` |
 | Assets | `Kreftjs.native.asset(…)` |
 
+### Publishing your app to Google Play and the App Store
+
+These are the usual Capacitor, Android Studio and Xcode steps. The framework's own tests build and run *debug* apps in the Android emulator; they do not make store builds, so check each step on your own computer.
+
+1. **Name it before the first build.** `kreft new` gives the app the id `com.example.<name>`. Set your own reverse-domain id and name in `capacitor.config.json` (`"appId": "com.yourcompany.myapp"`, `"appName"`) **before** you run `kreft mobile:build` for the first time: the id is written into `android/` and `ios/` when they are created. A published app must not keep `com.example`.
+2. **Icon and splash screen.** `kreft mobile:icons logo.png` and `kreft mobile:splash splash.png` (see [App icon and splash screen](#app-icon-and-splash-screen)).
+3. **Point it at your real server.** `kreft mobile:build --android --api-url https://api.your-site.com`. A store app must use `https://`, and your server must allow the app in CORS.
+4. **Version numbers.** Android: `versionCode` (a whole number that grows with every upload) and `versionName` in `android/app/build.gradle`. iOS: *Version* and *Build* in Xcode.
+5. **Android.** `kreft mobile:open --android`, then in Android Studio *Build → Generate Signed App Bundle / APK*. Make a keystore, and keep it and its passwords safe: you need the same one for every update. Upload the `.aab` file in the Google Play Console.
+6. **iPhone.** `kreft mobile:open --ios` (a Mac with Xcode), pick a team, then *Product → Archive* and *Distribute App*. Selling in the App Store needs a paid Apple Developer account. Add the usage texts (camera, location, photos) to `ios/App/App/Info.plist`.
+7. **Before you submit.** Test on a real phone, write the privacy policy the stores ask for, and list only the permissions you use.
+
 ### Writing your own edge components
 
 The components in `components/edge/` are plain `.kreft` files, so copy one and change it. The ones that came with the kit follow a few rules, because each one was a real bug once. A test in the framework checks them for every kit component:
@@ -2521,6 +2536,7 @@ The components in `components/edge/` are plain `.kreft` files, so copy one and c
 | Nothing opens after `kreft mobile:build` | It only prepares the project. Run `kreft mobile:open --android` and press **Run**, or use `kreft mobile:dev`. |
 | The page loads but data and sign-in fail | The app is calling an address the phone cannot reach. Build with `--api-url` and read the table in [Run it on an emulator, a simulator or a phone](#run-it-on-an-emulator-a-simulator-or-a-phone). |
 | Content sits under the status bar | Android 15 and newer draw apps edge to edge. `capacitor.config.json` from `kreft mobile:init` has `android.adjustMarginsForEdgeToEdge: "force"`; add it to an older config. |
+| `kreft mobile:dev` says a port is busy | It uses the next free one and tells the app (`Port 8000 is busy: using 8001`), so there is nothing to do. |
 | `kreft mobile:icons` fails | The tool downloads itself the first time and needs the internet. The picture must be a PNG (1024x1024 for icons, 2732x2732 for the splash screen). |
 | `kreft --version` shows an old number | The `kreft` command is the globally installed one. Update it: `npm install -g kreftjs@latest` (or the tag you published). |
 
@@ -2530,7 +2546,7 @@ The components in `components/edge/` are plain `.kreft` files, so copy one and c
 - The backend never runs inside the phone. Use `--api-url`, API tokens for sign-in (not cookie sessions) and CORS on your server for the app.
 - Android builds work on Mac, Windows and Linux. iOS builds need a Mac with Xcode.
 - Camera, location and photo library on iPhone need a usage text in `ios/App/App/Info.plist`.
-- The native plugins are checked in the Android emulator; iOS has not been run in a simulator by the framework's own tests.
+- The framework's own checks run in the Android emulator: debug builds, the native plugins, the animated splash screen, `kreft mobile:run`, and live reload with `kreft mobile:dev` (a saved edit shows in the running app within seconds). iOS has not been run in a simulator by those checks, and store builds are not made.
 
 ## Packages
 
@@ -2690,6 +2706,13 @@ Kreft is built so the safe thing is the default. This chapter lists what is prot
 - **Prototype pollution is blocked.** Paths and keys such as `__proto__`, `constructor` and `prototype` are ignored in views, translations and JSON bodies.
 - **A login cookie is HttpOnly**, so a script on your page cannot read it.
 
+### In the phone app
+
+- **Anything inside the app can be read** by whoever installs it: the files, the code and every `PUBLIC_` value. Secrets (API keys, database passwords, `APP_KEY`) stay on the server; the app talks to your server, and your server talks to the other services.
+- **Sign in with API tokens**, not cookie sessions, and keep the token in the phone's secure storage. Use `https://` for every address.
+- **`Kreftjs.native.system.openUrl` opens only `http`, `https`, `mailto`, `tel` and `sms`** addresses, never `javascript:` or `file:`. `edge-web-view` shows only `http(s)` and relative addresses, in a sandbox that cannot reach your app's data.
+- **Live reload (`kreft mobile:dev`) shares the dev server on your network.** Use a private network.
+
 ### On the server
 
 #### CSRF
@@ -2782,6 +2805,8 @@ Go through this before your first real user:
 | HTTPS in front of the app, and `FORCE_HTTPS=true` | Cookies are `Secure` in production and on `https` URLs. Plain HTTP is only redirected to HTTPS with `FORCE_HTTPS=true` or an `https://` `APP_URL`. |
 | No `SESSION_SECURE_COOKIE=false` in `.env` | It switches the `Secure` flag off, so the login cookie is also sent over plain `http://`. Older templates wrote it; the server warns about it at start-up in production. |
 | `npm audit` and `kreft update` | Fix known vulnerabilities before release. |
+| Phone app: `--api-url` is an `https://` address, and the app id is yours | A published app must not call `http://10.0.2.2` or keep the id `com.example.…`. See [Publishing your app](#publishing-your-app-to-google-play-and-the-app-store). |
+| Phone app: no secrets inside it | Everything in an app (the code, `PUBLIC_` values) can be read by whoever installs it. Keep keys and passwords on the server. |
 
 > [!NOTE]
 > Kreft does not replace a security review. For regulated or high-risk systems, have the app, its infrastructure and its dependencies reviewed by someone who does that professionally.
@@ -2794,6 +2819,7 @@ Go through this before your first real user:
 - The sanitizer removes unsafe markup; it is not a substitute for choosing carefully what HTML you show.
 - `--prerender` makes static HTML at build time. On a running server whole pages are drawn only for crawlers and link previews; every other visitor gets the page drawn by the browser, and an address the app does not have answers 200 (the app shows its own 404 page) unless `seo.js` says otherwise.
 - `.kreft` files must be served over `http://` or `https://`, not opened from `file://`.
+- Phone apps run your web app in the phone's WebView and need a server for the backend; iOS builds need a Mac with Xcode. See [Mobile: what to know](#mobile-what-to-know).
 
 # Reference
 
@@ -2811,6 +2837,8 @@ Set these in `.env` (never commit it). Variables that start with `PUBLIC_` are c
 | `APP_KEY` | Encrypts sessions and signs links. Make it with `kreft key:generate`; required in production. |
 | `APP_LOCALE`, `APP_FALLBACK_LOCALE`, `APP_TIMEZONE` | Language and time zone defaults. |
 | `HOST`, `PORT` | Where `kreft serve` listens. |
+| `PUBLIC_APP_NAME` | The app's name in the browser, in the phone app's top bar and home page, and under the animated splash logo. |
+| `PUBLIC_API_URL` | The server a phone app talks to. `kreft mobile:build --api-url https://api.example.com` writes it for you; read it with `Kreftjs.env.PUBLIC_API_URL`. It is visible inside the app, so never put a secret in it. |
 | `FORCE_HTTPS` | `true` redirects plain HTTP in production. |
 | `MAX_BODY_KB` | Largest request body accepted. |
 

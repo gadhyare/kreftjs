@@ -587,6 +587,8 @@ export interface Native {
     hideSplash(): Promise<any>
     exit(): Promise<any>
   }
+  /** the animated splash screen: minTime is how long (ms) it plays at least, counted from when it appears */
+  splash: { config: { minTime: number; anim: string }; set(options: { minTime?: number; anim?: 'pulse' | 'zoom' | 'rise' | 'none' | '' }): void; hide(): Promise<void> }
   position: { get(options?: { accurate?: boolean; timeout?: number }): Promise<NativePosition | null>; watch(fn: (p: NativePosition) => void, options?: { accurate?: boolean }): Stop }
   dialog: NativeDialogs
   on(event: 'pause' | 'resume' | 'network' | 'urlOpen' | 'keyboardShow' | 'keyboardHide' | string, fn: (data?: any) => void): Stop

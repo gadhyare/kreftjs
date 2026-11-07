@@ -40,6 +40,7 @@ Open the address in the terminal (normally `http://localhost:8000`). A new proje
 | **Router** | Nested routes, layouts, guards, error pages, clean URLs. |
 | **Backend** | `Route`, controllers, form requests, policies, models with relations, soft deletes and scopes, migrations, seeders, factories, jobs, mail, notifications, cache, Redis, file storage, scheduling. |
 | **Authentication** | Cookie sessions with CSRF protection, API tokens with permissions, device list, two-factor codes, email verification, account lockout. |
+| **Phone apps** | iOS and Android apps with Capacitor: `kreft new my-app --mobile`, one command to run on an emulator, a layout whose top and bottom bars never move, 42 phone components, native features (device, files, haptics, share, position), touch events, an animated splash screen, app icons. |
 | **Tooling** | `kreft dev` with hot reload, DevTools, an error monitor, `kreft build` (CSP-safe), prerendering, TypeScript, Vite and Electron support, a safer `kreft add`, an MCP server for AI agents. |
 
 ## Put it online
@@ -69,6 +70,17 @@ npm run electron:build:all     # all three (same as: kreft electron:build --all)
 ```
 
 The app icon is `build/icon.png`, and `ELECTRON_MENU=show|auto|hide` controls the window menu. Details: [Desktop apps with Electron](docs/README.md#desktop-apps-with-electron).
+
+## Phone apps (iOS and Android)
+
+```bash
+kreft new my-app --mobile        # or: kreft mobile:init in an existing app
+cd my-app
+npm install
+kreft mobile:run --android       # builds, installs and starts the app on an emulator or phone
+```
+
+`kreft mobile:dev` adds live reload and does the first-run setup (`APP_KEY`, storage link, migrations). Android needs Android Studio and a Java from 21 to 23 (the commands find one by themselves); iOS needs a Mac with Xcode. Details, every component and the native API: [Mobile apps](docs/README.md#mobile-apps-ios-and-android).
 
 ## Learn more
 

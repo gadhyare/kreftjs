@@ -174,3 +174,39 @@ test('a phone app gets no service worker (it would keep serving old files after 
   const native = fs.readFileSync(path.join(__dirname, '..', 'templates', 'mobile', 'kreftjs-native.js'), 'utf8');
   assert.match(native, /serviceWorker\.getRegistrations\(\)/);
 });
+
+test('a --mobile project gets a mobile section in its own README, once', () => {
+  const dir = tmp();
+  assert.strictEqual(run(['new', 'a1', '--js', '--mobile', '--no-auth'], dir).status, 0);
+  const appDir = path.join(dir, 'a1');
+  const readme = () => fs.readFileSync(path.join(appDir, 'README.md'), 'utf8');
+  assert.match(readme(), /^## Mobile app \(iOS and Android\)/m);
+  assert.match(readme(), /kreft mobile:run --android/);
+  assert.match(readme(), /kreft mobile:setup/);
+  assert.match(readme(), /--api-url/);
+  const once = readme();
+  assert.strictEqual(run(['mobile:init'], appDir).status, 0);
+  assert.strictEqual(readme(), once, 'running mobile:init again adds nothing');
+  const plain = tmp();
+  assert.strictEqual(run(['new', 'b1', '--js', '--no-auth'], plain).status, 0);
+  assert.doesNotMatch(fs.readFileSync(path.join(plain, 'b1', 'README.md'), 'utf8'), /Mobile app/, 'a project without --mobile is unchanged');
+});
+
+test('mobile:dev picks a free port and the running device by itself', async () => {
+  const m = require('../bin/mobile.js');
+  const net = require('net');
+  const hold = net.createServer();
+  await new Promise((r) => hold.listen(0, '0.0.0.0', r));
+  const busy = hold.address().port;
+  const got = await m.freePort(busy);
+  assert.notStrictEqual(got, busy, 'a busy port is skipped');
+  assert.ok(got > busy && got <= busy + 20);
+  await new Promise((r) => hold.close(r));
+  assert.strictEqual(await m.freePort(busy), busy, 'a free port is used as asked');
+  assert.strictEqual(m.pickTarget(['--android', '--target', 'emulator-5556'], 'android'), 'emulator-5556', '--target always wins');
+  assert.strictEqual(m.pickTarget(['--ios'], 'ios'), null, 'iOS: Capacitor asks');
+  assert.ok(Array.isArray(m.runningAndroid()));
+  const src = fs.readFileSync(path.join(__dirname, '..', 'bin', 'mobile.js'), 'utf8');
+  assert.match(src, /'10\.0\.2\.2' : \(ip \? ip\.address/, 'the emulator uses its own name for this computer');
+  assert.match(src, /'--live-reload', '--host', liveHost, '--port', port/, 'the same port and host go to the server and to the app');
+});

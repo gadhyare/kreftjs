@@ -57,6 +57,28 @@ function requireApp(dir) {
   }
 }
 
+// a short mobile section in the project's own README, so the next person knows the commands (added once)
+function addReadmeSection(root) {
+  const file = path.join(root, 'README.md');
+  if (!fs.existsSync(file)) return;
+  const txt = fs.readFileSync(file, 'utf8');
+  if (/^## Mobile app/m.test(txt)) return;
+  fs.appendFileSync(file, `${txt.endsWith('\n') ? '' : '\n'}
+## Mobile app (iOS and Android)
+
+\`\`\`bash
+npm install
+kreft mobile:run --android       # builds, installs and starts the app on an emulator or phone (--ios on a Mac)
+kreft mobile:dev --android       # live reload, and the first-run setup (APP_KEY, storage link, migrations)
+kreft mobile:setup               # the first-run setup alone
+kreft mobile:icons logo.png      # the app icon (a 1024x1024 PNG);  kreft mobile:splash splash.png  for the splash screen
+\`\`\`
+
+The backend does not run inside the phone: build with \`--api-url https://your-server\` (for the Android emulator, \`http://10.0.2.2:8000\`).
+Open \`/edge\` in the app to see every phone component. Everything is explained in the docs: https://kreftjs.com/docs#mobile-apps-ios-and-android
+`);
+}
+
 function init(target) {
   const root = typeof target === 'string' ? target : projectRoot();
   if (typeof target !== 'string') requireApp(root); // kreft new passes its own new folder
@@ -83,6 +105,7 @@ function init(target) {
     need(pkg.scripts, 'mobile:ios', 'kreft mobile:build --ios');
     if (changed) { fs.writeFileSync(pkgFile, JSON.stringify(pkg, null, 2) + '\n'); console.log('  Added Capacitor to package.json. Run:  npm install'); }
   }
+  addReadmeSection(root);
   const ignore = path.join(root, '.gitignore');
   if (fs.existsSync(ignore)) {
     const txt = fs.readFileSync(ignore, 'utf8');
@@ -231,14 +254,14 @@ async function runApp(args = []) {
   const root = projectRoot();
   requireApp(root);
   const plat = platforms(args)[0] || 'android';
-  const t = args.indexOf('--target');
   const flags = args.filter((a, i) => a !== '--target' && args[i - 1] !== '--target' && !['--android', '--ios'].includes(a));
   await build([...flags, '--' + plat], { quiet: true });
   const cap = capBin(root);
   if (!cap) { console.error('\n  Capacitor is not installed. Run:  npm install\n'); process.exit(1); }
   console.log(`\n  Step 3: Installing and starting the app (${plat === 'ios' ? 'iOS Simulator or iPhone' : 'Android emulator or phone'})…`);
   if (plat === 'android') console.log('  (No emulator running? Capacitor lists them and starts the one you choose.)');
-  const c = await run(cap, ['run', plat, ...(t >= 0 && args[t + 1] ? ['--target', args[t + 1]] : [])], root);
+  const target = pickTarget(args, plat);
+  const c = await run(cap, ['run', plat, ...(target ? ['--target', target] : [])], root);
   if (c) { console.error('\n  The app did not start. If the error mentions Java, run:  kreft mobile:help   and read the Java note in the docs.\n'); process.exit(c); }
   console.log('\n  The app is running. After you change your code, run the same command again (or use kreft mobile:dev for live reload).\n');
 }
@@ -249,6 +272,41 @@ async function open(args = []) {
   const cap = capBin(root);
   if (!cap) { console.error('\n  Capacitor is not installed. Run:  npm install\n'); process.exit(1); }
   process.exit(await run(cap, ['open', platforms(args)[0] || 'android'], root));
+}
+
+// ---- a free port, and the one running emulator or phone: no questions when there is nothing to choose ----
+function freePort(start, tries = 20) {
+  const net = require('net');
+  return new Promise((resolve) => {
+    const attempt = (p, left) => {
+      const srv = net.createServer();
+      srv.once('error', () => (left > 0 ? attempt(p + 1, left - 1) : resolve(start)));
+      srv.once('listening', () => srv.close(() => resolve(p)));
+      srv.listen(p, '0.0.0.0');
+    };
+    attempt(start, tries);
+  });
+}
+function adbBin() {
+  const home = require('os').homedir();
+  const sdk = [process.env.ANDROID_HOME, process.env.ANDROID_SDK_ROOT, path.join(home, 'Library', 'Android', 'sdk'), path.join(home, 'Android', 'Sdk'), path.join(home, 'AppData', 'Local', 'Android', 'Sdk')].filter(Boolean);
+  const exe = process.platform === 'win32' ? 'adb.exe' : 'adb';
+  return sdk.map((d) => path.join(d, 'platform-tools', exe)).find((f) => fs.existsSync(f)) || 'adb';
+}
+function runningAndroid() {
+  const r = require('child_process').spawnSync(adbBin(), ['devices'], { encoding: 'utf8' });
+  if (r.error || r.status !== 0) return [];
+  return String(r.stdout).split('\n').slice(1).map((l) => /^(\S+)\s+device\b/.exec(l)).filter(Boolean).map((m) => m[1]);
+}
+// --target id wins; with exactly one running Android device that one is used; otherwise Capacitor asks
+function pickTarget(args, plat) {
+  const i = args.indexOf('--target');
+  if (i >= 0 && args[i + 1]) return args[i + 1];
+  if (plat === 'android') {
+    const d = runningAndroid();
+    if (d.length === 1) { console.log(`  Using the running device: ${d[0]}`); return d[0]; }
+  }
+  return null;
 }
 
 // ---- first-run setup: key:generate, storage:link, migrate. Safe to run again: each step does something only when it is needed.
@@ -307,16 +365,20 @@ async function dev(args = []) {
   const plat = platforms(args)[0] || 'android';
   if (!args.includes('--no-setup')) { console.log('\n  First-run setup (skip with --no-setup)'); for (const st of setupApp(root)) console.log(`    ${st.ok ? '✔' : '✖'} ${st.text}`); }
   if (fs.existsSync(path.join(root, 'android'))) pinGradleJava(root, androidEnv().JAVA_HOME);
-  const port = process.env.PORT || '8000';
+  const wanted = Number(process.env.PORT) || 8000;
+  const port = String(await freePort(wanted));
+  if (Number(port) !== wanted) console.log(`  Port ${wanted} is busy: using ${port}`);
   const ip = Object.values(require('os').networkInterfaces()).flat().find((n) => n && n.family === 'IPv4' && !n.internal);
-  const url = `http://${ip ? ip.address : 'localhost'}:${port}`;
-  console.log(`  Dev server: ${url}  (the phone must be on the same network)`);
+  const target = pickTarget(args, plat);
+  // the Android emulator reaches this computer as 10.0.2.2; a phone needs this computer's address on the Wi-Fi
+  const liveHost = target && /^emulator-/.test(target) ? '10.0.2.2' : (ip ? ip.address : 'localhost');
+  console.log(`  Dev server: http://${liveHost}:${port}${liveHost === '10.0.2.2' ? '  (how the emulator reaches this computer)' : '  (the phone must be on the same network)'}`);
   // the dev server answers only this computer by default: share it on the network (--host) and allow the names the phone uses to reach it
   const allowed = [ip && ip.address, '10.0.2.2', process.env.KREFT_ALLOWED_HOSTS].filter(Boolean).join(','); // 10.0.2.2 is how the Android emulator names this computer
   const server = spawn(process.execPath, [path.join(__dirname, 'kreftjs.js'), 'dev', '--seed', '--host', '0.0.0.0', '--port', port], { cwd: root, stdio: 'inherit', env: { ...process.env, PORT: port, KREFT_ALLOWED_HOSTS: allowed } });
   const stop = () => { try { server.kill('SIGTERM'); } catch (_) {} process.exit(0); };
   process.on('SIGINT', stop); process.on('SIGTERM', stop);
-  const c = await run(cap, ['run', plat, '--live-reload', '--host', ip ? ip.address : 'localhost', '--port', port], root);
+  const c = await run(cap, ['run', plat, '--live-reload', '--host', liveHost, '--port', port, ...(target ? ['--target', target] : [])], root);
   try { server.kill('SIGTERM'); } catch (_) {}
   process.exit(c);
 }
@@ -387,4 +449,4 @@ function help() {
 `);
 }
 
-module.exports = { RETIRE_SW, PLUGINS, appKeyState, setupApp, setup, pinGradleJava, run: runApp, pngSize, assetPlan, init, icons: (a) => assetsCmd('icons', a), splash: (a) => assetsCmd('splash', a), build, open, dev, help, appId, configFor, androidEnv, javaMajor, findJava21 };
+module.exports = { freePort, pickTarget, runningAndroid, RETIRE_SW, PLUGINS, appKeyState, setupApp, setup, pinGradleJava, run: runApp, pngSize, assetPlan, init, icons: (a) => assetsCmd('icons', a), splash: (a) => assetsCmd('splash', a), build, open, dev, help, appId, configFor, androidEnv, javaMajor, findJava21 };
