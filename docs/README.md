@@ -1920,7 +1920,7 @@ Check that people get it with `npm view kreftjs version` and a fresh `npm instal
 npm publish --tag mobile-test --access public     # npm asks you to approve in the browser
 npm install -g kreftjs@mobile-test                  # you, on any computer
 kreft --version                                     # shows the new number
-npm dist-tag add kreftjs@0.0.26-beta beta           # when it is good: the tag everyone uses moves
+npm dist-tag add kreftjs@0.0.27-beta beta           # when it is good: the tag everyone uses moves
 ```
 
 `--access public` is needed because this package's `package.json` has `publishConfig.access` set to `restricted` (left from an old scoped package), which npm refuses for a plain package name. A version number can be published only once, so the next try is the next number. To test the folder you are in without publishing anything, run `npm link` (undo with `npm unlink -g kreftjs`). `kreft --version` after `npm install -g` reads the globally installed package, not the repository.
