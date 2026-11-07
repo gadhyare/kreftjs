@@ -63,11 +63,13 @@ action pick(it) {
 .item { flex: 1 1 0; min-width: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px; min-height: 48px; padding: 4px 2px; border: 0; background: transparent; color: inherit; font: inherit; font-size: 12px; border-radius: 14px; position: relative; }
 .item:disabled { opacity: .4; }
 .item.on { color: var(--edge-bottom-active); font-weight: 700; }
+.item.on .ico { animation: edge-nav-pop .3s ease; }
+@keyframes edge-nav-pop { 0% { transform: scale(.82); } 60% { transform: scale(1.14); } 100% { transform: scale(1); } }
 .ico { position: relative; display: inline-flex; align-items: center; justify-content: center; min-width: 52px; height: 30px; border-radius: 999px; transition: background .15s ease; }
 .pin { position: absolute; top: -2px; right: 6px; }
 .lab-never .ico { height: 36px; }
 .ind-pill .item.on .ico { background: var(--edge-bottom-indicator); }
 .ind-line .item.on::before { content: ''; position: absolute; top: -6px; left: 22%; right: 22%; height: 3px; border-radius: 0 0 3px 3px; background: var(--edge-bottom-active); }
 .lbl { max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-@media (prefers-reduced-motion: reduce) { .ico { transition: none; } }
+@media (prefers-reduced-motion: reduce) { .ico { transition: none; } .item.on .ico { animation: none; } }
 </style>

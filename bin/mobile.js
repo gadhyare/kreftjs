@@ -182,6 +182,16 @@ function capBin(root) {
   return fs.existsSync(bin) ? bin : null;
 }
 
+const RETIRE_SW = `// Written by kreft mobile:build. A phone app has no service worker; this one only removes a worker an older build left behind.
+self.addEventListener('install', () => self.skipWaiting());
+self.addEventListener('activate', (e) => {
+  e.waitUntil(caches.keys().then((keys) => Promise.all(keys.map((k) => caches.delete(k))))
+    .then(() => self.registration.unregister())
+    .then(() => self.clients.matchAll({ type: 'window' }))
+    .then((all) => all.forEach((c) => c.navigate(c.url))));
+});
+`;
+
 async function build(args = [], opts = {}) {
   const root = projectRoot();
   requireApp(root);
@@ -190,10 +200,14 @@ async function build(args = [], opts = {}) {
   if (i >= 0) setApiUrl(root, args[i + 1] || '');
   const plats = platforms(args);
 
-  console.log('\n  Step 1: Building the site (relative base, PWA files)…');
+  console.log('\n  Step 1: Building the site (relative base)…');
   const kreftCli = path.join(__dirname, 'kreftjs.js');
-  const code = await run(process.execPath, [kreftCli, 'build', '--base', './', '--pwa', '--no-htaccess'], root);
+  const code = await run(process.execPath, [kreftCli, 'build', '--base', './', '--no-htaccess'], root);
   if (code) { console.error('  Build failed with code ' + code); process.exit(code); }
+  // A phone app ships its files inside the app, so it needs no service worker (one would keep serving the old files after an update).
+  // This sw.js is only for phones that still have the worker an older build registered: it clears its caches and removes itself.
+  const distDir = path.join(root, 'dist');
+  if (fs.existsSync(distDir)) fs.writeFileSync(path.join(distDir, 'sw.js'), RETIRE_SW);
 
   const cap = capBin(root);
   if (!cap) { console.error('\n  Capacitor is not installed. Run:  npm install\n'); process.exit(1); }
@@ -237,12 +251,61 @@ async function open(args = []) {
   process.exit(await run(cap, ['open', platforms(args)[0] || 'android'], root));
 }
 
+// ---- first-run setup: key:generate, storage:link, migrate. Safe to run again: each step does something only when it is needed.
+// A good APP_KEY is never replaced (key:generate would log every user out), and the key is never printed.
+function appKeyState(envText) {
+  if (envText == null) return 'no-file';
+  const m = /^APP_KEY=(.*)$/m.exec(envText);
+  const v = m ? m[1].trim().replace(/^["']|["']$/g, '') : '';
+  return v.length >= 16 ? 'ok' : 'missing';
+}
+function setupApp(root) {
+  const lay = require('./layout.js').layout(root);
+  const has = (p) => fs.existsSync(p);
+  if (!has(path.join(root, '.env')) && !has(path.join(root, '.env.example')) && !has(lay.backend === root ? path.join(root, 'app') : lay.backend)) {
+    return [{ name: 'setup', ok: true, text: 'no backend in this app: nothing to set up' }];
+  }
+  const kreft = path.join(__dirname, 'kreftjs.js');
+  const call = (args) => require('child_process').spawnSync(process.execPath, [kreft, ...args], { cwd: root, encoding: 'utf8', env: { ...process.env, NO_COLOR: '1' } });
+  const tail = (r) => String((r.stderr || '') + (r.stdout || '')).replace(/base64:[A-Za-z0-9+/=]+/g, 'base64:…').trim().split('\n').slice(-3).join(' | ');
+  const out = [];
+
+  const envFile = path.join(root, '.env');
+  const state = appKeyState(has(envFile) ? fs.readFileSync(envFile, 'utf8') : null);
+  if (state === 'ok') out.push({ name: 'key', ok: true, text: 'APP_KEY is set' });
+  else {
+    const r = call(['key:generate']);
+    out.push(r.status === 0 ? { name: 'key', ok: true, text: 'APP_KEY created in .env' } : { name: 'key', ok: false, text: 'key:generate failed: ' + tail(r) });
+  }
+
+  const l = call(['storage:link']);
+  out.push(l.status !== 0 ? { name: 'storage', ok: false, text: 'storage:link failed: ' + tail(l) }
+    : { name: 'storage', ok: true, text: /LINKED/.test(l.stdout) ? 'storage linked (public files)' : 'storage already linked' });
+
+  const m = call(['migrate']);
+  const ran = /(\d+) migrations? ran/.exec(m.stdout || '');
+  out.push(m.status !== 0 ? { name: 'migrate', ok: false, text: 'migrate failed: ' + tail(m) }
+    : { name: 'migrate', ok: true, text: ran ? `database: ${ran[1]} migration${ran[1] === '1' ? '' : 's'} ran` : 'database is up to date' });
+  return out;
+}
+function setup(args = []) {
+  const root = projectRoot();
+  requireApp(root);
+  console.log('\n  First-run setup');
+  const steps = setupApp(root);
+  for (const s of steps) console.log(`    ${s.ok ? '✔' : '✖'} ${s.text}`);
+  console.log('');
+  if (steps.some((s) => !s.ok)) process.exitCode = 1;
+  return steps;
+}
+
 async function dev(args = []) {
   const root = projectRoot();
   requireApp(root);
   const cap = capBin(root);
   if (!cap) { console.error('\n  Capacitor is not installed. Run:  npm install\n'); process.exit(1); }
   const plat = platforms(args)[0] || 'android';
+  if (!args.includes('--no-setup')) { console.log('\n  First-run setup (skip with --no-setup)'); for (const st of setupApp(root)) console.log(`    ${st.ok ? '✔' : '✖'} ${st.text}`); }
   if (fs.existsSync(path.join(root, 'android'))) pinGradleJava(root, androidEnv().JAVA_HOME);
   const port = process.env.PORT || '8000';
   const ip = Object.values(require('os').networkInterfaces()).flat().find((n) => n && n.family === 'IPv4' && !n.internal);
@@ -250,7 +313,7 @@ async function dev(args = []) {
   console.log(`  Dev server: ${url}  (the phone must be on the same network)`);
   // the dev server answers only this computer by default: share it on the network (--host) and allow the names the phone uses to reach it
   const allowed = [ip && ip.address, '10.0.2.2', process.env.KREFT_ALLOWED_HOSTS].filter(Boolean).join(','); // 10.0.2.2 is how the Android emulator names this computer
-  const server = spawn(process.execPath, [path.join(__dirname, 'kreftjs.js'), 'dev', '--host', '0.0.0.0', '--port', port], { cwd: root, stdio: 'inherit', env: { ...process.env, PORT: port, KREFT_ALLOWED_HOSTS: allowed } });
+  const server = spawn(process.execPath, [path.join(__dirname, 'kreftjs.js'), 'dev', '--seed', '--host', '0.0.0.0', '--port', port], { cwd: root, stdio: 'inherit', env: { ...process.env, PORT: port, KREFT_ALLOWED_HOSTS: allowed } });
   const stop = () => { try { server.kill('SIGTERM'); } catch (_) {} process.exit(0); };
   process.on('SIGINT', stop); process.on('SIGTERM', stop);
   const c = await run(cap, ['run', plat, '--live-reload', '--host', ip ? ip.address : 'localhost', '--port', port], root);
@@ -313,6 +376,7 @@ function help() {
     kreft mobile:build --api-url https://api.example.com
                                        the address of your server (the backend does not run inside the phone)
     kreft mobile:run --android         build, then install and start the app on an emulator or phone (--ios; --target <id> picks the device)
+    kreft mobile:setup                 first-run setup: APP_KEY (key:generate), storage:link and migrate; safe to run again
     kreft mobile:open --android        open Android Studio (--ios: Xcode)
     kreft mobile:icons logo.png --bg "#ffffff"     make the app icon in every size (a 1024x1024 PNG)
     kreft mobile:splash splash.png --bg "#ffffff" --dark-bg "#000000"     make the splash screen (a 2732x2732 PNG)
@@ -323,4 +387,4 @@ function help() {
 `);
 }
 
-module.exports = { PLUGINS, pinGradleJava, run: runApp, pngSize, assetPlan, init, icons: (a) => assetsCmd('icons', a), splash: (a) => assetsCmd('splash', a), build, open, dev, help, appId, configFor, androidEnv, javaMajor, findJava21 };
+module.exports = { RETIRE_SW, PLUGINS, appKeyState, setupApp, setup, pinGradleJava, run: runApp, pngSize, assetPlan, init, icons: (a) => assetsCmd('icons', a), splash: (a) => assetsCmd('splash', a), build, open, dev, help, appId, configFor, androidEnv, javaMajor, findJava21 };

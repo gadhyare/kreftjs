@@ -30,6 +30,10 @@
   --edge-bottom-indicator: var(--edge-surface);
   --edge-bottom-border: var(--edge-border);
   --edge-bottom-height: 64px;
+  /* animated splash */
+  --edge-splash-bg: var(--edge-bg);
+  --edge-splash-fg: var(--edge-fg);
+  --edge-splash-logo: 96px;
 }
 
 /* ---- an app screen: the bars stay where they are, only the middle scrolls ---- */
@@ -103,3 +107,19 @@ button[data-edge]:active { transform: none; }
 input[data-edge], select[data-edge], textarea[data-edge] { height: auto; min-height: 0; margin: 0; padding: 0; border: 0; border-radius: 0; background: transparent; color: inherit; font: inherit; box-shadow: none; transition: none; }
 input[data-edge]:focus-visible, select[data-edge]:focus-visible, textarea[data-edge]:focus-visible { border: 0; box-shadow: none; background: transparent; outline: none; }
 button[data-edge]:focus-visible { outline: 2px solid var(--edge-accent); outline-offset: 2px; }
+
+/* ---- the animated splash screen: covers the app while it starts, then fades away (phone and desktop app; the browser skips it) ----
+   Choose the animation with data-anim on #edge-splash in index.html: pulse (default), zoom, rise or none. Colours: --edge-splash-bg / --edge-splash-fg. */
+.edge-splash { display: none; position: fixed; inset: 0; z-index: 2000; flex-direction: column; align-items: center; justify-content: center; gap: 22px; background: var(--edge-splash-bg); color: var(--edge-splash-fg); opacity: 1; transition: opacity .35s ease, transform .35s ease; }
+html.platform-android .edge-splash, html.platform-ios .edge-splash, html.platform-electron .edge-splash, .edge-splash[data-web="true"] { display: flex; }
+.edge-splash.leaving { opacity: 0; transform: scale(1.06); pointer-events: none; }
+.edge-splash-logo { width: var(--edge-splash-logo); height: var(--edge-splash-logo); object-fit: contain; }
+.edge-splash-name { margin: 0; font-size: 20px; font-weight: 700; letter-spacing: -0.02em; opacity: 0; animation: edge-splash-name .5s .3s ease forwards; }
+.edge-splash[data-anim="pulse"] .edge-splash-logo { animation: edge-splash-pulse 1.5s ease-in-out infinite; }
+.edge-splash[data-anim="zoom"] .edge-splash-logo { animation: edge-splash-zoom .75s cubic-bezier(.2, .9, .3, 1.25) both; }
+.edge-splash[data-anim="rise"] .edge-splash-logo { animation: edge-splash-rise .7s ease both; }
+@keyframes edge-splash-pulse { 0%, 100% { transform: scale(1); } 50% { transform: scale(1.1); } }
+@keyframes edge-splash-zoom { from { transform: scale(.4); opacity: 0; } to { transform: scale(1); opacity: 1; } }
+@keyframes edge-splash-rise { from { transform: translateY(24px); opacity: 0; } to { transform: none; opacity: 1; } }
+@keyframes edge-splash-name { from { transform: translateY(8px); opacity: 0; } to { transform: none; opacity: 1; } }
+@media (prefers-reduced-motion: reduce) { .edge-splash .edge-splash-logo { animation: none; } .edge-splash .edge-splash-name { animation: none; opacity: 1; } .edge-splash, .edge-splash.leaving { transition: opacity .15s ease; transform: none; } }

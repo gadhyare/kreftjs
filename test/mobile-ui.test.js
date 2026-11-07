@@ -144,7 +144,7 @@ function sandbox() {
     Kreftjs: { store: (n, o) => (stores[n] = o), currentRouter: () => null },
     navigator: { userAgent: 'Mozilla/5.0 (Linux; Android 14)', onLine: true, language: 'so' }, screen: { width: 360, height: 800 }, devicePixelRatio: 2,
     localStorage: ls, addEventListener() {}, removeEventListener() {}, history: { length: 3, back() { ctx.wentBack = true; } },
-    document: { readyState: 'complete', baseURI: 'http://localhost/app/', documentElement: node(), body: node(), head: node(), createElement: node, querySelector: () => null, addEventListener() {}, removeEventListener() {} },
+    document: { readyState: 'complete', baseURI: 'http://localhost/app/', documentElement: node(), body: node(), head: node(), createElement: node, querySelector: () => null, getElementById: () => null, addEventListener() {}, removeEventListener() {} },
     getComputedStyle: () => ({ paddingTop: '0px', paddingRight: '0px', paddingBottom: '0px', paddingLeft: '0px' }),
     requestAnimationFrame: (f) => f(),
   });
@@ -238,4 +238,35 @@ test('mobile:icons and mobile:splash check the picture and colours before runnin
   assert.throws(() => m.assetPlan('icons', [path.join(dir, 'none.png')], dir), /does not exist/);
   assert.throws(() => m.assetPlan('icons', [big, '--bg', 'red'], dir), /Colours look like/);
   assert.throws(() => m.assetPlan('icons', [], dir), /Give the picture/);
+});
+
+/* ---------------- the animated splash screen ---------------- */
+
+test('the animated splash: an element in index.html, styles in edge.css, a native API, and Capacitor waits for it', async () => {
+  const dir = app(['--mobile', '--no-auth']);
+  const f = path.join(dir, 'frontend');
+  const html = read(f, 'index.html');
+  assert.strictEqual((html.match(/id="edge-splash"/g) || []).length, 1);
+  assert.match(html, /data-anim="pulse" data-web="false"/);
+  assert.match(html, /<img class="edge-splash-logo" src="logo-mark\.svg"/);
+  assert.ok(html.indexOf('id="edge-splash"') > html.indexOf('<div id="app"></div>'), 'a sibling of #app, so mounting the app does not remove it');
+  const cfg = JSON.parse(read(dir, 'capacitor.config.json'));
+  assert.strictEqual(cfg.plugins.SplashScreen.launchAutoHide, false, 'the native splash waits until the page says go');
+  const css = read(f, 'edge.css');
+  for (const a of ['pulse', 'zoom', 'rise']) assert.match(css, new RegExp('data-anim="' + a + '"'));
+  assert.match(css, /prefers-reduced-motion[\s\S]*edge-splash/, 'less motion for people who ask for it');
+  assert.match(css, /html\.platform-android \.edge-splash/, 'shown in the phone app only (a browser skips it)');
+  // running the installer again changes nothing; a splash setting the person wrote stays
+  assert.strictEqual(run(['mobile:ui'], dir).status, 0);
+  assert.strictEqual((read(f, 'index.html').match(/id="edge-splash"/g) || []).length, 1);
+  fs.writeFileSync(path.join(dir, 'capacitor.config.json'), JSON.stringify({ appId: 'a.b', appName: 'x', webDir: 'dist', plugins: { SplashScreen: { launchAutoHide: true } } }));
+  run(['mobile:ui'], dir);
+  assert.strictEqual(JSON.parse(read(dir, 'capacitor.config.json')).plugins.SplashScreen.launchAutoHide, true, 'never over the person\'s own setting');
+  // the API, in a sandbox
+  const { N } = sandbox();
+  assert.strictEqual(N.splash.config.minTime, 900);
+  N.splash.set({ minTime: 1500, anim: 'zoom' });
+  assert.strictEqual(N.splash.config.minTime, 1500);
+  await N.splash.hide();
+  assert.strictEqual(await N.splash.hide(), undefined, 'hiding twice is fine');
 });

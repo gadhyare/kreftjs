@@ -41,6 +41,31 @@ function patchIndex(front, { layout }) {
   return html !== before;
 }
 
+// the animated splash: an element in index.html that the native API fades out when the app is on the screen
+function patchSplash(front) {
+  const file = path.join(front, 'index.html');
+  if (!fs.existsSync(file)) return false;
+  let html = fs.readFileSync(file, 'utf8');
+  if (html.includes('id="edge-splash"')) return true;
+  const logo = fs.existsSync(path.join(front, 'logo-mark.svg')) ? '<img class="edge-splash-logo" src="logo-mark.svg" alt="">' : '';
+  const el = `<div id="edge-splash" class="edge-splash" data-anim="pulse" data-web="false" aria-hidden="true">${logo}<p class="edge-splash-name"></p></div>`;
+  const next = /<div id="app"><\/div>/.test(html) ? html.replace(/(<div id="app"><\/div>)/, `$1\n  ${el}`) : html.replace(/<\/body>/i, `  ${el}\n</body>`);
+  if (next === html) return false;
+  fs.writeFileSync(file, next);
+  return true;
+}
+// only when the page can hide it again: with launchAutoHide off, the native splash waits for kreftjs-native.js to say go
+function patchCapacitorSplash(root) {
+  const file = path.join(root, 'capacitor.config.json');
+  if (!fs.existsSync(file)) return;
+  let cfg;
+  try { cfg = JSON.parse(fs.readFileSync(file, 'utf8')); } catch (_) { return; }
+  cfg.plugins = cfg.plugins || {};
+  if (cfg.plugins.SplashScreen) return; // the person's own settings stay
+  cfg.plugins.SplashScreen = { launchAutoHide: false, launchFadeOutDuration: 200, backgroundColor: '#ffffff', showSpinner: false };
+  fs.writeFileSync(file, JSON.stringify(cfg, null, 2) + '\n');
+}
+
 function patchRoutes(front, { layout, gallery }) {
   const file = path.join(front, 'routes', 'web.kreft');
   if (!fs.existsSync(file)) return;
@@ -78,6 +103,7 @@ function install(target, opts = {}) {
   }
   if (opts.gallery) copy(path.join(SRC, 'pages', 'EdgeGallery.kreft'), path.join(front, 'pages', 'EdgeGallery.kreft'));
   patchIndex(front, opts);
+  if (patchSplash(front)) patchCapacitorSplash(require('./layout.js').layout(target).project);
   patchRoutes(front, opts);
   return { front, added };
 }

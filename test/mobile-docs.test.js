@@ -52,7 +52,9 @@ test('the documented Java range is the one the CLI enforces', () => {
 
 test('mobile:dev shares the dev server on the network and allows the phone host names', () => {
   const mobile = fs.readFileSync(path.join(root, 'bin', 'mobile.js'), 'utf8');
-  assert.match(mobile, /'dev', '--host', '0\.0\.0\.0', '--port', port/);
+  assert.match(mobile, /'dev', '--seed', '--host', '0\.0\.0\.0', '--port', port/, 'a new database is seeded');
+  assert.match(mobile, /--no-setup/, 'the first-run setup can be skipped');
+  assert.match(mobile, /setupApp\(root\)/, 'and runs before the server starts');
   assert.match(mobile, /KREFT_ALLOWED_HOSTS: allowed/);
   assert.match(mobile, /'10\.0\.2\.2'/);
 });

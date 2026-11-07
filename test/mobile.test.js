@@ -74,7 +74,7 @@ test('Android builds find a Java 21 when the default Java is older (or say so)',
 test('mobile commands refuse to run outside a Kreft app and change nothing', () => {
   const empty = fs.mkdtempSync(path.join(os.tmpdir(), 'kreft-notapp-'));
   fs.writeFileSync(path.join(empty, 'package.json'), '{"name":"x"}\n');
-  for (const cmd of ['mobile:init', 'mobile:build', 'mobile:run', 'mobile:open', 'mobile:dev']) {
+  for (const cmd of ['mobile:init', 'mobile:build', 'mobile:run', 'mobile:open', 'mobile:dev', 'mobile:setup']) {
     const r = run([cmd, '--android'], empty);
     assert.notStrictEqual(r.status, 0, cmd);
     assert.match(r.stdout + r.stderr, /not a Kreft app/, cmd);
@@ -112,4 +112,65 @@ test('Gradle is pinned to a fitting Java in android/gradle.properties, once, and
   fs.writeFileSync(file, '');
   m.pinGradleJava(dir, 'C:\\Java\\jdk-21');
   assert.match(fs.readFileSync(file, 'utf8'), /^org\.gradle\.java\.home=C:\/Java\/jdk-21$/m, 'Windows paths use forward slashes');
+});
+
+test('mobile:setup does the first-run steps once, never replaces a good APP_KEY, and never prints it', () => {
+  const m = require('../bin/mobile.js');
+  assert.strictEqual(m.appKeyState(null), 'no-file');
+  assert.strictEqual(m.appKeyState('APP_NAME=x\nAPP_KEY=\n'), 'missing');
+  assert.strictEqual(m.appKeyState('APP_KEY=short'), 'missing');
+  assert.strictEqual(m.appKeyState('APP_KEY=base64:' + 'a'.repeat(40)), 'ok');
+  assert.strictEqual(m.appKeyState('APP_KEY="base64:' + 'a'.repeat(40) + '"'), 'ok');
+  const dir = tmp();
+  assert.strictEqual(run(['new', 'a1', '--js', '--mobile', '--auth'], dir).status, 0);
+  const appDir = path.join(dir, 'a1');
+  const key = () => (fs.readFileSync(path.join(appDir, '.env'), 'utf8').match(/^APP_KEY=(.*)$/m) || [])[1];
+  const k1 = key();
+  const first = run(['mobile:setup'], appDir);
+  assert.strictEqual(first.status, 0, first.stdout + first.stderr);
+  assert.match(first.stdout, /APP_KEY is set/);
+  assert.match(first.stdout, /storage linked/);
+  assert.match(first.stdout, /database: 4 migrations ran/);
+  const again = run(['mobile:setup'], appDir);
+  assert.match(again.stdout, /storage already linked/);
+  assert.match(again.stdout, /database is up to date/);
+  assert.strictEqual(key(), k1, 'a good key is never replaced (that would log everybody out)');
+  // a fresh checkout: no .env (git ignores it) and no database
+  fs.rmSync(path.join(appDir, '.env'));
+  for (const f of fs.readdirSync(path.join(appDir, 'backend', 'database'))) if (/\.db/.test(f)) fs.rmSync(path.join(appDir, 'backend', 'database', f));
+  const clone = run(['mobile:setup'], appDir);
+  assert.strictEqual(clone.status, 0, clone.stdout + clone.stderr);
+  assert.match(clone.stdout, /APP_KEY created in \.env/);
+  assert.match(clone.stdout, /database: 4 migrations ran/);
+  assert.notStrictEqual(key(), k1);
+  assert.ok(key().startsWith('base64:'));
+  for (const out of [first.stdout, again.stdout, clone.stdout]) assert.doesNotMatch(out, /base64:[A-Za-z0-9+/=]{20,}/, 'the key is never printed');
+});
+
+test('mobile:setup refuses outside an app', () => {
+  const empty = tmp();
+  const r = run(['mobile:setup'], empty);
+  assert.notStrictEqual(r.status, 0);
+  assert.match(r.stdout + r.stderr, /not a Kreft app/);
+});
+
+test('a phone app gets no service worker (it would keep serving old files after an update)', () => {
+  const mobile = fs.readFileSync(path.join(__dirname, '..', 'bin', 'mobile.js'), 'utf8');
+  assert.match(mobile, /'build', '--base', '\.\/', '--no-htaccess'\]/, 'mobile:build builds without --pwa');
+  assert.doesNotMatch(mobile, /'--pwa'/);
+  const m = require('../bin/mobile.js');
+  assert.match(m.RETIRE_SW, /caches\.delete/);
+  assert.match(m.RETIRE_SW, /registration\.unregister\(\)/);
+  assert.match(m.RETIRE_SW, /skipWaiting/);
+  // and a site built with --pwa never registers its worker inside the phone app or Electron
+  const dir = tmp();
+  assert.strictEqual(run(['new', 'a1', '--js', '--no-auth'], dir).status, 0);
+  const appDir = path.join(dir, 'a1');
+  assert.strictEqual(run(['build', '--pwa'], appDir).status, 0);
+  const reg = fs.readFileSync(path.join(appDir, 'dist', 'pwa-register.js'), 'utf8');
+  assert.match(reg, /Capacitor\.isNativePlatform/);
+  assert.match(reg, /__KREFT_ELECTRON__/);
+  // the native API also removes a worker an older build left behind
+  const native = fs.readFileSync(path.join(__dirname, '..', 'templates', 'mobile', 'kreftjs-native.js'), 'utf8');
+  assert.match(native, /serviceWorker\.getRegistrations\(\)/);
 });

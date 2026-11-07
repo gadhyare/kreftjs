@@ -44,6 +44,9 @@ state app = Kreftjs.env.PUBLIC_APP_NAME || 'My app'
 state tiles = ${js(tiles)}${standalone ? `\nstate tabs = ${js(tabs)}` : ''}
 state taps = 0
 state note = 'Tap the card. Swipe left to reset. Hold to double.'
+state hour = new Date().getHours()
+derive greeting = hour < 5 ? 'Good night' : hour < 12 ? 'Good morning' : hour < 18 ? 'Good afternoon' : 'Good evening'
+derive platform = Kreftjs.native ? Kreftjs.native.platform() : 'web'
 
 action hit() { taps++; note = 'Tapped ' + taps + (taps === 1 ? ' time' : ' times') }
 action reset() { taps = 0; note = 'Reset by swipe' }
@@ -52,12 +55,15 @@ action boost() { taps = taps * 2; note = 'Doubled by long press' }
 <view>
   ${bars.open}${bars.top}
     <section class="page">
-      <edge-text size="sm" muted>Welcome back</edge-text>
-      <edge-text size="xl" weight={800}>What do you want to do?</edge-text>
+      <div class="hero">
+        <p class="hi">{greeting}<span k-if="$store.auth && $store.auth.user">, {$store.auth.user.name}</span></p>
+        <h2>What do you want to do?</h2>
+        <span class="chip">Running on <b>{platform}</b></span>
+      </div>
 
       <div class="grid">
-        <edge-pressable k-each="t in tiles" k-key="t.to" feedback="scale" haptics @press="$router.go(t.to)">
-          <div class="tile"><edge-icon name={t.icon} size={28}></edge-icon><edge-text weight={600}>{t.label}</edge-text></div>
+        <edge-pressable k-each="(t, i) in tiles" k-key="t.to" feedback="scale" haptics @press="$router.go(t.to)">
+          <div class="tile" :style="{ animationDelay: (i * 60) + 'ms' }"><edge-icon name={t.icon} size={28}></edge-icon><edge-text weight={600}>{t.label}</edge-text></div>
         </edge-pressable>
       </div>
 
@@ -79,10 +85,21 @@ action boost() { taps = taps * 2; note = 'Doubled by long press' }
 
 <style scoped>
 .page { display: flex; flex-direction: column; gap: 16px; padding: 16px 16px 24px; }
+.hero { position: relative; overflow: hidden; padding: 22px 20px; border-radius: 22px; color: #fff; background: linear-gradient(135deg, var(--edge-accent), color-mix(in srgb, var(--edge-accent) 45%, #7c3aed)); }
+.hero::before, .hero::after { content: ''; position: absolute; border-radius: 50%; background: rgba(255, 255, 255, .13); }
+.hero::before { width: 150px; height: 150px; right: -40px; top: -50px; }
+.hero::after { width: 90px; height: 90px; right: 50px; bottom: -45px; }
+.hero > * { position: relative; }
+.hi { margin: 0 0 4px; font-size: 14px; color: rgba(255, 255, 255, .85); }
+.hero h2 { margin: 0 0 14px; color: #fff; font-size: 26px; line-height: 1.2; letter-spacing: -0.03em; }
+.chip { display: inline-block; padding: 4px 12px; border-radius: 999px; background: rgba(255, 255, 255, .2); font-size: 12px; font-weight: 500; }
+.chip b { font-weight: 700; text-transform: capitalize; }
 .grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 12px; }
-.tile { display: flex; flex-direction: column; justify-content: space-between; gap: 18px; min-height: 104px; padding: 16px; background: var(--edge-card); border: 1px solid var(--edge-border); border-radius: var(--edge-radius); }
+.tile { animation: tile-in .45s ease both; display: flex; flex-direction: column; justify-content: space-between; gap: 18px; min-height: 104px; padding: 16px; background: var(--edge-card); border: 1px solid var(--edge-border); border-radius: var(--edge-radius); }
 .card { display: flex; flex-direction: column; gap: 4px; padding: 18px; background: var(--edge-card); border: 1px solid var(--edge-border); border-radius: var(--edge-radius); }
 .try { align-items: center; text-align: center; user-select: none; -webkit-user-select: none; }
+@keyframes tile-in { from { opacity: 0; transform: translateY(14px) scale(.96); } to { opacity: 1; transform: none; } }
+@media (prefers-reduced-motion: reduce) { .tile { animation: none; } }
 </style>
 `;
 }

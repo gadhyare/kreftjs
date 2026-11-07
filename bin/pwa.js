@@ -60,7 +60,9 @@ self.addEventListener('fetch', (e) => {
 });
 `);
   fs.writeFileSync(path.join(dist, 'pwa-register.js'),
-    `if ('serviceWorker' in navigator && location.protocol !== 'file:' && !location.protocol.startsWith('capacitor')) {\n  window.addEventListener('load', () => navigator.serviceWorker.register('sw.js').catch(() => {}));\n}\n`);
+    `// not inside the phone app or Electron: they ship their own files, and a service worker would keep serving the old ones after an update
+const native = window.Capacitor && window.Capacitor.isNativePlatform && window.Capacitor.isNativePlatform();
+if ('serviceWorker' in navigator && location.protocol !== 'file:' && !location.protocol.startsWith('capacitor') && !native && !window.__KREFT_ELECTRON__) {\n  window.addEventListener('load', () => navigator.serviceWorker.register('sw.js').catch(() => {}));\n}\n`);
 
   const file = path.join(dist, 'index.html');
   let html = fs.readFileSync(file, 'utf8');

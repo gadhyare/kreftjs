@@ -125,6 +125,8 @@ Run `npm link` inside the Kreft folder. The `kreft` command then runs that folde
 | `command not found: kreftjs` | npm's global folder is not on your `PATH`. Run `npm config get prefix`, add its `bin` folder to `PATH`, and open a new terminal. |
 | `EACCES: permission denied` while installing | Do not use `sudo`. Install Node with [nvm](https://github.com/nvm-sh/nvm), or run `npm config set prefix ~/.npm-global` and add `~/.npm-global/bin` to `PATH`. |
 | `SQLite needs Node.js 22.5 or newer` | Update Node.js. `node --version` must show 22.5.0 or higher. |
+| A new project shows `Missing APP_KEY` or a database error on the first run | Run `kreft mobile:setup` (or `kreft mobile:dev`, which does it): it creates `.env` and the key, links storage and migrates. |
+| The phone shows an old version of your app after you rebuilt | An older build registered a service worker that keeps serving cached files. New builds remove it by themselves, but a phone that already has it may need the app's data cleared once (Android: *App info → Storage → Clear data*, or `adb shell pm clear com.example.yourapp`) or the app uninstalled and installed again. |
 | `kreft --version` shows an old number | Another copy comes first on your `PATH`. Run `which -a kreftjs` (Windows: `where kreftjs`) and remove the old one. |
 | PowerShell says "running scripts is disabled" (Windows) | Run `Set-ExecutionPolicy -Scope CurrentUser RemoteSigned`, or use Command Prompt. |
 | The browser shows a blank page or "Not found: /" | Run `kreft dev` from the project's top folder (the one with `frontend/` and `backend/`). The dev server serves `frontend/`. |
@@ -1918,7 +1920,7 @@ Check that people get it with `npm view kreftjs version` and a fresh `npm instal
 npm publish --tag mobile-test --access public     # npm asks you to approve in the browser
 npm install -g kreftjs@mobile-test                  # you, on any computer
 kreft --version                                     # shows the new number
-npm dist-tag add kreftjs@0.0.25-beta beta           # when it is good: the tag everyone uses moves
+npm dist-tag add kreftjs@0.0.26-beta beta           # when it is good: the tag everyone uses moves
 ```
 
 `--access public` is needed because this package's `package.json` has `publishConfig.access` set to `restricted` (left from an old scoped package), which npm refuses for a plain package name. A version number can be published only once, so the next try is the next number. To test the folder you are in without publishing anything, run `npm link` (undo with `npm unlink -g kreftjs`). `kreft --version` after `npm install -g` reads the globally installed package, not the repository.
@@ -2255,8 +2257,9 @@ kreft mobile:open --android      # Android Studio (--ios: Xcode, needs a Mac)
 | Command | What it does |
 |---|---|
 | `kreft mobile:init` (alias `kreft make:mobile`) | Adds `capacitor.config.json`, the Capacitor packages, the native plugins, the `mobile:*` scripts and the [phone UI kit](#the-phone-ui-kit) |
-| `kreft mobile:build [--android] [--ios]` | Builds the site with a relative base and PWA files, adds the platform the first time, then runs `cap sync`. Without a flag it syncs the platforms that exist |
+| `kreft mobile:build [--android] [--ios]` | Builds the site with a relative base, adds the platform the first time, then runs `cap sync`. Without a flag it syncs the platforms that exist. (No service worker goes into a phone app: its files are inside the app.) |
 | `kreft mobile:run [--android] [--ios] [--target id]` | The one command to see your app: builds, then installs and starts it on an emulator or phone (Capacitor lists the devices and starts the one you choose). Run it again after every change |
+| `kreft mobile:setup` | First-run setup: `key:generate` (only when `APP_KEY` is missing), `storage:link` and `migrate`. Safe to run again. `mobile:dev` runs it for you |
 | `kreft mobile:open` | Opens the native project |
 | `kreft mobile:dev` | Runs on a device or emulator with live reload from your dev server (same Wi-Fi) |
 | `kreft mobile:ui [--layout] [--gallery]` | Adds the [phone UI kit](#the-phone-ui-kit) to an app |
@@ -2292,6 +2295,8 @@ Use API tokens for sign-in in the app, not cookie sessions.
 
 **Live reload.** `kreft mobile:dev --android` (or `--ios`) starts your dev server on the network and runs the app on the emulator or phone, so a saved change shows up without building again. The phone must reach your computer, so use the same Wi-Fi. It needs the Capacitor tools from `npm install`.
 
+**First-run setup.** Before it starts the server, `mobile:dev` runs `kreft mobile:setup` (skip it with `--no-setup`): it creates `.env` and a new `APP_KEY` when they are missing (a fresh checkout from git has no `.env`), links `storage` for public files, and runs the database migrations. A new database is also seeded, so the test user exists. Every step only does something when it is needed, so running it again is harmless. A good `APP_KEY` is never replaced (that would log every user out), and the key is never printed.
+
 **Where is the backend?** The backend runs on your computer or a server, never inside the phone. Give the app the address the phone can reach:
 
 | The app runs on | Address of the server on your computer |
@@ -2310,6 +2315,22 @@ Plain `http://` is for testing; a published app should always use `https://`.
 ### Mobile and desktop in one app
 
 `kreft new my-app --mobile --electron` makes one project for both. Pages use the dashboard layout (`layouts/app.kreft`) as in a web app, and `pages/Home.kreft` shows the desktop workspace inside the Electron window and the phone screen everywhere else (the phone one draws its own top bar and bottom bar). With only `--mobile`, every page uses `layouts/mobile.kreft`. To use the phone layout in a project that has both, run `kreft mobile:ui --layout`.
+
+### The animated splash screen
+
+A phone app shows the native splash screen (made by `kreft mobile:splash`) while the web part loads. The kit adds an **animated splash** that takes over from it without a flash: your logo moves, the app name fades in, and when the app is on the screen it fades away. It is the `<div id="edge-splash">` in `index.html`. The native splash covers only the first moment (`launchAutoHide: false` in `capacitor.config.json` lets the page decide): as soon as the animated one is painted, the native one fades away and the animation plays. Give both the same background colour, so nothing flashes: `kreft mobile:splash splash.png --bg "#ffffff"` for the native one and `--edge-splash-bg` for the animated one. The splash is never stuck: it is gone after 8 seconds at the latest.
+
+```html
+<div id="edge-splash" class="edge-splash" data-anim="pulse" data-web="false">…</div>
+```
+
+- `data-anim` is `pulse` (the logo breathes), `zoom` (it pops in), `rise` (it slides up) or `none`.
+- `data-web="true"` shows it in a browser too; by default a browser skips it.
+- Colours: `--edge-splash-bg` and `--edge-splash-fg` in `edge.css` (they follow dark mode). Change the logo by changing the `<img>`.
+- From code: `Kreftjs.native.splash.set({ minTime: 1500, anim: 'zoom' })` (the animation plays at least `minTime` milliseconds from when it appears; 900 by default, and `0` means as soon as the app is ready) and `Kreftjs.native.splash.hide()`.
+- People who asked their phone for less motion get a plain fade.
+
+To turn it off, delete the `#edge-splash` element and set `"launchAutoHide": true` under `plugins.SplashScreen` in `capacitor.config.json`.
 
 ### Home pages made for apps
 

@@ -55,6 +55,7 @@ const commands = {
   'mobile:init': (a) => require('./mobile.js').init(a.find((x) => !x.startsWith('-'))),
   'mobile:build': (a) => require('./mobile.js').build(a),
   'mobile:run': (a) => require('./mobile.js').run(a),
+  'mobile:setup': (a) => require('./mobile.js').setup(a),
   'mobile:open': (a) => require('./mobile.js').open(a),
   'mobile:dev': (a) => require('./mobile.js').dev(a),
   'mobile:help': () => require('./mobile.js').help(),

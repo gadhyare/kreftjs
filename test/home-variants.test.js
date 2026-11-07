@@ -24,7 +24,9 @@ test('--mobile: the home page is the phone screen, built from edge components, i
   assert.doesNotMatch(read(f, 'pages', 'Home.kreft'), /home-desktop/);
   const m = read(f, 'components', 'HomeMobile.kreft');
   assert.match(m, /<edge-gesture-area @tap="hit\(\)"/);
-  assert.match(m, /<edge-pressable k-each="t in tiles"/);
+  assert.match(m, /<edge-pressable k-each="\(t, i\) in tiles"/);
+  assert.match(m, /class="hero"/);
+  assert.match(m, /Good morning/);
   assert.doesNotMatch(m, /<edge-shell>|<edge-bottom-nav/, 'the bars come from layouts/mobile.kreft');
   assert.match(read(f, 'index.html'), /\.component\('HomeMobile', 'components\/HomeMobile\.kreft'\)/);
   assert.match(read(f, 'index.html'), /layout: 'mobile'/);

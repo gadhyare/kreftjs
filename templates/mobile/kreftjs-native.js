@@ -190,7 +190,7 @@
         m.content = o.color;
       }
     },
-    hideSplash() { return call('SplashScreen', 'hide'); },
+    hideSplash() { return call('SplashScreen', 'hide', { fadeOutDuration: 200 }); },
   };
 
   /* ------------------------------------------------------------ positioning (GPS) */
@@ -346,8 +346,48 @@
     showBars() { this.top.show = true; this.bottom.show = true; },
   });
 
+  /* ------------------------------------------------------------ the animated splash screen */
+  // The native splash (made by kreft mobile:splash) covers the first moment only. As soon as the animated #edge-splash from index.html is painted
+  // under it, the native one fades away (both have the same background, so there is no flash) and the animation plays. The animated one goes by
+  // itself once the app is on the screen and minTime has passed. Change it before that:
+  //   Kreftjs.native.splash.set({ minTime: 1500, anim: 'zoom' })     Kreftjs.native.splash.hide()
+  let hiding = null;
+  const splash = {
+    config: { minTime: 900, anim: '' }, // minTime: how long the animation plays at least, counted from when it appears
+    set(o) { Object.assign(splash.config, o || {}); const e = document.getElementById('edge-splash'); if (e && splash.config.anim) e.setAttribute('data-anim', splash.config.anim); },
+    hide() {
+      if (hiding) return hiding;
+      hiding = new Promise((resolve) => {
+        system.hideSplash();
+        const e = document.getElementById('edge-splash');
+        if (!e) return resolve();
+        e.classList.add('leaving');
+        setTimeout(() => { e.remove(); resolve(); }, 380);
+      });
+      return hiding;
+    },
+  };
+  function autoSplash() {
+    const e = document.getElementById('edge-splash');
+    if (!e) return;
+    if (platform() === 'web' && e.getAttribute('data-web') !== 'true') { e.remove(); return; } // a browser needs no splash
+    const name = e.querySelector('.edge-splash-name');
+    if (name) name.textContent = (K.env && K.env.PUBLIC_APP_NAME) || '';
+    // two frames later the animated splash is on the screen: now the native one may go, and the animation's minimum time starts
+    const now = () => (global.performance ? performance.now() : Date.now());
+    let shownAt = 0;
+    const reveal = () => { shownAt = now(); system.hideSplash(); };
+    if (global.requestAnimationFrame) requestAnimationFrame(() => requestAnimationFrame(reveal)); else reveal();
+    const check = () => {
+      const app = document.getElementById('app');
+      if ((app && app.children.length > 0 && shownAt && now() - shownAt >= splash.config.minTime) || now() > 8000) splash.hide(); // never stuck: gone after 8 seconds
+      else setTimeout(check, 60);
+    };
+    if (document.readyState === 'complete') check(); else global.addEventListener('load', () => setTimeout(check, 0));
+  }
+
   /* ------------------------------------------------------------ start */
-  const N = { platform, isNative, isDesktop: system.isDesktop, isWeb: system.isWeb, plugin: call, device, haptics, file, system, position, dialog, on, emit, pushBack, back: handleBack, safeArea, asset, edge };
+  const N = { platform, isNative, isDesktop: system.isDesktop, isWeb: system.isWeb, plugin: call, device, haptics, file, system, splash, position, dialog, on, emit, pushBack, back: handleBack, safeArea, asset, edge };
   K.native = N;
 
   function start() {
@@ -356,6 +396,12 @@
     global.addEventListener('resize', safeArea);
     global.addEventListener('orientationchange', () => setTimeout(safeArea, 200));
     if (isNative()) listen('App', 'backButton', handleBack); // the Android back button: close a sheet first, then go back, then leave the app
+    autoSplash();
+    // a phone app ships its own files; a service worker left by an older build would keep serving old ones
+    if (isNative() && global.navigator && navigator.serviceWorker && navigator.serviceWorker.getRegistrations) {
+      navigator.serviceWorker.getRegistrations().then((rs) => rs.forEach((r) => r.unregister())).catch(() => {});
+      if (global.caches && caches.keys) caches.keys().then((ks) => ks.forEach((k) => caches.delete(k))).catch(() => {});
+    }
   }
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', start); else start();
 })(typeof window !== 'undefined' ? window : globalThis);
