@@ -1,8 +1,12 @@
 # Changelog
 
-## 0.0.39-beta
+## 0.0.40-beta
 
 - Editors: Emmet in `.kreft` files (`ul>li*3` in `<view>`, `m10` in `<style>`) in VS Code, Antigravity, Cursor, Sublime Text and Zed, and two new plugins, for JetBrains IDEs (WebStorm, PhpStorm, IDEA...) and for Vim / Neovim. `kreft editor <name>` installs one: `vscode`, `sublime`, `zed`, `jetbrains`, `vim`. `kreft editor <name> --download` writes it as one file instead (`.vsix`, `.sublime-package`, `.jar`, `.zip`). The manual has a part for each editor: Editor plugins.
+- The package and the editor plugins name the website, kreftjs.com, and the repository's new address, github.com/gadhyare/kreftjs.
+
+## 0.0.39-beta
+
 - Release builds: the server address built into an app is the one you decided (a stale PUBLIC_API_URL in the terminal can no longer replace it), and the finished build is checked before anything is signed.
 - Website builds never copy signing keys, native projects, release files, security reports or the Capacitor config, also in projects with index.html at the top.
 - Package security judges a shared dependency whose version the new package changes, and cancelling or interrupting an install leaves no stage folders behind.

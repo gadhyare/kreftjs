@@ -99,7 +99,7 @@ npx kreftjs@latest new my-app
 ### Check that it works
 
 ```bash
-kreft --version     # for example 0.0.39-beta
+kreft --version     # for example 0.0.40-beta
 kreft about         # Kreft and Node.js versions, this project's settings and drivers
 kreft list          # every command your version has
 ```
@@ -2056,7 +2056,7 @@ Then upload what is *inside* `dist/kreftjs-com` (not the folder itself, and incl
 
 ```bash
 npm test                       # the regression tests must pass
-npm version 0.0.39-beta --no-git-tag-version --ignore-scripts  # choose a fresh version for the next release
+npm version 0.0.40-beta --no-git-tag-version --ignore-scripts  # choose a fresh version for the next release
 npm pack --dry-run             # review the package contents
 npm publish --tag beta --access public  # runs tests first; needs npm authentication
 npm run build                  # then upload dist/kreftjs-com as above
@@ -2070,7 +2070,7 @@ Check that people get it with `npm view kreftjs version` and a fresh `npm instal
 npm publish --tag mobile-test --access public     # npm asks you to approve in the browser
 npm install -g kreftjs@mobile-test                  # you, on any computer
 kreft --version                                     # shows the new number
-npm dist-tag add kreftjs@0.0.39-beta beta           # when it is good: the tag everyone uses moves
+npm dist-tag add kreftjs@0.0.40-beta beta           # when it is good: the tag everyone uses moves
 ```
 
 `package.json` sets public access, the official npm registry and the `beta` tag for prereleases. Use `npm run publish:beta` (or explicitly pass `--tag beta`) to publish a prerelease; moving `latest` is a separate maintainer decision. Unscoped packages such as `kreftjs` are public. Organization packages require an explicitly chosen name such as `@your-org/kreftjs` and access to that organization. A version number can be published only once, so the next try is the next number. To test the folder you are in without publishing anything, run `npm link` (undo with `npm unlink -g kreftjs`). `kreft --version` after `npm install -g` reads the globally installed package, not the repository.
