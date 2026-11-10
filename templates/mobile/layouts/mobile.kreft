@@ -5,10 +5,13 @@ use edge
 
 // ---- Appearance: the starting look of the bars on every page ----
 const appName = Kreftjs.env.PUBLIC_APP_NAME || 'My app'
+state menuOpen = false
+
 const base = {
   top: {
-    // bg: '#111827', color: '#ffffff',      // colours (they fall back to edge.css, which follows light and dark mode)
+    bg: '#111827', color: '#ffffff', borderColor: '#1f2937',   // dark bar. Light instead: bg: '#ffffff', color: '#111827', borderColor: '#e4e4e7'
     // height: 56, center: true, elevated: false, blur: false, border: true,
+    left: [{ icon: 'menu', id: 'menu', label: 'Menu', onTap: () => { menuOpen = true } }],   // the ☰ button that opens the side menu (remove this line to have no menu)
     right: [],                               // buttons on the right: [{ icon: 'search', id: 'search', onTap: () => {} }]
   },
   bottom: {
@@ -16,7 +19,8 @@ const base = {
       { label: 'Home', icon: 'home', to: '/' },
       { label: 'Docs', icon: 'book', to: '/docs' },
     ],
-    // bg: '#ffffff', color: '#71717a', active: '#2563eb',
+    bg: '#111827', color: '#9ca3af', activeColor: '#ffffff',   // dark bar. Light instead: bg: '#ffffff', color: '#71717a', activeColor: '#111827'
+    indicatorColor: 'rgba(255, 255, 255, 0.14)', borderColor: '#1f2937',   // the pill behind the active icon, and the line above the bar
     labels: 'always',                        // 'always' | 'active' | 'never'
     indicator: 'pill',                       // 'pill' | 'line' | 'none'
     floating: false, blur: false, border: true,
@@ -30,9 +34,17 @@ action applyBase() {
 }
 applyBase()
 
+// the phone's status bar (the clock and battery) takes the colour of the top bar, with light icons on a dark bar
+action syncStatusBar() {
+  if (Kreftjs.native) Kreftjs.native.system.statusBar({ color: edge.top.bg || '#ffffff', style: 'auto' })
+}
+on ready { syncStatusBar() }
+watch edge.top.bg { syncStatusBar() }
+
 // the back arrow shows on pages that are not one of the bottom buttons
 derive isRoot = $route.path === '/' || edge.bottom.items.some((i) => i.to === $route.path)
 derive showBack = edge.top.back === 'auto' ? !isRoot : Boolean(edge.top.back)
+derive menuTitle = appName
 derive title = edge.top.title || ($route.meta && $route.meta.title) || appName
 
 watch $route.path { applyBase() }
@@ -41,14 +53,15 @@ watch $route.path { applyBase() }
   <edge-shell>
     <template k-slot:top>
       <edge-top-bar k-if="edge.top.show" title={title} subtitle={edge.top.subtitle} back={showBack} bg={edge.top.bg} color={edge.top.color}
-                    border={edge.top.border} height={edge.top.height} center={edge.top.center} elevated={edge.top.elevated} blur={edge.top.blur}
+                    border={edge.top.border} borderColor={edge.top.borderColor} height={edge.top.height} center={edge.top.center} elevated={edge.top.elevated} blur={edge.top.blur}
                     left={edge.top.left} right={edge.top.right}></edge-top-bar>
     </template>
     <slot></slot>
     <template k-slot:bottom>
       <edge-bottom-nav k-if="edge.bottom.show" items={edge.bottom.items} active={edge.bottom.active} labels={edge.bottom.labels} indicator={edge.bottom.indicator}
-                       bg={edge.bottom.bg} color={edge.bottom.color} activeColor={edge.bottom.activeColor} height={edge.bottom.height}
-                       border={edge.bottom.border} floating={edge.bottom.floating} blur={edge.bottom.blur} haptics={edge.bottom.haptics}></edge-bottom-nav>
+                       bg={edge.bottom.bg} color={edge.bottom.color} activeColor={edge.bottom.activeColor} indicatorColor={edge.bottom.indicatorColor} height={edge.bottom.height}
+                       border={edge.bottom.border} borderColor={edge.bottom.borderColor} floating={edge.bottom.floating} blur={edge.bottom.blur} haptics={edge.bottom.haptics}></edge-bottom-nav>
     </template>
   </edge-shell>
+  <edge-side-nav k-model="menuOpen" title={menuTitle} items={edge.bottom.items} bg="#111827" color="#9ca3af" activeColor="#ffffff" indicatorColor="rgba(255,255,255,.14)" borderColor="#1f2937"></edge-side-nav>
 </view>

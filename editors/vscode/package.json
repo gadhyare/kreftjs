@@ -1,17 +1,17 @@
 {
   "name": "kreftjs",
   "displayName": "Kreft (.kreft files)",
-  "description": "Colors, brackets, formatting and snippets for Kreft .kreft component files (and .kreftjs files from the 0.0.x betas).",
-  "version": "2.3.0",
+  "description": "Colors, brackets, formatting, snippets and Emmet for Kreft .kreft component files (and .kreftjs files from the 0.0.x betas).",
+  "version": "2.4.0",
   "publisher": "kreft",
   "icon": "icon.png",
   "repository": {
     "type": "git",
-    "url": "https://github.com/gadhyare/somjs.git"
+    "url": "https://github.com/gadhyare/kreftjs.git"
   },
-  "homepage": "https://github.com/gadhyare/somjs#readme",
+  "homepage": "https://github.com/gadhyare/kreftjs#readme",
   "bugs": {
-    "url": "https://github.com/gadhyare/somjs/issues"
+    "url": "https://github.com/gadhyare/kreftjs/issues"
   },
   "galleryBanner": {
     "color": "#1e1b4b",
@@ -24,12 +24,13 @@
     "syntax highlighting",
     "snippets",
     "formatter",
+    "emmet",
     "framework",
     "laravel"
   ],
   "license": "SEE LICENSE IN LICENSE",
   "engines": {
-    "vscode": "^1.60.0"
+    "vscode": "^1.67.0"
   },
   "categories": [
     "Programming Languages",
@@ -74,6 +75,11 @@
         "language": "kreftjs",
         "path": "./snippets/kreftjs.json"
       }
-    ]
+    ],
+    "configurationDefaults": {
+      "emmet.includeLanguages": {
+        "kreftjs": "html"
+      }
+    }
   }
 }

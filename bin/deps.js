@@ -75,7 +75,7 @@ function prepare(root, spec, minify) {
   }
   const options = (contents) => ({
     stdin: { contents, resolveDir: root, loader: 'js', sourcefile: spec }, bundle: true, write: false, format: 'esm', platform: 'browser',
-    target: 'es2020', minify, logLevel: 'silent', legalComments: minify ? 'none' : 'inline',
+    target: 'es2018', minify, logLevel: 'silent', legalComments: minify ? 'none' : 'inline',
     define: { 'process.env.NODE_ENV': JSON.stringify(minify ? 'production' : 'development'), global: 'globalThis' },
   });
   return { esbuild, key, tries, options };

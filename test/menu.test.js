@@ -6,11 +6,11 @@ const path = require('node:path');
 
 const read = (rel) => fs.readFileSync(path.join(__dirname, '..', rel), 'utf8');
 
-test('the top menu has Docs, Playground and Examples, in that order, linking to real pages', () => {
+test('the top menu has Docs, Platforms, Playground and Examples, in that order, linking to real pages', () => {
   const header = read('demo/components/SiteHeader.kreft');
   const nav = header.slice(header.indexOf('<nav class="top'), header.indexOf('</nav>'));
   const links = [...nav.matchAll(/to="([^"]+)"[^>]*>([^<]+)</g)].map((m) => [m[1], m[2]]);
-  assert.deepStrictEqual(links, [['/docs', 'Docs'], ['/playground', 'Playground'], ['/basics', 'Examples']]);
+  assert.deepStrictEqual(links, [['/docs', 'Docs'], ['/platforms', 'Platforms'], ['/playground', 'Playground'], ['/basics', 'Examples']]);
   assert.ok(fs.existsSync(path.join(__dirname, '..', 'demo/pages/Playground.kreft')), 'the page behind /playground exists');
   assert.match(read('demo/layouts/main.kreft'), /to: '\/playground'/, 'and it is in the side menu too');
 });

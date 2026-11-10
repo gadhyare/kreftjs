@@ -8,6 +8,7 @@
  *   kreft dev ./site            another folder
  *   kreft build                 build this folder for production into ./dist
  *   kreft vscode                install colors and snippets for .kreft files in VS Code
+ *   kreft editor <name>         the same for sublime, zed, jetbrains, vim
  *   kreft serve dist            run the built app in production (with --db: its database API)
  *   kreft db migrate            run new database/migrations/*.sql   (also: seed, tables, sql "…")
  *   kreft help                  show this help
@@ -47,13 +48,28 @@ const commands = {
   'electron:build': (a) => require('./electron.js').build(a),
   'electron:init': (a) => require('./electron.js').init(a),
   'electron:help': () => require('./electron.js').help(),
+  'electron:config': (a) => require('./electron.js').config(a),
   'make:electron': (a) => require('./electron.js').init(a),
+  tauri: (a) => require('./tauri.js').run(a),
+  'tauri:dev': (a) => require('./tauri.js').dev(a),
+  'tauri:build': (a) => require('./tauri.js').build(a),
+  'tauri:init': (a) => require('./tauri.js').init(a),
+  'tauri:help': () => require('./tauri.js').help(),
+  'tauri:sync': (a) => require('./tauri.js').sync(a),
+  'tauri:config': (a) => require('./tauri.js').config(a),
+  'make:tauri': (a) => require('./tauri.js').init(a),
+  'harmony:init': (a) => require('./harmony.js').init(a),
+  'harmony:build': (a) => require('./harmony.js').build(a),
+  'harmony:open': (a) => require('./harmony.js').open(a),
+  'harmony:help': () => require('./harmony.js').help(),
+  'make:harmony': (a) => require('./harmony.js').init(a),
   'mobile:icons': (a) => require('./mobile.js').icons(a),
   'mobile:splash': (a) => require('./mobile.js').splash(a),
   'mobile:ui': (a) => require('./mobile-ui.js').run(a),
   'make:home': (a) => require('./home-variants.js').make(a),
   'mobile:init': (a) => require('./mobile.js').init(a.find((x) => !x.startsWith('-'))),
   'mobile:build': (a) => require('./mobile.js').build(a),
+  'mobile:release': (a) => require('./release.js').main(a),
   'mobile:run': (a) => require('./mobile.js').run(a),
   'mobile:setup': (a) => require('./mobile.js').setup(a),
   'mobile:open': (a) => require('./mobile.js').open(a),
@@ -76,8 +92,18 @@ const commands = {
   add: (args) => require('./add.js')(args),
   install: (args) => require('./add.js')(args),
   i: (args) => require('./add.js')(args),
-  new: createProject, dev: devServer, serve: (a) => devServer(a, { production: true }), db: dbCommand, vscode: installVscode, build: (args) => require('./build.js')(args), update: (args) => require('./update.js')(args), upgrade: (args) => require('./update.js')(args), help, '--help': help, '-h': help, '--version': version, '-v': version
+  new: createProject, dev: devServer, serve: (a) => devServer(a, { production: true }), db: dbCommand, vscode: installVscode, editor: (args) => require('./editors.js')(args, { vscode: installVscode }), editors: (args) => require('./editors.js')(args, { vscode: installVscode }), build: (args) => require('./build.js')(args), update: (args) => require('./update.js')(args), upgrade: (args) => require('./update.js')(args), help, '--help': help, '-h': help, '--version': version, '-v': version
 };
+// the mobile commands can run from anywhere: kreft mobile:dev --android --app /path/to/my-app  (the same as cd /path/to/my-app first)
+if (/^mobile:/.test(command || '') || command === 'make:home') {
+  const at = rest.indexOf('--app');
+  if (at >= 0) {
+    const dir = rest[at + 1];
+    rest.splice(at, dir && !dir.startsWith('-') ? 2 : 1);
+    try { if (!dir || dir.startsWith('-')) throw new Error('--app needs the app folder: --app /path/to/my-app'); process.chdir(require('path').resolve(dir)); }
+    catch (e) { console.error(`\n  Could not use the app folder${dir ? ' ' + dir : ''}: ${/ENOENT/.test(e.message) ? 'it does not exist' : e.message}\n`); process.exit(1); }
+  }
+}
 // a folder that was deleted or put in the Trash must not be worked in (see guard.js)
 const guard = require('./guard.js');
 guard.checkStart(command);
@@ -102,6 +128,8 @@ function help() {
         --ui <library>      …with a CSS library from a CDN: tailwind, bootstrap, bulma or pico
         --ts                …use TypeScript across frontend (.kreft, .ts) and backend (.ts)
         --js                …use JavaScript (default when non-interactive)
+        --harmony           …with HarmonyOS support (harmony/ project for DevEco Studio)
+        --tauri             …with Tauri desktop app support (src-tauri, small installers, needs Rust)
         --electron          …with Electron desktop app support (main.js, preload.js, packaging)
         --mobile            …with iOS / Android support (Capacitor)
         --vite              …with Vite.js bundling & instant HMR (vite.config.js, npm run vite)
@@ -134,10 +162,28 @@ function help() {
     kreft electron          Open the app in a desktop window only: no browser, no URL (alias: kreft electron:dev)
     kreft electron:build    Build and make installers (--mac, --win, --linux; or npm run electron:build:all)
     kreft electron:init     Add Electron support to an existing project (alias: kreft make:electron)
+    kreft electron:config   Check config/electron.config.js and print the final settings
+    kreft add electron      Add Electron: config/electron.config.js, electron/, scripts, packages (--force, --no-install)
     kreft make:home         Write an app-style home page: --mobile (phone screen) or --desktop (sidebar workspace)
     kreft mobile:run        Build and start the app on an emulator or phone (--android, --ios, --target; see kreft mobile:help)
     kreft mobile:build      Build for iOS / Android with Capacitor (--android, --ios, --api-url; see kreft mobile:help)
+    kreft mobile:release    A signed release: .apk and .aab (Android), .ipa (iOS), .hap and .app (HarmonyOS); see --help
     kreft electron:help     Everything about desktop apps: menu, icon, installers, errors
+
+  Desktop (Tauri, small installers, needs Rust):
+    kreft tauri             Open the app in a Tauri desktop window (alias: kreft tauri:dev)
+    kreft tauri:build       Build and make installers (--debug, --bundles dmg|nsis|deb|appimage …)
+    kreft tauri:init        Add Tauri support to an existing project (alias: kreft make:tauri)
+    kreft tauri:config      Check config/tauri.config.js and print the final settings
+    kreft tauri:sync        Write src-tauri/ from config/tauri.config.js (dev and build do it)
+    kreft add tauri         Add Tauri: config/tauri.config.js, src-tauri/, scripts, packages (kreft add electron tauri: both)
+    kreft tauri:help        Prerequisites, files and options
+
+  HarmonyOS (Huawei, needs DevEco Studio):
+    kreft harmony:build     Build the site into a HarmonyOS project in harmony/ (--api-url https://…, --hap)
+    kreft harmony:open      Open harmony/ in DevEco Studio
+    kreft harmony:init      Add HarmonyOS support to an existing project (alias: kreft make:harmony)
+    kreft harmony:help      Prerequisites, files and options
 
   The backend (kreft list shows every command, yours too):
     kreft key:generate      Set the application encryption key in .env (--show: print only)
@@ -186,14 +232,15 @@ function help() {
         -D, --dev           Install as devDependency
         -y, --yes           Auto-confirm unverified community packages in CI/CD
         --dry-run, --check  Inspect package security report without installing
-        --allow-scripts     Permit postinstall lifecycle scripts (default: sandboxed with --ignore-scripts)
+        --json              Emit a machine-readable security report (scripts are disabled)
         --force             Bypass redundancy blocks, typosquat traps and security warnings
     kreft update [packages]     Update project packages (npm update) and Kreft runtime files
         --latest            Upgrade packages to their latest versions
         --check             Check for outdated packages (npm outdated)
         --core              Update only Kreft runtime files (kreftjs.js, kreftjs.d.ts, server.d.ts)
         --npm               Update only npm dependencies
-    kreft vscode            Install .kreft colors and snippets in VS Code (also Cursor, VSCodium)
+    kreft vscode            Install .kreft colors, snippets and Emmet in VS Code (also Antigravity, Cursor, Windsurf, VSCodium)
+    kreft editor <name>     The same for another editor: sublime, zed, jetbrains, vim (kreft editor: the list)
 
   Examples:
     kreft new shop
@@ -212,10 +259,12 @@ function unknown() {
 
 /* ------------------------------------------------------------------ kreft new */
 async function createProject(args) {
-  let name = null, dbKind = null, ui = null, ts = false, langChosen = false, electron = false, mobile = false, vite = false, redis = false, auth = true, authChosen = false;
+  let name = null, dbKind = null, ui = null, ts = false, langChosen = false, electron = false, tauri = false, harmony = false, mobile = false, vite = false, redis = false, auth = true, authChosen = false;
   for (let i = 0; i < args.length; i++) {
     if (args[i] === '--ts' || args[i] === '--typescript') { ts = true; langChosen = true; }
     else if (args[i] === '--js' || args[i] === '--javascript') { ts = false; langChosen = true; }
+    else if (args[i] === '--tauri') tauri = true;
+    else if (args[i] === '--harmony') harmony = true;
     else if (args[i] === '--electron' || args[i] === '--desktop') electron = true;
     else if (args[i] === '--mobile') mobile = true;
     else if (args[i] === '--vite') vite = true;
@@ -312,6 +361,8 @@ async function createProject(args) {
   }
   fs.writeFileSync(path.join(target, 'package.json'), JSON.stringify(projectPkg, null, 2) + '\n');
   if (electron) require('./electron.js').init(target);
+  if (tauri) require('./tauri.js').init(target);
+  if (harmony) require('./harmony.js').init(target);
   if (mobile) {
     require('./mobile.js').init(target);
     require('./mobile-ui.js').install(target, { layout: !electron, gallery: true }); // top bar and bottom bar that never move; /edge shows every component
@@ -633,7 +684,7 @@ function installVscode() {
   const os = require('os');
   const from = path.join(__dirname, '..', 'editors', 'vscode');
   const ext = require(path.join(from, 'package.json'));
-  const homes = ['.vscode', '.vscode-insiders', '.cursor', '.vscode-oss', '.windsurf', '.antigravity-ide']
+  const homes = ['.vscode', '.vscode-insiders', '.cursor', '.vscode-oss', '.windsurf', '.antigravity-ide', '.antigravity', '.kiro', '.trae']
     .map((d) => path.join(os.homedir(), d))
     .filter((d, i) => i === 0 || fs.existsSync(d));
   for (const home of homes) {
@@ -654,8 +705,9 @@ function installVscode() {
   }
   cfg['files.associations'] = { ...(cfg['files.associations'] || {}), '*.kreft': 'kreftjs', '*.kreftjs': 'kreftjs' };
   cfg['[kreftjs]'] = { ...(cfg['[kreftjs]'] || {}), 'editor.defaultFormatter': 'kreft.kreftjs' };
+  cfg['emmet.includeLanguages'] = { ...(cfg['emmet.includeLanguages'] || {}), kreftjs: 'html' };   // Emmet in <view> and <style>
   fs.writeFileSync(settings, JSON.stringify(cfg, null, 2) + '\n');
-  console.log('  Updated .vscode/settings.json: .kreft files use Kreft language and kreft.kreftjs formatter');
+  console.log('  Updated .vscode/settings.json: .kreft files use Kreft language, the kreft.kreftjs formatter and Emmet');
   console.log('\n  Restart VS Code (or run "Reload Window") to see updated colors and formatting in .kreft files.\n');
 }
 
@@ -1091,6 +1143,32 @@ async function devServer(args, { production = false } = {}) {
     return !(oh === mine || (isLocalName(oh) && isLocalName(mine)) || allowedHosts.has(oh));
   };
 
+  // A form another web site submits to this server (a plain POST the browser sends without asking first). Cookies set by the answer
+  // would sign the visitor in as someone else (login CSRF), so it is refused. The whole address of the sender counts (host AND port):
+  // another program on the same host, on another port, is another site. Allowed senders: this server's own address, the host of
+  // APP_URL, and the full origins listed in KREFT_ALLOWED_ORIGINS (https://app.example.com,http://localhost:5173). On a development
+  // machine bound to localhost, localhost and 127.0.0.1 count as the same address (same port). Requests with a JSON body need a CORS check from the browser first.
+  const allowedOrigins = new Set(String(process.env.KREFT_ALLOWED_ORIGINS || '').split(',').map((x) => x.trim().replace(/\/+$/, '').toLowerCase()).filter(Boolean));
+  let appUrlHost = '';
+  try { if (process.env.APP_URL) appUrlHost = new URL(process.env.APP_URL).host.toLowerCase(); } catch (_) { /* no usable APP_URL */ }
+  const crossSiteForm = (req) => {
+    if (['GET', 'HEAD', 'OPTIONS'].includes(String(req.method).toUpperCase())) return false;
+    const type = String(req.headers['content-type'] || '').toLowerCase().split(';')[0].trim();
+    if (!(type === '' || type === 'application/x-www-form-urlencoded' || type === 'multipart/form-data' || type === 'text/plain')) return false;
+    const origin = req.headers.origin;
+    if (!origin) return false;   // not a browser (curl, a script)
+    let o;
+    try { o = new URL(origin); } catch (_) { return true; }
+    if (o.protocol !== 'http:' && o.protocol !== 'https:') return true;   // "null" and other schemes
+    const mine = String(req.headers.host || '').toLowerCase();
+    if (o.host.toLowerCase() === mine || o.host.toLowerCase() === appUrlHost) return false;
+    if (allowedOrigins.has(o.origin.toLowerCase())) return false;
+    // localhost and 127.0.0.1 are one machine, but only the same port is this server
+    const port = (h) => (String(h).match(/:(\d+)$/) || [])[1] || '';
+    if (loopbackBind && isLocalName(hostOnly(o.host)) && isLocalName(hostOnly(mine)) && port(o.host) === port(mine)) return false;
+    return true;
+  };
+
   const server = http.createServer(async (req, res) => {
     try {
       // SHIELD=true in .env: rate limits, bans and load shedding per visitor address (see backend/shield.js)
@@ -1139,6 +1217,10 @@ async function devServer(args, { production = false } = {}) {
         return getMcpServer({ baseDir: backendDir || root }).handleHttpRequest(req, res);
       }
 
+      if ((backend || serverRoutes) && (urlPath === '/api' || urlPath.startsWith('/api/')) && crossSiteForm(req)) {
+        res.writeHead(403, { 'Content-Type': 'application/json; charset=utf-8', 'Cache-Control': 'no-store' });
+        return res.end(JSON.stringify({ message: 'Blocked: another web site may not submit a form here.' }));
+      }
       if (backend && (urlPath === '/api' || urlPath.startsWith('/api/'))) {
         if (await backend(req, res, urlPath)) return; // routes/api.js answered
       }

@@ -10,7 +10,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Geist:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600;700&family=Geist+Mono:wght@400;500;600;700&display=swap">
-  <!-- the look: quiet, like shadcn/ui, with square corners and no shadows -->
+  <!-- the look: "Horizon" (see ui.css): cool canvas, cobalt and cyan, soft shadows, dark mode -->
   <link rel="stylesheet" href="ui.css">
   <style>
     /* page changes: <kreft-view k-animate.after="page"> */
@@ -54,6 +54,7 @@
         // Basics
         { path: '/', component: 'pages/Start.kreft', meta: { title: 'Kreft · components in plain words' } },
         // …unless a route names another one (Start.kreft says `layout plain` itself)
+        { path: '/platforms', component: 'pages/Platforms.kreft', layout: 'plain', meta: { title: 'Platforms · Kreft' } },
         { path: '/docs', component: '../docs/Docs.kreft', layout: 'plain', meta: { title: 'Documentation · Kreft' } },
         { path: '/basics', component: 'pages/Home.kreft', meta: { title: 'Basics · Kreft' } },
         { path: '/lifecycle', component: 'pages/Lifecycle.kreft', meta: { title: 'Lifecycle · Kreft' } },

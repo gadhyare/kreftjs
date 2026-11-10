@@ -32,7 +32,9 @@ const deps = require('./deps.js');
 // component files: .kreft, or .kreftjs in a project from the 0.0.x betas
 const isComp = (f) => /\.(?:kreftjs|kreft)$/i.test(f);
 const SERVER_DIRS = new Set();
-const SKIP = new Set(['node_modules', 'dist', 'dist-electron', '.git', '.vscode', '.idea', 'package.json', 'package-lock.json', '.DS_Store']);
+// Native app projects and release artifacts never belong to the website: in a flat layout they sit at the app root,
+// next to index.html, and must not be copied into dist (an android/ folder can hold the signing key and its password).
+const SKIP = new Set(['node_modules', 'dist', 'dist-electron', 'electron', 'src-tauri', 'harmony', 'android', 'ios', 'release', '.kreft', 'capacitor.config.json', '.git', '.vscode', '.idea', 'package.json', 'package-lock.json', '.DS_Store']);
 
 module.exports = function build(args) {
   let pwa = false, folder = null, out = null, base = null, prerender = null, urlsFile = null, htaccess = true, minify = true;
@@ -57,6 +59,11 @@ module.exports = function build(args) {
   if (!fs.existsSync(path.join(root, 'index.html'))) fail(`No index.html in ${root}`);
   if (dist === root) fail('The output folder must be different from the app folder.');
   const project = deps.projectDir(root);
+  // The output folder is emptied first. A folder that holds the app, its project or its backend (--out . in a project with
+  // frontend/ and backend/) would lose all of them.
+  for (const [what, dir] of [['the app folder', root], ['the project', project], ['the backend', lay.backend], ['the project folder', lay.project]]) {
+    if (dir && (dist === path.resolve(dir) || path.resolve(dir).startsWith(dist + path.sep))) fail(`The output folder ${dist} would contain ${what} (${path.resolve(dir)}), and it is emptied before the build. Choose another folder, like --out dist.`);
+  }
   const env = require('./env.js');
   env.loadEnv(project); // PUBLIC_ values from .env go into app.js, as Kreftjs.env
   // server code never goes into the built site: server/, backend app/ and routes/
@@ -163,7 +170,7 @@ ${indent(components.join('\n\n'))}
   let minified = false;
   if (esb) {
     try {
-      fs.writeFileSync(runtimeOut, esb.transformSync(fs.readFileSync(runtimeSrc, 'utf8'), { minify: true, target: 'es2020', legalComments: 'none' }).code);
+      fs.writeFileSync(runtimeOut, esb.transformSync(fs.readFileSync(runtimeSrc, 'utf8'), { minify: true, target: 'es2018', legalComments: 'none' }).code);
       minified = true;
     } catch (_) { /* fall back to the plain copy */ }
   }
@@ -587,14 +594,16 @@ function copyCss(file, pkgDir, toDir, seen = new Set()) {
 function walk(dir, exclude) {
   const out = [];
   for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
-    if (SKIP.has(entry.name)) continue;
+    if (SKIP.has(entry.name) || entry.name.startsWith('.kreft-')) continue;
     if (entry.name === 'storage' && (entry.isSymbolicLink() || entry.isDirectory())) continue;
     // the database, its settings and its migrations stay on the server, never in the built site
-    if (/\.(db|sqlite3?)(-wal|-shm)?$/i.test(entry.name) || entry.name === 'kreftjs.config.json' || entry.name === 'kreft.config.json' || (entry.isDirectory() && entry.name === 'database')) continue;
+    if (/\.(db|sqlite3?)(-wal|-shm)?$/i.test(entry.name) || entry.name === 'kreftjs.config.json' || entry.name === 'kreft.config.json' || /^(electron|tauri)\.config\.(js|cjs|mjs)$/.test(entry.name) || (entry.isDirectory() && entry.name === 'database')) continue;
     const full = path.join(dir, entry.name);
     if (exclude && full === exclude) continue;
     if (SERVER_DIRS.has(full)) continue; // server/ code runs on the server only
     if (/^\.env(\..*)?$/.test(entry.name)) continue; // secrets stay on the server
+    // signing material is never a website asset, wherever it sits (android/, build/, a custom folder)
+    if (entry.name === 'keystore.properties' || /\.(jks|keystore)$/i.test(entry.name)) continue;
     if (entry.isSymbolicLink()) {
       try { if (fs.statSync(full).isDirectory()) continue; } catch (_) { continue; }
     }

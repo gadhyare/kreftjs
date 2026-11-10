@@ -22,15 +22,32 @@ action add() { count++ }
 | **The `.kreft` language** | `state`, `derive`, `action`, `watch`, props, events, slots, stores, a router with layouts and nested routes, forms with validation, animations. |
 | **The backend** | `Route`, controllers, an Active Record `Model`, migrations, seeders, factories, jobs, mail, cache, file storage, policies, scheduling. |
 | **Authentication** | Sign-in pages, password reset, email verification, two-factor codes, device sessions and API tokens, ready in every new project (leave them out with `--no-auth`). |
-| **Tooling** | `kreft dev` with hot reload that keeps state, DevTools, an error monitor, `kreft build`, TypeScript, Vite and Electron support. |
+| **Tooling** | `kreft dev` with hot reload that keeps state, DevTools, an error monitor, `kreft build`, TypeScript, Vite, and targets for every platform: Electron, Tauri, iOS/Android (Capacitor), HarmonyOS and PWA. |
+| **Platforms** | The web, desktop apps for macOS, Linux and Windows (Electron or Tauri), and phone apps for iOS, Android and HarmonyOS. TV apps are coming soon. See [One codebase, every screen](#one-codebase-every-screen). |
 | **Security by default** | Escaped views, CSRF protection, hashed passwords, rate limits, hardened package installs. See [Security overview](#security-overview). |
+
+### Where it runs
+
+One project, many targets. The pages are the same `.kreft` files everywhere; only the shell around them changes.
+
+| Target | What it is | Build it | Details |
+|---|---|---|---|
+| **Web** | The normal website. | `kreft build` | — |
+| **PWA** | The site as an installable app that works offline. | `kreft build --pwa` | [Mobile apps (iOS and Android)](#mobile-apps-ios-and-android) |
+| **Desktop — Electron** | A desktop program for Windows, macOS and Linux (ships its own browser). | `kreft new app --electron`, then `kreft electron:build` | [Desktop apps with Electron](#desktop-apps-with-electron) |
+| **Desktop — Tauri** | A desktop program with installers of a few MB (uses the system web view, needs Rust). | `kreft new app --tauri`, then `kreft tauri:build` | [Desktop apps with Tauri](#desktop-apps-with-tauri) |
+| **Mobile — iOS and Android** | A real app for the App Store and Google Play (a Capacitor WebView). | `kreft new app --mobile`, then `kreft mobile:build --android` | [Mobile apps (iOS and Android)](#mobile-apps-ios-and-android) |
+| **Mobile — HarmonyOS** | A small native ArkTS shell with a web view for Huawei phones and tablets. | `kreft new app --harmony`, then `kreft harmony:build` | [HarmonyOS apps](#harmonyos-apps) |
+
+- The backend never runs inside a desktop or phone app: it runs on your computer or a server, and the app reaches it with `--api-url` (or `PUBLIC_API_URL` in `.env`).
+- Combine flags for one project that targets several platforms, for example `kreft new app --mobile --electron`. `--desktop` is an alias for `--electron`.
 
 ### How the docs are organised
 
 1. **Start here** gets a project running.
 2. **The Kreft language** is everything in the browser.
 3. **Backend** is everything on the server.
-4. **Tooling** covers the command line, building and deploying.
+4. **Tooling** covers the command line, building and deploying, and **Platforms** covers desktop, phone and (soon) TV apps.
 5. **Security** and **Reference** are for checking details.
 
 > [!NOTE]
@@ -82,7 +99,7 @@ npx kreftjs@latest new my-app
 ### Check that it works
 
 ```bash
-kreft --version     # for example 0.0.22-beta
+kreft --version     # for example 0.0.39-beta
 kreft about         # Kreft and Node.js versions, this project's settings and drivers
 kreft list          # every command your version has
 ```
@@ -95,7 +112,18 @@ kreft list          # every command your version has
 kreft vscode
 ```
 
-installs colors and snippets for `.kreft` files in VS Code (also Cursor and VSCodium). Restart the editor afterwards.
+installs colors, snippets and Emmet for `.kreft` files in VS Code and the editors built on it (Antigravity, Cursor, Windsurf, VSCodium). Restart the editor afterwards.
+
+Other editors have their own plugin, each with Emmet (`ul>li*3` in `<view>`, `m10` in `<style>`):
+
+```bash
+kreft editor sublime      # Sublime Text
+kreft editor zed          # Zed
+kreft editor jetbrains    # WebStorm, PhpStorm, IntelliJ IDEA, PyCharm, Android Studio ...
+kreft editor vim          # Vim and Neovim
+```
+
+`kreft editor` alone lists them. [Editor plugins](#editor-plugins) has one part per editor: what you get, how to install it, and how to download the plugin as a file.
 
 ### Update
 
@@ -157,6 +185,8 @@ More examples:
 kreft new shop --db mysql --ts          # TypeScript, with a MySQL database
 kreft new site --ui tailwind --no-auth  # Tailwind, no sign-in
 kreft new desk --electron               # with desktop-app support
+kreft new desk --tauri                  # desktop app with small installers (needs Rust)
+kreft new phone --harmony               # HarmonyOS app (Huawei, needs DevEco Studio)
 ```
 
 > [!NOTE]
@@ -1740,7 +1770,7 @@ Run `kreft list` to see every command your installed version has, and `kreft hel
 
 | Command | What it does |
 |---|---|
-| `kreft new my-app` | Makes a project (`--js`, `--ts`, `--db sqlite`, `--ui tailwind`, `--no-auth`, `--mobile` for iOS and Android, `--electron` for a desktop app, `--vite`, `--redis`). |
+| `kreft new my-app` | Makes a project (`--js`, `--ts`, `--db sqlite`, `--ui tailwind`, `--no-auth`, `--mobile` for iOS and Android, `--electron` or `--tauri` for a desktop app, `--harmony` for HarmonyOS, `--vite`, `--redis`). |
 | `kreft dev` | Development server with hot reload (`--port`, `--host`, `--db`, `--api`, `--server`, `--backend`, `--seed`, `--no-hot`, `--gc`). |
 | `kreft build` | Compiles the app into plain files in `dist/` (`--out`, `--base`, `--prerender`). |
 | `kreft serve [dist]` | Runs a built app for real users. Answers everyone, serves only the tables you list. |
@@ -1748,8 +1778,12 @@ Run `kreft list` to see every command your installed version has, and `kreft hel
 | `kreft add <package>` | A safer `npm install`. See [Packages](#packages). |
 | `kreft about`, `kreft env`, `kreft log`, `kreft tinker` | Versions and folders, environment, logs, a console with your models (`await User.count()`). |
 | `kreft down --secret=x` / `kreft up` | Maintenance mode: visitors get `503`, and `/x` lets you in. |
-| `kreft vscode` | Installs colors, snippets and folding for `.kreft` files in VS Code, Cursor and VSCodium. |
+| `kreft vscode` | Installs colors, snippets, folding and Emmet for `.kreft` files in VS Code, Antigravity, Cursor, Windsurf and VSCodium. |
+| `kreft editor <name>` | The same for `sublime`, `zed`, `jetbrains` (WebStorm, PhpStorm, IDEA...) and `vim` (Vim, Neovim). |
+| `kreft editor <name> --download [folder]` | Writes the plugin as one file instead of installing it: [Editor plugins](#editor-plugins). |
 | `kreft electron:dev`, `kreft electron:build` | A desktop window, and installers: [Desktop apps](#desktop-apps-with-electron). |
+| `kreft tauri:dev`, `kreft tauri:build` | The same with Tauri: [Desktop apps with Tauri](#desktop-apps-with-tauri). |
+| `kreft harmony:build`, `kreft harmony:open` | A HarmonyOS project and DevEco Studio: [HarmonyOS apps](#harmonyos-apps). |
 | `kreft mobile:init`, `mobile:build`, `mobile:open`, `mobile:dev` | iOS and Android apps with Capacitor: [Mobile apps](#mobile-apps-ios-and-android). |
 | `kreft mobile:ui`, `mobile:icons`, `mobile:splash` | The phone UI kit, the app icon and the splash screen: [The phone UI kit](#the-phone-ui-kit). |
 | `kreft make:home --mobile` / `--desktop` | An app-style home page: [Home pages made for apps](#home-pages-made-for-apps). |
@@ -1759,7 +1793,7 @@ Run `kreft list` to see every command your installed version has, and `kreft hel
 
 | Group | Commands |
 |---|---|
-| `make:` | `model`, `controller`, `page`, `routes`, `migration`, `seeder`, `factory`, `middleware`, `request`, `resource`, `policy`, `rule`, `job`, `event`, `listener`, `mail`, `notification`, `observer`, `command`, `lang`, `errors`, `admin`, `electron`, `mobile`, `home`, `vite` |
+| `make:` | `model`, `controller`, `page`, `routes`, `migration`, `seeder`, `factory`, `middleware`, `request`, `resource`, `policy`, `rule`, `job`, `event`, `listener`, `mail`, `notification`, `observer`, `command`, `lang`, `errors`, `admin`, `electron`, `tauri`, `harmony`, `mobile`, `home`, `vite` |
 | `migrate` | `migrate`, `:rollback`, `:fresh`, `:refresh`, `:reset`, `:status`, `:file`, `:undo` |
 | `db:` | `db:seed`, `db:wipe` |
 | `queue:` | `work`, `start`, `stop`, `pause`, `resume`, `restart`, `status`, `failed`, `retry`, `flush`, `clear`, `table` |
@@ -1781,7 +1815,7 @@ Everything here comes with Kreft. Nothing else to install.
 
 **Hot reload.** While `kreft dev` runs, save a `.kreft` file and only that component is swapped; its state stays. A `.css` file is reloaded without a page refresh, and an error shows an overlay with the file and line.
 
-**Kreft DevTools.** The **S** button in the corner (or <kbd>Alt</kbd>+<kbd>Shift</kbd>+<kbd>D</kbd>) opens a panel:
+**Kreft DevTools.** The **S** button in the corner (or <kbd>Alt</kbd>+<kbd>Shift</kbd>+<kbd>D</kbd>) opens a panel. In the phone app the button is hidden so it never covers the bottom bar; to show it there run `localStorage.setItem('kreft:devtools-button', 'on')` in the app's console:
 
 | Tab | Shows |
 |---|---|
@@ -1816,6 +1850,121 @@ state caught = null
   <error-monitor k-if="caught" error={caught} status={500} title={caught.name} message={caught.message}></error-monitor>
 </view>
 ```
+
+## Editor plugins
+
+Kreft has a plugin for each editor. Every one gives `.kreft` files colors, snippets and **Emmet**: type `ul>li.item*3` in `<view>`, or `m10`, `df`, `bgc` in `<style>`, and expand it.
+
+| Editor | Install | Download as a file | Source |
+|---|---|---|---|
+| VS Code, Antigravity, Cursor, Windsurf, VSCodium | `kreft editor vscode` | `kreft-vscode-<version>.vsix` | [editors/vscode](https://github.com/gadhyare/kreftjs/tree/main/editors/vscode) |
+| Sublime Text | `kreft editor sublime` | `Kreft.sublime-package` | [editors/sublime](https://github.com/gadhyare/kreftjs/tree/main/editors/sublime) |
+| Zed | `kreft editor zed` | `kreft-zed-<version>.zip` | [editors/zed](https://github.com/gadhyare/kreftjs/tree/main/editors/zed) |
+| WebStorm, PhpStorm, IntelliJ IDEA, PyCharm, Android Studio | `kreft editor jetbrains` | `kreft-jetbrains-<version>.jar` | [editors/jetbrains](https://github.com/gadhyare/kreftjs/tree/main/editors/jetbrains) |
+| Vim, Neovim | `kreft editor vim` | `kreft-vim.zip` | [editors/vim](https://github.com/gadhyare/kreftjs/tree/main/editors/vim) |
+
+`kreft editor all` installs every one. `kreft editor` alone prints the list.
+
+### Download a plugin
+
+Add `--download` and the plugin is not installed: it is written as one file, in the form the editor installs by itself. Use it to share the plugin with your team, to keep it, or to set up a computer that has no Kreft.
+
+```bash
+kreft editor vscode --download            # kreft-vscode-<version>.vsix in this folder
+kreft editor jetbrains --download ~/Downloads
+kreft editor all --download plugins       # the five files in ./plugins
+```
+
+Without a Kreft project, `npx` does the same:
+
+```bash
+npx kreftjs@beta editor sublime --download
+```
+
+The command prints the file and how to install it. The same steps are below.
+
+### VS Code, Antigravity, Cursor, Windsurf
+
+```bash
+kreft editor vscode
+```
+
+It installs the extension in every one of these editors it finds, and sets the project's `.vscode/settings.json`. Restart the editor. (`kreft vscode` is the same command.)
+
+From a file: `kreft editor vscode --download`, then in the editor open *Extensions > the `...` menu > Install from VSIX...* and pick `kreft-vscode-<version>.vsix`. Or from a terminal:
+
+```bash
+code --install-extension kreft-vscode-2.4.0.vsix
+```
+
+You get: colors for `<view>`, `<style>` and `<script>`, *Format Document*, snippets (`kreftjs`, `state`, `action`, `for`, `kreft-wait`...), folding, and Emmet. If you have your own `emmet.includeLanguages` setting, the extension asks once and adds `"kreftjs": "html"` to it. To expand with Tab, set `"emmet.triggerExpansionOnTab": true`.
+
+### Sublime Text
+
+```bash
+kreft editor sublime
+```
+
+It copies the package to `Packages/Kreft`. Reopen your `.kreft` files.
+
+From a file: `kreft editor sublime --download`, then *Preferences > Browse Packages...*, go one folder up, and put `Kreft.sublime-package` in `Installed Packages`. Do not rename the file: its name is the package's name.
+
+For Emmet, install the **Emmet** package: *Command Palette > Package Control: Install Package > Emmet*. It needs no setting.
+
+### Zed
+
+```bash
+kreft editor zed
+```
+
+It puts the extension in `~/.kreft/editors/zed`. In Zed, open the command palette, run **zed: install dev extension** and pick that folder. Zed compiles the extension, so [Rust](https://rustup.rs) must be installed.
+
+From a file: `kreft editor zed --download`, unzip it, and pick the `kreft-zed` folder in the same command.
+
+Emmet needs no other extension and no setting: the Kreft extension starts the Emmet language server itself (Zed downloads it the first time). To turn it off:
+
+```json
+"languages": { "Kreft": { "language_servers": ["!kreft-emmet"] } }
+```
+
+### JetBrains IDEs
+
+For WebStorm, PhpStorm, IntelliJ IDEA, PyCharm, RubyMine, GoLand, Rider and Android Studio, 2022.3 or newer.
+
+```bash
+kreft editor jetbrains
+```
+
+It builds the plugin and puts it in every JetBrains IDE it finds. Restart the IDE.
+
+From a file: `kreft editor jetbrains --download`, then *Settings > Plugins > the gear > Install Plugin from Disk...* and pick `kreft-jetbrains-<version>.jar`.
+
+A `.kreft` file opens as HTML, so the markup, the CSS in `<style>` and the JavaScript in `<script>` are colored and completed, and Emmet expands with Tab. The snippets are live templates: *Settings > Editor > Live Templates > Kreft*. Emmet for CSS needs an IDE with web support (WebStorm, PhpStorm, IDEA Ultimate, PyCharm Professional); Kreft-only syntax such as `state x = 0` is shown as plain text.
+
+### Vim and Neovim
+
+```bash
+kreft editor vim
+```
+
+It copies the plugin to `pack/kreft/start/kreft` in your Vim and Neovim folders.
+
+From a file: `kreft editor vim --download`, then unzip `kreft-vim.zip` into `~/.vim/pack/kreft/start/` (Neovim: `~/.config/nvim/pack/kreft/start/`).
+
+For Emmet, install [emmet-vim](https://github.com/mattn/emmet-vim) and press `Ctrl+y` then `,` after an abbreviation. In Neovim (0.11 or newer) you can use the Emmet language server instead (`npm i -g @olrtg/emmet-language-server`):
+
+```lua
+vim.lsp.config('emmet_language_server', {
+  cmd = { 'emmet-language-server', '--stdio' },
+  filetypes = { 'html', 'css', 'kreft' },
+  init_options = { includeLanguages = { kreft = 'html' } },
+})
+vim.lsp.enable('emmet_language_server')
+```
+
+### Another editor
+
+An editor that takes TextMate grammars can use `editors/vscode/syntaxes/kreftjs.tmLanguage.json`. For Emmet, tell the editor to treat `.kreft` files as HTML: that is all the plugins above do.
 
 ## Build and deploy
 
@@ -1907,8 +2056,9 @@ Then upload what is *inside* `dist/kreftjs-com` (not the folder itself, and incl
 
 ```bash
 npm test                       # the regression tests must pass
-npm version prerelease --preid=beta   # or: patch, minor (changes package.json and makes a git tag)
-npm publish --tag latest       # needs npm login; the package is then installed with kreftjs@latest
+npm version 0.0.39-beta --no-git-tag-version --ignore-scripts  # choose a fresh version for the next release
+npm pack --dry-run             # review the package contents
+npm publish --tag beta --access public  # runs tests first; needs npm authentication
 npm run build                  # then upload dist/kreftjs-com as above
 ```
 
@@ -1920,10 +2070,10 @@ Check that people get it with `npm view kreftjs version` and a fresh `npm instal
 npm publish --tag mobile-test --access public     # npm asks you to approve in the browser
 npm install -g kreftjs@mobile-test                  # you, on any computer
 kreft --version                                     # shows the new number
-npm dist-tag add kreftjs@0.0.27-beta beta           # when it is good: the tag everyone uses moves
+npm dist-tag add kreftjs@0.0.39-beta beta           # when it is good: the tag everyone uses moves
 ```
 
-`--access public` is needed because this package's `package.json` has `publishConfig.access` set to `restricted` (left from an old scoped package), which npm refuses for a plain package name. A version number can be published only once, so the next try is the next number. To test the folder you are in without publishing anything, run `npm link` (undo with `npm unlink -g kreftjs`). `kreft --version` after `npm install -g` reads the globally installed package, not the repository.
+`package.json` sets public access, the official npm registry and the `beta` tag for prereleases. Use `npm run publish:beta` (or explicitly pass `--tag beta`) to publish a prerelease; moving `latest` is a separate maintainer decision. Unscoped packages such as `kreftjs` are public. Organization packages require an explicitly chosen name such as `@your-org/kreftjs` and access to that organization. A version number can be published only once, so the next try is the next number. To test the folder you are in without publishing anything, run `npm link` (undo with `npm unlink -g kreftjs`). `kreft --version` after `npm install -g` reads the globally installed package, not the repository.
 
 ### Ready HTML for every page: `--prerender`
 
@@ -2013,7 +2163,7 @@ Execution needs no setup: Kreft uses `esbuild` if installed, otherwise Node's bu
 > [!NOTE]
 > Kreft removes types; it does not check them. Run `tsc --noEmit` in your CI for type checking.
 
-## Vite and Electron
+## Vite, Electron and Tauri
 
 **Vite.** If your team prefers the Vite ecosystem, Kreft has a plugin that compiles `.kreft` files on the fly:
 
@@ -2025,6 +2175,104 @@ kreft vite:preview
 ```
 
 **Electron.** Turn the same app into a desktop application. See [Desktop apps with Electron](#desktop-apps-with-electron) below.
+
+**Tauri.** The same, with installers of a few megabytes, because the system web view is used instead of a bundled browser. See [Desktop apps with Tauri](#desktop-apps-with-tauri).
+
+## One codebase. Every screen.
+
+**One codebase, every screen.** A single Kreft project runs as a **web application**, a desktop app for **macOS, Linux and Windows** (with **Electron** or **Tauri**), and a phone or tablet app for **iOS, Android and HarmonyOS**. **TV apps are coming soon** and are not available yet. The pages are the same `.kreft` files everywhere; each target only adds a native shell around them.
+
+### Where a Kreft app runs
+
+| Target | Shell | Add it | Run it | Package it | Status |
+|---|---|---|---|---|---|
+| Web application | the browser | `kreft new my-app` | `kreft dev` | `kreft build` | Tested |
+| macOS (Electron) | Electron | `kreft add electron` | `kreft electron:dev` | `kreft electron:build --mac` | Tested |
+| Linux (Electron) | Electron | `kreft add electron` | `kreft electron:dev` | `kreft electron:build --linux` | Not tested here |
+| Windows (Electron) | Electron | `kreft add electron` | `kreft electron:dev` | `kreft electron:build --win` | Not tested here |
+| macOS (Tauri) | Tauri | `kreft add tauri` | `kreft tauri:dev` | `kreft tauri:build` | Tested |
+| Linux (Tauri) | Tauri | `kreft add tauri` | `kreft tauri:dev` | `kreft tauri:build` | Not tested here |
+| Windows (Tauri) | Tauri | `kreft add tauri` | `kreft tauri:dev` | `kreft tauri:build` | Not tested here |
+| iOS | Capacitor | `kreft new my-app --mobile` | `kreft mobile:run --ios` | `kreft mobile:release --ios` | Not tested here |
+| Android | Capacitor | `kreft new my-app --mobile` | `kreft mobile:run --android` | `kreft mobile:release --android` | Tested |
+| HarmonyOS | ArkTS web view | `kreft new my-app --harmony` | `kreft harmony:open` (DevEco Studio) | `kreft mobile:release --harmony` | Not tested here |
+| Android TV, tvOS, webOS, Tizen | | | | | **Coming soon** |
+
+**What the status means.** *Tested* means Kreft's own tests ran it for real: the Electron and Tauri apps were started on macOS and checked (menu, DevTools, window, security, production builds), and an Android app was run on the emulator and built as a signed release. *Not tested here* means the same code is meant to run on that system, but Kreft has not run it there: build it on that system and check it before you ship. *Coming soon* means planned and not available.
+
+### Which one do I choose?
+
+| I want… | Choose |
+|---|---|
+| A website only | The web. Nothing to add. |
+| A desktop app, and I want the page to look the same on every system | **Electron**. It ships its own Chromium. Needs only Node.js. Installers are about 100 MB. |
+| A desktop app with a small installer, and I can use Rust | **Tauri**. It uses the system's web view. Installers are a few megabytes. Needs Rust. |
+| An app in Google Play | **Android**. |
+| An app in the App Store | **iOS**. Needs a Mac with Xcode and a paid Apple Developer account. |
+| An app for Huawei phones and tablets | **HarmonyOS**. Needs DevEco Studio. |
+
+Both desktop runtimes can live in one project (`kreft add electron tauri`), and a project can have desktop and phone targets together (`kreft new my-app --mobile --electron`). They share your pages. See [Desktop configuration](#desktop-configuration) for the settings file each one reads.
+
+### What each target needs
+
+| Target | You need installed |
+|---|---|
+| Web | Node.js 22.5 or newer |
+| Electron | Node.js (Electron and electron-builder come with `kreft add electron`) |
+| Tauri | Node.js and [Rust](https://rustup.rs); on Linux the WebKitGTK libraries; on Windows the Visual Studio C++ build tools |
+| Android | Android Studio and a Java from 21 to 23 |
+| iOS | A Mac with Xcode |
+| HarmonyOS | DevEco Studio (and a Huawei developer account to sign for a real device) |
+
+Build a desktop installer **on the system it is for**: a macOS installer needs a Mac, a Windows installer is best built on Windows, a Linux one on Linux.
+
+### What is different on each target
+
+- **The backend does not run inside an app.** A desktop or phone app holds your built pages. Point the API client at a server you host (for phones, build with `--api-url https://…`). See [Desktop apps with Electron](#desktop-apps-with-electron) and [Mobile apps](#mobile-apps-ios-and-android).
+- **The address style.** A packaged app loads its pages from files, so the router uses `mode: 'hash'` there; `harmony:init` sets that up so the website keeps its normal addresses.
+- **The native bridge differs.** Electron gives pages `window.kreftDesktop`; Tauri gives `window.__TAURI__`; the phone apps give `Kreftjs.native` (camera, files, share, haptics…). Write the page once and ask which one it is running in:
+
+```js
+if (Kreftjs.isElectron) {            // an Electron window
+  kreftDesktop.notify('Saved', 'Your note was saved.')
+} else if (Kreftjs.isTauri) {        // a Tauri window
+  window.__TAURI__.event.emit('saved')
+} else if (Kreftjs.native.isNative()) {  // an iOS or Android app
+  Kreftjs.native.system.share({ text: 'Hello' })
+}
+
+Kreftjs.native.platform()    // 'ios' | 'android' | 'electron' | 'tauri' | 'web'
+Kreftjs.native.isDesktop()   // true in Electron and Tauri
+```
+
+HarmonyOS apps run your pages in a web view, so they behave as the web there; use feature checks (`'share' in navigator`) for anything that depends on the device.
+
+### TV apps (coming soon)
+
+TV apps are **planned and not available yet**. Kreft has no TV packaging and no remote-control navigation today. What is planned:
+
+| Target | Plan |
+|---|---|
+| Android TV | The Android app, with a remote-control (D-pad) focus ring and a TV layout kit |
+| Apple tvOS | A tvOS shell around the same pages |
+| LG webOS | A packaged web app for LG TVs |
+| Samsung Tizen | A packaged web app for Samsung TVs |
+
+There is no release date, and nothing here is promised until it ships and is tested. Until then, a TV that has a web browser can open your website; that is not a packaged TV app and has no focus handling for a remote.
+
+### Platform commands at a glance
+
+| I want to… | Command |
+|---|---|
+| Add Electron or Tauri to an app | `kreft add electron`, `kreft add tauri`, or `kreft add electron tauri` |
+| Check the desktop settings | `kreft electron:config`, `kreft tauri:config` |
+| Run a desktop app | `kreft electron:dev`, `kreft tauri:dev` |
+| Make desktop installers | `kreft electron:build [--mac] [--win] [--linux]`, `kreft tauri:build` |
+| Add phone support | `kreft new my-app --mobile`, or `kreft mobile:init` |
+| Run on a phone or emulator | `kreft mobile:run --android`, `kreft mobile:run --ios`, `kreft mobile:dev` |
+| Add HarmonyOS | `kreft new my-app --harmony`, or `kreft harmony:init` |
+| Build and open HarmonyOS | `kreft harmony:build --api-url https://…`, `kreft harmony:open` |
+| Release a phone app | `kreft mobile:release --android`, `--ios`, `--harmony`; the steps are in [Publishing your app to Google Play and the App Store](#publishing-your-app-to-google-play-and-the-app-store) |
 
 ## Desktop apps with Electron
 
@@ -2042,16 +2290,18 @@ kreft electron:build          # an installer in dist-electron/
 Add desktop support to an existing app instead:
 
 ```bash
-kreft electron:init           # alias: kreft make:electron
-npm install                     # installs electron and electron-builder
+kreft add electron            # config/electron.config.js, electron/, scripts, packages (runs npm install)
 ```
+
+Everything you can change (window, menu, DevTools, security, tray, updates, installers) is in `config/electron.config.js`: see [Desktop configuration](#desktop-configuration).
 
 ### Commands
 
 | Command | What it does |
 |---|---|
-| `kreft electron:init` | Writes `electron/main.js`, `electron/preload.js` and the app icon `build/icon.png`, and adds the scripts (including `electron:build:mac`, `:win`, `:linux` and `:all`), the `electron` and `electron-builder` dev dependencies and a `build` block to `package.json`. Files that already exist are never overwritten. It also removes the Google Fonts links from `index.html`, so the app starts without a network. |
-| `kreft electron:dev` | Opens the app in a desktop window only: no browser opens and no URL is printed. The dev server runs hidden on a private port of your computer that only the window uses (hot reload works). Closing the window stops the server. Flags after the command go to the dev server. |
+| `kreft add electron` | Writes `config/electron.config.js`, the generated `electron/main.js` and `electron/preload.js` and the app icon `build/icon.png`, adds the scripts (including `electron:build:mac`, `:win`, `:linux` and `:all`) and the `electron` and `electron-builder` dev dependencies to `package.json`, and runs `npm install`. An existing config file is never replaced without a yes (`--force` replaces it). `kreft electron:init` (alias `make:electron`) does the same without `npm install`. It also removes the Google Fonts links from `index.html`, so the app starts without a network. |
+| `kreft electron:config` | Checks `config/electron.config.js` and prints the final settings (`--json` for machines). |
+| `kreft electron:dev` | Checks the settings, then opens the app in a desktop window only: no browser opens and no URL is printed. The dev server runs hidden on a private port of your computer that only the window uses (hot reload works). Closing the window stops the server. Flags after the command go to the dev server. |
 | `kreft electron:build` | Runs `kreft build --base ./`, then `electron-builder`. With no flag it builds for the system you are on. |
 | `kreft electron:build --mac` | `.dmg` and `.zip` for macOS. |
 | `kreft electron:build --win` | NSIS installer and portable `.exe` for Windows. |
@@ -2068,12 +2318,13 @@ Other flags go straight to electron-builder: `--x64`, `--arm64`, `--ia32`, `--ar
 
 | I want to… | Do this |
 |---|---|
-| Add desktop support | `kreft new my-app --electron`, or `kreft electron:init` in an existing app, then `npm install` |
+| Add desktop support | `kreft new my-app --electron`, or `kreft add electron` in an existing app |
 | Open the app in its window | `kreft electron` (no browser, no URL) |
-| Open DevTools | `kreft electron --devtools=bottom`, `ELECTRON_DEVTOOLS=right`, or F12 |
-| Show, auto-hide or hide the menu | `ELECTRON_MENU=show`, `auto` or `hide`; `kreftDesktop.setMenu('hide')` |
+| Open DevTools | `kreft electron --devtools=bottom`, `devtools.openOnStart` in the config file, or F12 |
+| Show, auto-hide or hide the menu | `menu.visibility` (`'hidden'` is the default), `kreft electron --menu=visible`; `kreftDesktop.setMenu('visible')` |
+| Change any setting | Edit `config/electron.config.js`, or `--set window.width=1000` for one run |
 | Change the icon | Replace `build/icon.png` (square PNG, 512×512 or bigger) |
-| Change the app name | `build.productName` and `build.appId` in `package.json` |
+| Change the app name and id | `app.name` and `app.id` in `config/electron.config.js` |
 | Make an installer | `npm run electron:build:mac`, `:win`, `:linux` or `:all` |
 | Get help in the terminal | `kreft electron:help` |
 
@@ -2081,12 +2332,17 @@ Other flags go straight to electron-builder: `--x64`, `--arm64`, `--ia32`, `--ar
 
 ```text
 my-app/
+├── config/
+│   └── electron.config.js   your settings: the only file you edit
 ├── electron/
-│   ├── main.js        the main process: creates the window, handles the desktop functions
-│   └── preload.js     the safe bridge exposed to your pages as window.kreftDesktop
+│   ├── main.js        generated: the main process, reads your settings (do not edit)
+│   ├── preload.js     generated: the safe bridge exposed to your pages as window.kreftDesktop
+│   ├── custom.js      yours, optional: your own main-process code (see "Your own code")
+│   ├── kreft.resolved.json    written by the commands: your settings, checked and merged
+│   └── builder.config.json    written by the commands: the electron-builder configuration
 ├── dist/              the static build the packaged app loads
 ├── dist-electron/     installers written by electron-builder
-└── package.json       "main": "electron/main.js" and the "build" block
+└── package.json       "main": "electron/main.js"
 ```
 
 ### How it runs
@@ -2140,15 +2396,16 @@ async function pick() {
 
 ### Adding your own desktop function
 
-1. In `electron/main.js`, add a handler: `ipcMain.handle('app:ping', () => 'pong')`.
-2. In `electron/preload.js`, add it to the `desktop` object: `ping: () => ipcRenderer.invoke('app:ping')`.
-3. Call `Kreftjs.desktop.ping()` from a page.
+`electron/main.js` and `preload.js` are generated, so your code goes in `electron/custom.js`:
 
-Expose one narrow function per task. Never pass a path or a command from a page straight to the file system or a shell without checking it in `main.js`.
+1. In `electron/custom.js`, register a handler whose name starts with `app:`: `ipcMain.handle('app:ping', () => 'pong')`.
+2. Call it from a page: `await kreftDesktop.invoke('app:ping')`.
+
+Pages can reach only channels that start with `app:`, never the built-in ones. Expose one narrow function per task. Never pass a path or a command from a page straight to the file system or a shell without checking it in `custom.js`. See [Your own code](#your-own-code).
 
 ### DevTools
 
-They are hidden by default. Open them with a flag or an environment variable:
+They are available while you work, closed when the window opens, and **off in the installed app**. All three are settings (`devtools.development`, `devtools.openOnStart`, `devtools.production`, `devtools.mode`). To open them at start for one run:
 
 ```bash
 kreft electron:dev --devtools          # right side
@@ -2157,30 +2414,32 @@ kreft electron:dev --no-devtools
 ELECTRON_DEVTOOLS=bottom kreft electron:dev
 ```
 
-In development, F12 or Ctrl+Shift+I toggles them.
+F12 or Ctrl+Shift+I toggles them (Cmd+Option+I on macOS) where they are allowed. In production they are refused: the shortcuts do nothing and DevTools that open anyway are closed. See [Desktop configuration](#desktop-configuration).
 
 ### The window menu
 
-Set the menu bar when you start the app:
+The menu bar is **hidden by default**. Set `menu.visibility` in `config/electron.config.js` (`'hidden'`, `'visible'` or `'auto'`), or for one run:
 
 ```bash
-ELECTRON_MENU=show kreft electron   # default: the menu bar is visible
-ELECTRON_MENU=auto kreft electron   # hidden, press Alt to show it (Windows and Linux)
-ELECTRON_MENU=hide kreft electron   # no menu at all
+kreft electron --menu=visible        # the menu bar
+kreft electron --menu=auto           # hidden, press Alt to show it (Windows and Linux)
+ELECTRON_MENU=show kreft electron    # the older variable still works: show | auto | hide
 ```
 
 Or change it while the app runs, from a page:
 
 ```js
-window.kreftDesktop.setMenu('hide')   // 'show' | 'auto' | 'hide'
-window.kreftDesktop.getMenu()         // the current mode
+window.kreftDesktop.setMenu('visible')   // 'visible' | 'auto' | 'hidden' ('show' and 'hide' also work)
+window.kreftDesktop.getMenu()            // the current mode
 ```
 
-On macOS the menu lives in the top bar of the screen, so `show` and `auto` look the same, and `hide` keeps only the app-name menu (with Quit) because macOS needs one. Apps created before 0.0.18 have the old `electron/main.js` without this: delete it and run `kreft electron:init` (copy your own changes back first). For your own menu (File, Edit…), call `Menu.buildFromTemplate([...])` and `Menu.setApplicationMenu(...)` in `electron/main.js`.
+Your own menu goes in `menu.template` (see [Desktop configuration](#desktop-configuration)).
+
+On macOS the menu lives in the top bar of the screen, so `visible` and `auto` look the same, and `hidden` keeps only an app menu (with Quit) and an Edit menu, because macOS always has a menu bar and copy and paste need Edit. For your own menu (File, Edit…), use `menu.template`; to send a click to the page, give the entry an `id` and listen with `kreftDesktop.onMenu`.
 
 ### The app icon
 
-`kreft electron:init` copies the Kreft logo to `build/icon.png`. Replace it with your own square PNG, 512×512 or bigger. The window uses it, and electron-builder makes the `.icns` (macOS) and `.ico` (Windows) files from it. Set the app name with `build.productName` and `build.appId` in `package.json`, electron-builder also needs `description`, `homepage`, an `author` with an e-mail and `build.linux.maintainer` (for `.deb` and `.rpm`). `kreft electron:init` and `kreft electron:build` fill in the missing ones (from your git name and e-mail); check them before you release.
+`kreft add electron` copies the Kreft logo to `build/icon.png`. Replace it with your own square PNG, 512×512 or bigger (or point `packaging.icon` at another file). The window uses it, and electron-builder makes the `.icns` (macOS) and `.ico` (Windows) files from it. The app name and id are `app.name` and `app.id` in `config/electron.config.js`.
 
 ### Packaging and installers
 
@@ -2194,7 +2453,7 @@ kreft electron:build --all                 # the same as the line above
 
 The `package.json` scripts do the same: `npm run electron:build:mac`, `:win`, `:linux` and `:all`.
 
-`electron:build` writes to `dist-electron/`. Flags go to electron-builder, for example `kreft electron:build --mac --arm64`. The defaults in the `build` block of `package.json` are:
+`electron:build` checks your settings, writes `electron/builder.config.json` from them and runs electron-builder, which writes to `dist-electron/` (`packaging.electron.outputDir`). Flags go to electron-builder, for example `kreft electron:build --mac --arm64`. The defaults are:
 
 | System | Targets |
 |---|---|
@@ -2202,7 +2461,7 @@ The `package.json` scripts do the same: `npm run electron:build:mac`, `:win`, `:
 | macOS | `dmg`, `zip` |
 | Linux | `AppImage`, `deb`, `rpm` |
 
-Edit `appId`, `productName` and the targets there. Build for each system on that system: a macOS installer needs a Mac (on a Mac, the Linux `AppImage` and the Windows installers build, but `.deb` and `.rpm` fail: build those on Linux, or remove them from `build.linux.target`). Code signing and notarisation (macOS) or a signing certificate (Windows) are set up through electron-builder (electron.build/code-signing) and are needed before you give the app to other people; unsigned macOS apps show a Gatekeeper warning.
+Change the targets in `packaging.electron` (`mac`, `win`, `linux`) and the app id and name in `app`; anything else electron-builder knows goes in `advanced.builder`. The `build` block of `package.json` is not used any more. Build for each system on that system: a macOS installer needs a Mac (on a Mac, the Linux `AppImage` and the Windows installers build, but `.deb` and `.rpm` fail: build those on Linux, or remove them from `build.linux.target`). Code signing and notarisation (macOS) or a signing certificate (Windows) are set up through electron-builder (electron.build/code-signing) and are needed before you give the app to other people; unsigned macOS apps show a Gatekeeper warning.
 
 The packaged app loads the built `dist/index.html` and does not start a backend. A frontend-only app works as is; a full-stack app (login, database) does not work once installed.
 
@@ -2219,14 +2478,14 @@ A `dist/` made by `npm run build` shows a white window if you open it in Electro
 
 ### Security
 
-The window follows Electron's security guidance:
+The window follows Electron's security guidance, and each of these is a setting in `security` (the defaults are the safe values; turning one off prints a note):
 
-- `contextIsolation` and `sandbox` are on; `nodeIntegration` is off.
+- `contextIsolation`, `sandbox` and `webSecurity` are on; `nodeIntegration` and `allowRunningInsecureContent` are off.
 - Links to other sites open in the system browser, and new windows are denied.
 - Navigation away from the app is blocked: only the dev server (development) or files inside `dist/` (packaged) can load.
 - The bridge exposes named functions only, with the option lists described above.
 
-Do not turn these off to make something work. Add a bridge function instead.
+Do not turn these off to make something work. Add a function in `electron/custom.js` instead. The permission requests of a page (location, camera, clipboard…) are all refused unless listed in `security.permissions`.
 
 ### Troubleshooting
 
@@ -2238,6 +2497,619 @@ Do not turn these off to make something work. Add a bridge function instead.
 | API calls fail in the packaged app | The backend is not bundled. Set an absolute `base` for the API client (see above). |
 | The window opens before the server is ready | It waits up to 15 seconds. Check the terminal for a dev server error. |
 | Port 8000 is taken | Nothing to do: the hidden server picks the next free port. |
+
+## Desktop apps with Tauri
+
+Tauri is the other way to make a desktop app from your Kreft project. Your pages are the same `.kreft` files. Instead of shipping a browser like Electron, Tauri uses the web view the system already has (WebView2 on Windows, WebKit on macOS and Linux), so installers are small and the app uses less memory. The trade-off is that the small native part is written in Rust.
+
+### What you need
+
+| You need | Why |
+|---|---|
+| [Rust](https://rustup.rs) (`cargo`) | Tauri compiles a small Rust program around your pages. Open a new terminal after installing. |
+| Linux only | `webkit2gtk` and a few libraries. See [tauri.app/start/prerequisites](https://tauri.app/start/prerequisites/). |
+| Windows only | The Visual Studio C++ build tools. WebView2 is already part of Windows 10 and 11. |
+
+Install Rust once: from [rustup.rs](https://rustup.rs), or on a Mac with Homebrew:
+
+```bash
+brew install rustup
+rustup default stable
+```
+
+Check it with `cargo --version`. Homebrew's `rustup` is *keg-only* (not linked into your normal path), so add it to your shell profile and open a new terminal:
+
+```bash
+echo 'export PATH=/opt/homebrew/opt/rustup/bin:$PATH' >> ~/.zshrc
+```
+
+Rust from rustup.rs puts `cargo` in `~/.cargo/bin`, which its installer adds to your path. `kreft tauri` also looks in `~/.cargo/bin` and in the Homebrew folder by itself, so it works even in a terminal that was opened before you installed Rust.
+
+### Start
+
+```bash
+kreft new my-app --tauri      # a new project with Tauri included
+cd my-app
+npm install                   # installs @tauri-apps/cli
+kreft tauri                   # opens the app in a desktop window
+```
+
+For a project you already have, run `kreft add tauri` (it also runs `npm install`). `kreft tauri:init` (alias `kreft make:tauri`) does the same without installing. It writes `config/tauri.config.js`, adds a `src-tauri/` folder and three scripts to `package.json`, and never replaces your config file without a yes. Everything you can change (window, menu, DevTools, security, tray, updates, installers) is in `config/tauri.config.js`: see [Desktop configuration](#desktop-configuration).
+
+| Command | What it does |
+|---|---|
+| `kreft tauri` (or `tauri:dev`) | Starts the dev server on a free port and opens a Tauri window on it. No browser tab opens. Close the window to stop both. `--port N` chooses the port. |
+| `kreft tauri:build` | Runs `kreft build --base ./`, then `tauri build`. Installers are written to `src-tauri/target/release/bundle/`. |
+| `kreft tauri:init` | Adds Tauri to an existing project (`kreft add tauri` also installs the packages). |
+| `kreft tauri:config` | Checks `config/tauri.config.js` and prints the final settings (`--json` for machines). |
+| `kreft tauri:sync` | Writes `src-tauri/` from the settings. `tauri:dev` and `tauri:build` do it by themselves. |
+| `kreft tauri:help` | Prerequisites, files and options. |
+
+`tauri:build` builds for the system you run it on. Options: `--debug` (faster, larger build), `--bundles dmg|app|nsis|msi|deb|rpm|appimage` (which installers to make), `--target <rust-triple>` (another CPU). The first build compiles Rust and takes several minutes; later builds are quick.
+
+### The files
+
+| File | What it is |
+|---|---|
+| `config/tauri.config.js` | **Your settings.** The only file you edit. |
+| `src-tauri/tauri.conf.json` | Generated from your settings: name, identifier, window, security, installers. Options this file lacks go in `advanced.tauriConf`. |
+| `src-tauri/capabilities/default.json` | Generated: what the window may do (`core:default`, plus notifications and updates when on, plus `security.capabilities`). |
+| `src-tauri/src/kreft_generated.rs` | Generated: menu, DevTools, right-click menu, tray, notifications and updates. Never edit it. |
+| `src-tauri/src/main.rs` | **Yours.** Written once; it calls `kreft_generated::apply`. Add your own commands here. |
+| `src-tauri/Cargo.toml` | Rust dependencies. Kreft rewrites only the lines between its two `kreft-generated` comments; add your own crates anywhere else. |
+| `build/icon.png` | The app icon: a square PNG, 1024x1024 is best. Kreft writes a default one if you have none. `kreft tauri` makes every size from it into `src-tauri/icons/` with `tauri icon` whenever one is missing. To use your own, replace the file and run `npx tauri icon build/icon.png`. |
+
+### In the page
+
+`window.__TAURI__` exists only inside the Tauri window, so you can tell it from a browser:
+
+```js
+if (window.__TAURI__) {
+  const name = await window.__TAURI__.core.invoke('greet', { name: 'Ada' })
+}
+```
+
+`invoke` calls a Rust command that you write in `main.rs` and register with `.invoke_handler(tauri::generate_handler![greet])`.
+
+### Electron or Tauri?
+
+| | Electron | Tauri |
+|---|---|---|
+| Installer size | About 100 MB | A few MB |
+| Needs | Node.js only | Node.js and Rust |
+| Web view | Its own Chromium, the same everywhere | The system's, so small differences between systems |
+| Your own system code | JavaScript (`window.kreftDesktop` bridge) | Rust commands |
+
+`window.kreftDesktop` and the other Electron-only helpers do not exist in a Tauri window.
+
+### The app icon
+
+Tauri needs the icon in several sizes (`src-tauri/icons/32x32.png`, `128x128.png`, `128x128@2x.png`, `icon.icns`, `icon.ico`) and will not compile without them. You do not have to make them: `kreft tauri` and `kreft tauri:build` make every size from `build/icon.png` whenever one is missing, and write a default `build/icon.png` first if your project has none.
+
+To use your own icon, put a square PNG (1024x1024 is best) at `build/icon.png`, then make the sizes again. Run it **inside your project folder**, where `node_modules` is:
+
+```bash
+cd my-app
+npx tauri icon build/icon.png
+```
+
+`tauri icon` also writes iOS and Android icon folders next to the desktop ones. A Tauri desktop app does not use them, so you can ignore them.
+
+> [!NOTE]
+> If `npx tauri` says `could not determine executable to run`, you are in the wrong folder or the command line is not installed. `cd` into your project and run `npm install` (it installs `@tauri-apps/cli`). Check with `ls node_modules/.bin | grep tauri`.
+
+### What has been tested
+
+`tauri:init`, `kreft new --tauri`, `tauri:dev` (the window opens on a free port and closes together with the dev server) and `tauri:build --debug --bundles app` (a macOS `.app`) were run with Rust 1.99 on macOS. Release installers, Windows and Linux were not tested.
+
+### Tauri troubleshooting
+
+| Problem | Fix |
+|---|---|
+| `Rust is not installed (cargo was not found)` | Install Rust (see the install steps above). If it is installed already, your terminal cannot see it: run `cargo --version`; if that says "command not found", add its folder to your path: `export PATH="$HOME/.cargo/bin:$PATH"` for rustup.rs, or `export PATH=/opt/homebrew/opt/rustup/bin:$PATH` for Homebrew (put the line in `~/.zshrc`, then open a new terminal). `kreft tauri` already looks in both folders, so this error usually means Rust is not installed at all. |
+| `failed to open icon …/icons/32x32.png` (a Rust "proc macro panicked" error) | The icon sizes were not made. In your project folder run `npx tauri icon build/icon.png` (any square PNG works; if you have none, copy one to `build/icon.png` first). Kreft versions after 0.0.28-beta do this by themselves. |
+| `npx tauri` says `could not determine executable to run` | You are not in your project folder, or `@tauri-apps/cli` is not installed. `cd` into the project and run `npm install`. |
+| `The Tauri command line is not installed` | Run `npm install` (or `kreft add -D @tauri-apps/cli`). |
+| A white window in the packaged app | Run `tauri:build` again; the build must use `--base ./`. Check that `dist/index.html` exists. |
+| API calls fail in the packaged app | The backend is not bundled. Set an absolute `base` for the API client, as for Electron. |
+| Linux build fails on `webkit2gtk` | Install the Linux libraries listed above. |
+| Port 8000 is taken | Nothing to do: the dev server picks the next free port. |
+
+## Desktop configuration
+
+Electron and Tauri apps are set up from **one readable JavaScript file each**: `config/electron.config.js` and `config/tauri.config.js`. You change the window, the menu, DevTools, security, the tray, notifications, updates and the installers there. You never edit the native files Kreft generates (`electron/main.js`, `src-tauri/tauri.conf.json`, `src-tauri/src/kreft_generated.rs`): they read your settings.
+
+### Add a runtime
+
+```bash
+kreft add electron            # config/electron.config.js, electron/, scripts, packages (runs npm install)
+kreft add tauri               # config/tauri.config.js, src-tauri/, scripts, packages
+kreft add electron tauri      # both, side by side
+```
+
+| Flag | What it does |
+|---|---|
+| `--no-install` | Do not run `npm install`. |
+| `--force` | Replace an existing config file with the defaults (the old one is saved as `.bak`). |
+
+**An existing config file is never replaced without a yes.** On a terminal `kreft add` asks `Replace it with the default settings? [y/N]`. Without a terminal (CI) it keeps your file and tells you to use `--force`. `kreft new my-app --electron` and `--tauri` write the same files. `kreft electron:init` and `kreft tauri:init` do the same as `add`, without installing packages.
+
+### The config file
+
+The file lists every option with its default, so you can see what exists. Change a value, save, run `kreft electron:dev` (or `tauri:dev`) again. Options you delete keep their default.
+
+```js
+// config/electron.config.js (a CommonJS project)
+/** @type {import('kreftjs/desktop').ElectronConfig} */
+module.exports = {
+  window: { width: 1000, height: 700 },
+  menu: { visibility: 'hidden' },
+  devtools: { openOnStart: false },
+}
+```
+
+In a project with `"type": "module"` in `package.json` the file uses `export default { … }` instead; `kreft add` writes the right form. A `.cjs` or `.mjs` file name also works. The file may export a function that returns the settings (it may be `async`), which receives the mode (`'development'` or `'production'`), the platform and the environment:
+
+```js
+// example: electron
+module.exports = ({ mode }) => ({
+  window: { title: mode === 'development' ? 'My app (dev)' : 'My app' },
+  devtools: { openOnStart: mode === 'development' },
+})
+```
+
+### What is used, in this order
+
+The last one wins. Each layer is checked on its own, then they are merged group by group (a list is replaced, not added to).
+
+| # | Layer | Where | Applies to |
+|---|---|---|---|
+| 1 | Built-in defaults | the tables below | the runtime |
+| 2 | Shared KreftJS configuration | `kreftjs.config.json` → `"desktop"` | both runtimes |
+| 3 | Shared environment | `KREFT_DESKTOP_WINDOW_WIDTH=1000` | both runtimes |
+| 4 | Runtime configuration file | `config/electron.config.js`, `config/tauri.config.js` | one runtime |
+| 5 | Runtime environment | `KREFT_ELECTRON_WINDOW_WIDTH=1000`, `KREFT_TAURI_WINDOW_WIDTH=1000` (and the older `ELECTRON_MENU`, `ELECTRON_DEVTOOLS`) | one runtime |
+| 6 | Command line | `--set window.width=1000`, `--menu=visible`, `--devtools[=mode]`, `--no-devtools` | one run |
+
+Layers 2 and 3 serve both runtimes, so an option or value one runtime does not have (`security.sandbox` in Tauri, `menu.visibility: 'auto'` in Tauri) is **ignored there with a note**, not an error. In layers 4 to 6 the same mistake is an error, because you wrote it for that runtime.
+
+```json
+{ "desktop": { "window": { "width": 1100, "height": 760 }, "tray": { "enabled": true } } }
+```
+
+The environment variable name of an option is its path in capitals with `_` between words: `window.minWidth` → `KREFT_ELECTRON_WINDOW_MIN_WIDTH`. A list is written with commas (`KREFT_ELECTRON_SECURITY_PERMISSIONS=geolocation,media`) or as JSON. `--set` takes any option (`--set devtools.mode=bottom --set window.resizable=false`); a value is read as JSON when it can be (`true`, `1000`, `null`), as text otherwise.
+
+### Check your settings
+
+```bash
+kreft electron:config       # checks config/electron.config.js and prints the final settings
+kreft tauri:config --json   # the same for Tauri, as JSON
+```
+
+`dev` and `build` check the settings too, **before** they start anything, so a mistake stops a build before it spends minutes. Every option is validated: unknown names, wrong types, numbers out of range, values the runtime does not support. All the problems are listed together, with where they come from:
+
+```text
+The tauri configuration has 3 problems:
+  - menu.visibility: "auto" is not allowed in tauri (that value is for Electron). Use one of: hidden, visible.
+    (from config/tauri.config.js)
+  - window.widht: unknown option. Did you mean "width"? The options in window are: title, width, height, …
+    (from config/tauri.config.js)
+  - window.minWidth: is 1300, larger than window.width (1200). Lower minWidth or raise width.
+```
+
+Settings that are allowed but unsafe (`security.nodeIntegration: true`, `devtools.production: true`…) are not errors; each one prints a note.
+
+### The defaults
+
+| Setting | Default | Meaning |
+|---|---|---|
+| `menu.visibility` | `'hidden'` | No menu bar. On macOS the system menu bar always exists, so a minimal app menu (Quit) and an Edit menu stay: without Edit, Cmd+C and Cmd+V stop working. |
+| `devtools.development` | `true` | DevTools are available while you work (F12 or Ctrl+Shift+I; Cmd+Option+I on macOS). |
+| `devtools.openOnStart` | `false` | …but closed when the window opens. Set it to `true` to open them by themselves. |
+| `devtools.production` | `false` | No DevTools in the installed app: the shortcuts do nothing, and in Electron DevTools that open anyway are closed. In Tauri a release build is made without its `devtools` feature. |
+| Electron `security` | `contextIsolation: true`, `sandbox: true`, `nodeIntegration: false`, `webSecurity: true` | Pages cannot reach Node.js. Turning one off prints a note. |
+| `security.blockNewWindows` | `true` | A page cannot open windows; a link to another site opens in the system browser. |
+| `webview.allowedNavigation` | `[]` | The window cannot go to any site except the app itself. |
+| `notifications.enabled` | `false` | A page may not show notifications until you allow it. |
+| `window` | 1200 × 800, minimum 800 × 600 | Resizable, centered. In both runtimes the size is the page area, without the title bar. |
+
+### Every option
+
+Runtime says where the option exists. Setting an Electron-only option in `config/tauri.config.js` (or the other way round) is an error that tells you what to use instead.
+
+<!-- desktop-options:start (made by "node bin/desktop/docs.js --write": do not edit between the markers) -->
+
+#### `app`
+
+Name, id and version of the app.
+
+| Option | Runtime | Default | What it does |
+|---|---|---|---|
+| `app.name` | both | `null` | The name people see. Default: the "productName" or "name" in package.json. |
+| `app.id` | both | `null` | The reverse-domain id, for example "com.acme.notes". Default: com.kreftjs. followed by the lowercase name. |
+| `app.version` | both | `null` | The version number. Default: the "version" in package.json. |
+| `app.description` | both | `null` | A one-line description. Default: the "description" in package.json. |
+| `app.author` | both | `null` | Who makes the app. Default: the "author" in package.json. |
+| `app.homepage` | both | `null` | The web address of the app. Default: the "homepage" in package.json. |
+| `app.copyright` | both | `null` | The copyright line shown in the installer and the About box. |
+
+#### `window`
+
+How the main window looks and behaves.
+
+| Option | Runtime | Default | What it does |
+|---|---|---|---|
+| `window.title` | both | `null` | The window title. Default: the app name. |
+| `window.width` | both | `1200` | Width in pixels. From 200 to 16000. |
+| `window.height` | both | `800` | Height in pixels. From 150 to 16000. |
+| `window.minWidth` | both | `800` | The window cannot be made narrower than this. From 0 to 16000. |
+| `window.minHeight` | both | `600` | The window cannot be made lower than this. From 0 to 16000. |
+| `window.maxWidth` | both | `null` | The window cannot be made wider than this. null: no limit. From 200 to 32000. |
+| `window.maxHeight` | both | `null` | The window cannot be made higher than this. null: no limit. From 150 to 32000. |
+| `window.x` | both | `null` | Distance from the left edge of the screen. null: the system chooses (or the window is centered). From -32000 to 32000. |
+| `window.y` | both | `null` | Distance from the top edge of the screen. null: the system chooses (or the window is centered). From -32000 to 32000. |
+| `window.center` | both | `true` | Open the window in the middle of the screen (ignored when x and y are set). |
+| `window.resizable` | both | `true` | Let people resize the window. |
+| `window.fullscreen` | both | `false` | Open the window in full screen. |
+| `window.maximized` | both | `false` | Open the window maximized. |
+| `window.alwaysOnTop` | both | `false` | Keep the window above all others. |
+| `window.frame` | both | `true` | Draw the system title bar and border. false: a window without them. |
+| `window.transparent` | both | `false` | A see-through window background (the page must draw its own background). |
+| `window.backgroundColor` | both | `'#ffffff'` | The colour shown before the page has drawn, as #rrggbb. |
+| `window.theme` | both | `'system'` | The look of the window frame and the system dialogs. Values: `system`, `light`, `dark`. |
+| `window.skipTaskbar` | both | `false` | Keep the window out of the taskbar or dock. |
+| `window.showOnReady` | Electron | `true` | Show the window only when the page is ready, so it never opens as a white flash. |
+
+#### `menu`
+
+The native application menu.
+
+| Option | Runtime | Default | What it does |
+|---|---|---|---|
+| `menu.visibility` | both | `'hidden'` | "hidden": no menu bar. "visible": the menu bar. "auto": hidden until Alt is pressed (Electron on Windows and Linux only). On macOS the system menu bar always exists, so "hidden" keeps a minimal app and Edit menu: without them, copy and paste shortcuts stop working. Values: Electron `hidden`, `visible`, `auto`; Tauri `hidden`, `visible`. |
+| `menu.template` | both | `null` | Your own menu, as a list of top-level entries with a submenu. null: the default menu of the runtime. |
+
+#### `contextMenu`
+
+The right-click menu.
+
+| Option | Runtime | Default | What it does |
+|---|---|---|---|
+| `contextMenu.enabled` | both | `true` | Allow the right-click menu. false: right-click does nothing. |
+| `contextMenu.items` | Electron | `['copy', 'cut', 'paste', 'selectAll']` | The entries of the right-click menu on text. |
+| `contextMenu.inspectElement` | Electron | `true` | Add "Inspect element" when DevTools are allowed. |
+
+#### `devtools`
+
+The developer tools.
+
+| Option | Runtime | Default | What it does |
+|---|---|---|---|
+| `devtools.development` | both | `true` | Allow DevTools while you work (kreft electron:dev, kreft tauri:dev). |
+| `devtools.production` | both | `false` | Allow DevTools in the installed app. Keep it false unless you need to debug a release. |
+| `devtools.openOnStart` | both | `false` | Open DevTools by themselves when the window opens (only where they are allowed). |
+| `devtools.mode` | both | Electron `'right'`, Tauri `'detach'` | Where DevTools open. Tauri can only open them in their own window. Values: Electron `right`, `bottom`, `left`, `detach`; Tauri `detach`. |
+| `devtools.shortcut` | both | `true` | F12 and Ctrl+Shift+I (Cmd+Option+I on macOS) toggle DevTools where they are allowed. |
+
+#### `webview`
+
+The web page inside the window.
+
+| Option | Runtime | Default | What it does |
+|---|---|---|---|
+| `webview.zoomFactor` | both | `1` | The page zoom. 1 is 100 %. From 0.25 to 5. |
+| `webview.userAgent` | both | `null` | Text sent to servers as the browser name. null: the default of the runtime. |
+| `webview.spellcheck` | Electron | `false` | Underline misspelled words in text fields. |
+| `webview.backgroundThrottling` | Electron | `true` | Slow the page down when the window is hidden. |
+| `webview.openExternalLinksInBrowser` | both | `true` | A link to another site opens in the system browser, not in the app window. |
+| `webview.allowedNavigation` | both | `[]` | Origins (like "https://login.acme.com") the window may go to besides the app itself. Everything else is blocked. |
+
+#### `security`
+
+What the page may do. The defaults are the safe ones.
+
+| Option | Runtime | Default | What it does |
+|---|---|---|---|
+| `security.csp` | both | `null` | The Content-Security-Policy of the pages, for example "default-src 'self'". null: none is added. |
+| `security.blockNewWindows` | both | `true` | Pages cannot open new windows. |
+| `security.contextIsolation` | Electron | `true` | Keep the page and the preload script in separate JavaScript worlds. |
+| `security.sandbox` | Electron | `true` | Run the page in the operating system sandbox. |
+| `security.nodeIntegration` | Electron | `false` | Give the page access to Node.js. Leave it false: any script on the page could then run programs on the computer. |
+| `security.webSecurity` | Electron | `true` | Keep the same-origin policy of the browser. |
+| `security.allowRunningInsecureContent` | Electron | `false` | Let an https page load http scripts. |
+| `security.permissions` | Electron | `[]` | Browser permissions the page may get, for example "geolocation", "media", "clipboard-read". Notifications are allowed by notifications.enabled. |
+| `security.capabilities` | Tauri | `[]` | Extra Tauri permissions for the window, like "dialog:default" (the plugin must also be added in src-tauri/Cargo.toml). "core:default" is always there. |
+| `security.globalTauri` | Tauri | `true` | Put the Tauri API on window.__TAURI__. |
+
+#### `tray`
+
+The system tray icon.
+
+| Option | Runtime | Default | What it does |
+|---|---|---|---|
+| `tray.enabled` | both | `false` | Show an icon in the system tray (the menu bar on macOS). |
+| `tray.icon` | both | `null` | A PNG file, relative to the project. null: the app icon. |
+| `tray.tooltip` | both | `null` | Text shown when the mouse rests on the icon. null: the app name. |
+| `tray.closeToTray` | both | `false` | Closing the window hides it; the app keeps running in the tray. Choose "Quit" in the tray menu to leave. |
+| `tray.clickAction` | both | `'toggle'` | What a click on the tray icon does. Values: `toggle`, `show`, `none`. |
+| `tray.menu` | both | `[{'label':'Show', 'action':'show'}, {'type':'separator'}, {'label':'Quit', 'action':'quit'}]` | The entries of the tray menu. |
+
+#### `notifications`
+
+System notifications.
+
+| Option | Runtime | Default | What it does |
+|---|---|---|---|
+| `notifications.enabled` | both | `false` | The page may show system notifications. In Tauri this adds the notification plugin (a crate and a permission). |
+
+#### `updates`
+
+Updates.
+
+| Option | Runtime | Default | What it does |
+|---|---|---|---|
+| `updates.enabled` | both | `false` | Look for new versions of the app. |
+| `updates.url` | both | `null` | The https address of the folder that holds the update files (Electron: latest.yml and the installers; Tauri: the update JSON). |
+| `updates.channel` | both | `'latest'` | The release channel, like "latest" or "beta". |
+| `updates.checkOnStart` | both | `true` | Look for an update each time the app starts (installed app only). |
+| `updates.autoDownload` | Electron | `false` | Download an update without asking. |
+| `updates.pubkey` | Tauri | `null` | The public key that update files are signed with (made by "npx tauri signer generate"). |
+
+#### `packaging`
+
+How the installers are made.
+
+| Option | Runtime | Default | What it does |
+|---|---|---|---|
+| `packaging.icon` | both | `'build/icon.png'` | The app icon, a square PNG (1024×1024 is best), relative to the project. |
+| `packaging.category` | both | `null` | The category in app stores and menus, like "public.app-category.productivity" (macOS) or "Utility" (Linux). null: the default of the runtime. |
+| `packaging.electron.outputDir` | both | `'dist-electron'` | The folder the installers are written to. |
+| `packaging.electron.mac` | both | `['dmg', 'zip']` | Installers to make for macOS. |
+| `packaging.electron.win` | both | `['nsis', 'portable']` | Installers to make for Windows. |
+| `packaging.electron.linux` | both | `['AppImage', 'deb', 'rpm']` | Installers to make for Linux. |
+| `packaging.electron.asar` | both | `true` | Pack the app files into one archive. |
+| `packaging.electron.compression` | both | `'normal'` | How much the installer is compressed. Values: `store`, `normal`, `maximum`. |
+| `packaging.electron.files` | both | `['dist/**/*', 'electron/**/*', 'package.json']` | The files that go into the app (build/icon.png and the tray icon are added). |
+| `packaging.electron.extraResources` | both | `[]` | Extra files copied next to the app, relative to the project. |
+| `packaging.tauri.targets` | both | `null` | Installers to make. null: all that fit the system you build on. |
+| `packaging.tauri.resources` | both | `[]` | Extra files that go into the app, relative to src-tauri/. |
+| `packaging.tauri.macMinimumSystemVersion` | both | `'10.15'` | The oldest macOS the app runs on. |
+| `packaging.tauri.windowsWebviewInstall` | both | `'downloadBootstrapper'` | How the installer gets WebView2 on Windows. Values: `skip`, `downloadBootstrapper`, `embedBootstrapper`, `offlineInstaller`. |
+
+#### `advanced`
+
+A way out for options this file does not know. Values here are merged into the generated native configuration last.
+
+| Option | Runtime | Default | What it does |
+|---|---|---|---|
+| `advanced.builder` | Electron | `{ … }` | Merged into the electron-builder configuration. Use it for options this file does not have. |
+| `advanced.tauriConf` | Tauri | `{ … }` | Merged into src-tauri/tauri.conf.json. Use it for options this file does not have. |
+
+<!-- desktop-options:end -->
+
+### Electron and Tauri are not the same
+
+The two runtimes do not offer the same things, so each has its own adapter (`bin/desktop/electron-adapter.js`, `bin/desktop/tauri-adapter.js`) and the options that exist in only one are marked above. The differences that matter:
+
+| | Electron | Tauri |
+|---|---|---|
+| What the settings become | `electron/kreft.resolved.json` (read by `electron/main.js`) and `electron/builder.config.json` (for electron-builder) | `src-tauri/tauri.conf.json`, `src-tauri/capabilities/default.json`, the dependency block of `Cargo.toml` and `src-tauri/src/kreft_generated.rs` |
+| Menu `'auto'` (Alt shows it) | Yes (Windows, Linux) | No |
+| Custom menu roles | the shared ones, and `reload`, `forceReload`, `toggleDevTools`, `zoomIn`, `zoomOut`, `resetZoom` | the shared ones only (`undo`, `redo`, `cut`, `copy`, `paste`, `selectAll`, `minimize`, `close`, `quit`, `fullscreen`, `about`) |
+| Right-click menu | You choose the entries (`contextMenu.items`) | The web view's own menu; only on or off (`contextMenu.enabled`) |
+| DevTools | right, bottom, left or detached; can be switched off in development | detached window only; a development build always has them (`devtools.development` must be `true`) |
+| Permissions | `security.permissions` (browser permissions) | `security.capabilities` (Tauri permissions); notifications and updates add theirs by themselves |
+| Notifications | a permission, and `kreftDesktop.notify(title, body)` | the `tauri-plugin-notification` crate, added by `notifications.enabled` (use its JavaScript API in the page) |
+| Updates | `electron-updater` (install it: `kreft add electron-updater`) and a `generic` feed at `updates.url` | `tauri-plugin-updater`, a signed update JSON at `updates.url` and the public key in `updates.pubkey` |
+| Installers | `packaging.electron` (targets per system, `asar`, compression…) | `packaging.tauri` (`targets`, `resources`, WebView2 install mode…) |
+| A way out | `advanced.builder` (merged into the electron-builder configuration) | `advanced.tauriConf` (merged into `tauri.conf.json`) |
+| Page API | `window.kreftDesktop` | `window.__TAURI__` (`security.globalTauri`) |
+| Events to the page | `kreftDesktop.onMenu(cb)`, `onTray(cb)`, `onUpdate(cb)` | `window.__TAURI__.event.listen('kreft:menu', cb)`, `'kreft:tray'`, `'kreft:update-available'` |
+
+### Examples
+
+A custom menu, a tray icon that keeps the app running, and a notification (Electron):
+
+```js
+// example: electron
+module.exports = {
+  menu: {
+    visibility: 'visible',
+    template: [
+      { label: 'File', submenu: [{ label: 'New note', id: 'note-new', accelerator: 'CmdOrCtrl+N' }, { type: 'separator' }, { role: 'quit' }] },
+      { label: 'Edit', submenu: [{ role: 'undo' }, { role: 'redo' }, { type: 'separator' }, { role: 'copy' }, { role: 'paste' }] },
+    ],
+  },
+  tray: {
+    enabled: true,
+    closeToTray: true,
+    tooltip: 'My notes',
+    menu: [{ label: 'Open', action: 'show' }, { label: 'New note', action: 'emit', id: 'note-new' }, { type: 'separator' }, { label: 'Quit', action: 'quit' }],
+  },
+  notifications: { enabled: true },
+}
+```
+
+In the page, listen for the entries that have an `id`:
+
+```js
+if (window.kreftDesktop) {
+  kreftDesktop.onMenu((id) => { if (id === 'note-new') newNote() })
+  kreftDesktop.onTray((id) => { if (id === 'note-new') newNote() })
+  kreftDesktop.notify('Saved', 'Your note was saved.')
+}
+```
+
+A fixed-size window, no right-click menu, and a strict content policy (Tauri):
+
+```js
+// example: tauri
+module.exports = {
+  window: { width: 480, height: 640, minWidth: 480, minHeight: 640, resizable: false, center: true },
+  contextMenu: { enabled: false },
+  security: { csp: "default-src 'self'; connect-src 'self' https://api.acme.test" },
+  webview: { allowedNavigation: ['https://login.acme.test'] },
+}
+```
+
+Updates (Tauri). Make the key pair once with `npx tauri signer generate -w ~/.tauri/notes.key`, keep the private key secret, and put the **public** key in the file:
+
+```js
+// example: tauri
+module.exports = {
+  updates: {
+    enabled: true,
+    url: 'https://updates.acme.test/notes/{{target}}/{{current_version}}',
+    pubkey: 'dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IEFCQ0RFRjAxMjM0NTY3ODk=',
+  },
+  notifications: { enabled: true },
+  security: { capabilities: ['dialog:default'] },
+}
+```
+
+Updates and installers (Electron), with an option this file does not have, passed on to electron-builder:
+
+```js
+// example: electron
+module.exports = {
+  app: { id: 'com.acme.notes', name: 'Acme Notes', copyright: 'Copyright © 2026 Acme' },
+  updates: { enabled: true, url: 'https://updates.acme.test/notes', channel: 'latest' },
+  packaging: {
+    category: 'public.app-category.productivity',
+    electron: { mac: ['dmg'], win: ['nsis'], linux: ['AppImage', 'deb'], compression: 'maximum' },
+  },
+  advanced: { builder: { mac: { hardenedRuntime: true } } },
+}
+```
+
+### Both runtimes in one project
+
+`kreft add electron tauri` installs both. They are independent: each has its own file (`config/electron.config.js`, `config/tauri.config.js`), folder (`electron/`, `src-tauri/`) and commands (`electron:dev`, `tauri:dev`…), and one never reads the other's file. Settings you want in both go in `kreftjs.config.json` under `"desktop"`. The page can tell which one it runs in (`window.kreftDesktop` or `window.__TAURI__`).
+
+### Your own code
+
+You never edit the generated files, so your own code has its own place:
+
+- **Electron.** Create `electron/custom.js`: it is loaded after the window opens. Register handlers there and call them from a page through the `app:` channels (a page can reach no other channel):
+
+  ```js
+  // electron/custom.js
+  const { ipcMain } = require('electron')
+  module.exports = function (app, win, config) {
+    ipcMain.handle('app:ping', () => 'pong')
+  }
+  ```
+
+  ```js
+  const answer = await kreftDesktop.invoke('app:ping')      // 'pong'
+  kreftDesktop.on('app:progress', (n) => update(n))          // sent with win.webContents.send('app:progress', n)
+  ```
+
+- **Tauri.** Write your commands in `src-tauri/src/main.rs`, which is yours and is never overwritten; it already calls `kreft_generated::apply`. Calling `.setup(…)` or `.invoke_handler(…)` on the builder replaces what was set before, so call `kreft_generated::setup(app)?` inside your own setup.
+
+### TypeScript and editor autocomplete
+
+`kreftjs/desktop` has the types, made from the same description as the validation, with a comment on every option:
+
+```js
+/** @type {import('kreftjs/desktop').TauriConfig} */
+module.exports = { devtools: { mode: 'detach' } }
+```
+
+```js
+const { defineElectronConfig } = require('kreftjs/desktop')
+module.exports = defineElectronConfig({ window: { width: 1000 } })
+```
+
+The editor then completes option names and values, and underlines a value the runtime does not accept (for example `menu.visibility: 'auto'` in a Tauri file). `ElectronConfig`, `TauriConfig` and `SharedDesktopConfig` (for `kreftjs.config.json`) are exported. In a TypeScript project, name the file `config/electron.config.cjs` or use `export default`.
+
+### If you used Electron or Tauri with an earlier Kreft
+
+- **The menu is hidden by default now.** It used to be visible. Set `menu.visibility: 'visible'` (or `ELECTRON_MENU=show`) to bring it back.
+- **`ELECTRON_MENU` and `ELECTRON_DEVTOOLS` still work**, as layer 5.
+- **The `build` block of `package.json` is ignored.** Installers are made from `packaging` and `app` in `config/electron.config.js`. Move your `appId`, `productName` and targets there (or into `advanced.builder`).
+- **`electron/main.js` and `preload.js` are generated.** A hand-written `main.js` is saved as `main.js.bak` and replaced the next time you run a command; move your code to `electron/custom.js`.
+- **`src-tauri/tauri.conf.json`, `capabilities/default.json` and `src/kreft_generated.rs` are written from the config file** every time. Put options this file lacks in `advanced.tauriConf`. Your `Cargo.toml` keeps your own dependencies; Kreft only writes the lines between its two `kreft-generated` comments.
+- **`window.width` and `height` are the page area** in Electron too (they used to include the title bar).
+
+### What has been tested
+
+Automated tests (`npm test`) cover the defaults of both runtimes, the six layers and their order, validation (unknown, wrong, unsupported and out-of-range values, with the messages), CommonJS and ESM projects, never overwriting a config file, both runtimes in one project, the files made for electron-builder and Tauri, and the TypeScript definitions and the examples above.
+
+The runtime tests (`npm run test:desktop`) start the real apps and read back what they do: the menu is hidden, DevTools are closed at start, open with the shortcut in development and are refused in production, `openOnStart` works only where DevTools are allowed, the window settings and the secure `webPreferences` are in effect, the file < environment < command line order holds in the real window, a production Electron build is packaged, starts and holds the checked configuration, and Tauri development and release builds compile with the safe defaults and with everything turned on. They were run on **macOS (Apple silicon)**. Windows and Linux are not tested by Kreft: the same code runs there, but check your own build on each system.
+
+### Configuration troubleshooting
+
+| Problem | Fix |
+|---|---|
+| `unknown option` | A name is misspelled or in the wrong group. The message lists the valid names and suggests the closest. |
+| `is not supported by Tauri` / `by Electron` | The option belongs to the other runtime. The message says what to use instead (see the table above). |
+| `x and y go together` | Set both `window.x` and `window.y`, or neither. |
+| `config/electron.config.js could not be loaded` | A syntax error, or the wrong module style: `module.exports` in a `"type": "module"` project (use `export default` or `.cjs`). |
+| My change has no effect | Restart `kreft electron:dev` / `tauri:dev`: the file is read at start. In Tauri, check `kreft tauri:config` shows your value. |
+| `electron/kreft.resolved.json is missing` | Start the app with `kreft electron:dev` or `kreft electron:build`; they write it. Running `electron .` by hand does not. |
+| A Tauri `main.rs` that ignores the settings | The note says to add `mod kreft_generated;` and `kreft_generated::apply(tauri::Builder::default())`. |
+| `updates.pubkey` is required | Tauri verifies every update. `npx tauri signer generate -w ~/.tauri/app.key`, then put the public key in the file. |
+| Shortcuts (F12) do nothing | DevTools are off in production (`devtools.production`), or `devtools.shortcut` is `false`. |
+
+## HarmonyOS apps
+
+Huawei phones and tablets running HarmonyOS NEXT cannot install Android apps, and Capacitor does not target them. So Kreft makes a small native project in ArkTS (the HarmonyOS language) whose only page is a full-screen web view. It loads your built site from the app's own files, so the pages are the same `.kreft` files and the app opens without a network.
+
+### What you need
+
+| You need | Why |
+|---|---|
+| [DevEco Studio](https://developer.huawei.com/consumer/en/deveco-studio/) | It brings the HarmonyOS SDK, the emulator and the tools that build and sign the app. |
+| A Huawei developer account | Only to sign the app for a real phone. The emulator needs none. |
+
+### Start
+
+```bash
+kreft new my-app --harmony      # a new project with HarmonyOS included
+cd my-app
+kreft harmony:build --api-url https://your-server.example
+kreft harmony:open              # opens harmony/ in DevEco Studio; press Run
+```
+
+For a project you already have, run `kreft harmony:init` (alias `kreft make:harmony`). It writes a `harmony/` folder and never overwrites a file that exists.
+
+| Command | What it does |
+|---|---|
+| `kreft harmony:build` | Runs `kreft build --base ./`, then copies `dist/` into `harmony/entry/src/main/resources/rawfile/`. `--api-url` sets the server the app talks to (written to `.env`). `--hap` also runs `hvigor` to make the `.hap` file (needs DevEco Studio's command line tools). |
+| `kreft harmony:open` | Opens `harmony/` in DevEco Studio. |
+| `kreft harmony:init` | Adds HarmonyOS to an existing project. |
+| `kreft harmony:help` | Prerequisites, files and options. |
+
+Run `harmony:build` again after every change to your pages. The backend does not run inside the phone, so the app needs `--api-url` (or a `PUBLIC_API_URL` in `.env`) to reach your server.
+
+### The files
+
+| File | What it is |
+|---|---|
+| `harmony/entry/src/main/ets/pages/Index.ets` | The web view. Change its settings here. |
+| `harmony/entry/src/main/module.json5` | Device types and permissions (`INTERNET` is on). |
+| `harmony/AppScope/app.json5` | Bundle name (`com.kreftjs.<name>`), version and icon. |
+| `harmony/entry/src/main/resources/rawfile/` | Your site, written by `harmony:build`. It is not committed. |
+
+> [!NOTE]
+> `harmony:init` makes one change to your project: in `frontend/index.html` the router gets `mode: /^https?:$/.test(location.protocol) ? 'history' : 'hash'`. Inside the app, addresses look like `#/login` (the app's own files have no `/login`); on your website they stay normal. If you set a `mode` yourself, it is left alone. `window.kreftDesktop` and the other Electron helpers do not exist here.
+
+> [!NOTE]
+> The project follows the DevEco Studio template for HarmonyOS NEXT (API 12). DevEco Studio may offer to upgrade the build files to its newer version the first time you open it: accept.
+
+> [!WARNING]
+> **What has been tested.** The `harmony/` files, `harmony:build`, the copy into `rawfile/`, the site rendering and the `#/` page addresses were tested on a computer. The project has **not** been opened in DevEco Studio or run on an emulator or phone yet, so the build files may need small changes. Report what DevEco Studio says and it will be fixed.
+
+### HarmonyOS troubleshooting
+
+| Problem | Fix |
+|---|---|
+| A white screen in the app | Run `kreft harmony:build` again and check that `rawfile/index.html` exists. |
+| Pages show "not found" after a click | The router must use `mode: 'hash'` inside the app (see the note above; `harmony:init` adds it unless you set a `mode`). |
+| API calls fail | Build with `--api-url https://…`. A phone cannot reach `localhost` on your computer. |
+| `hvigor was not found` | Use `kreft harmony:open` and run from DevEco Studio instead of `--hap`. |
+| The phone refuses to install the app | The app must be signed in DevEco Studio (File > Project Structure > Signing Configs). |
 
 ## Mobile apps (iOS and Android)
 
@@ -2261,8 +3133,9 @@ kreft mobile:open --android      # Android Studio (--ios: Xcode, needs a Mac)
 | `kreft mobile:run [--android] [--ios] [--target id]` | The one command to see your app: builds, then installs and starts it on an emulator or phone. With one running Android device it uses that one; with several (or none) Capacitor asks, or pass `--target emulator-5554`. Run it again after every change |
 | `kreft mobile:setup` | First-run setup: `key:generate` (only when `APP_KEY` is missing), `storage:link` and `migrate`. Safe to run again. `mobile:dev` runs it for you |
 | `kreft mobile:open` | Opens the native project |
-| `kreft mobile:dev [--android] [--ios] [--target id] [--no-setup]` | Runs the first-run setup, starts your dev server and runs the app with live reload: a saved change shows on the phone within a second or two, without building again |
+| `kreft mobile:dev [--android] [--ios] [--target id] [--lan] [--no-setup]` | Runs the first-run setup, starts your dev server and runs the app with live reload: a saved change shows on the phone within a second or two, without building again |
 | `kreft mobile:ui [--layout] [--gallery]` | Adds the [phone UI kit](#the-phone-ui-kit) to an app |
+| `kreft mobile:release` | A signed release: `.apk` and `.aab` (Android), `.ipa` (iOS), `.hap` and `.app` (HarmonyOS). See [the release guide](#publishing-your-app-to-google-play-and-the-app-store). |
 | `kreft mobile:icons` / `kreft mobile:splash` | Makes the [app icon and splash screens](#app-icon-and-splash-screen) |
 | `kreft mobile:help` | Lists these commands in the terminal |
 
@@ -2277,6 +3150,10 @@ Kreftjs.api.setup({ base: Kreftjs.env.PUBLIC_API_URL, token: () => Kreftjs.stora
 Use API tokens for sign-in in the app, not cookie sessions.
 
 ### Run it on an emulator, a simulator or a phone
+
+**Side menu.** `<edge-side-nav>` takes the same colour props as the bars (`bg`, `color`, `activeColor`, `indicatorColor`, `borderColor`) and highlights the item for the page you are on. The bottom bar's active pill is a see-through grey by default, so its icon stays readable on a light or a dark bar.
+
+**Dark bars.** The phone kit starts with a dark top bar and bottom bar (`#111827`). The strips behind the clock and the gesture bar follow them: `backgroundColor` in `capacitor.config.json`, an Android window background that `mobile:build` and `mobile:dev` add to `styles.xml` once, and `Kreftjs.native.system.statusBar({ color, style: 'auto' })`, which picks light icons on a dark colour. For a light look set `bg`, `color`, `activeColor`, `indicatorColor` and `borderColor` in the layout's *Appearance* block. **With a USB cable**, `mobile:dev` reopens the cable tunnel by itself if Android's tooling drops it while installing.
 
 `kreft mobile:build` only prepares the native project: it builds the site and copies it into `android/` or `ios/`. **To see the app, run `kreft mobile:run --android` (or `--ios`) inside your app folder**: it builds, installs the app on the emulator or phone and starts it. Or open the project yourself in Android Studio or Xcode, or use `kreft mobile:dev` for live reload.
 
@@ -2293,9 +3170,12 @@ Use API tokens for sign-in in the app, not cookie sessions.
 
 **A real phone.** Android: turn on *Developer options* and *USB debugging*, plug it in, and choose it in Android Studio's device list. iPhone: plug it in, trust the computer, choose it in Xcode and pick a signing team (a free Apple ID works for testing).
 
-**Live reload.** `kreft mobile:dev --android` (or `--ios`) starts your dev server on the network and runs the app on the emulator or phone, so a saved change shows up without building again. It picks the running emulator by itself, uses `10.0.2.2` (how the emulator reaches your computer) or your Wi-Fi address for a real phone, and takes the next free port if 8000 is busy, telling the app the right one. A real phone must reach your computer, so use the same Wi-Fi. It needs the Capacitor tools from `npm install`.
+**Live reload.** `kreft mobile:dev --android` (or `--ios`) starts your dev server and runs the app on the emulator or phone, so a saved change shows up without building again. It picks the running device by itself and takes the next free port if 8000 is busy, telling the app the right one. It needs the Capacitor tools from `npm install`.
 
-**Use a network you trust.** For live reload the dev server listens on your whole network (`--host 0.0.0.0`), so anyone on the same Wi-Fi can open it. Do it at home or on a private network, never on a public one, and stop it when you are done.
+- **Through the cable (the default for Android).** When an Android phone or emulator is connected through `adb` (USB with *USB debugging* on, or wireless debugging), `mobile:dev` runs `adb reverse`, which makes the phone's `localhost:8000` lead to your computer. No Wi-Fi is needed, it works behind any firewall, and the dev server listens on your computer only, not on the network. It removes the tunnel when you stop it.
+- **Through the Wi-Fi.** For iOS, when no Android device is connected yet, or with `--lan`, the app uses your computer's address on the Wi-Fi (`10.0.2.2` for an emulator), so the phone must be on the same Wi-Fi as the computer, and the dev server is open to that network.
+
+**Use a network you trust.** In Wi-Fi mode (iOS, `--lan`, or no Android device connected) the dev server listens on your whole network (`--host 0.0.0.0`), so anyone on the same Wi-Fi can open it. Do it at home or on a private network, never on a public one, and stop it when you are done. Through the cable (the Android default) it is not open to the network at all.
 
 **First-run setup.** Before it starts the server, `mobile:dev` runs `kreft mobile:setup` (skip it with `--no-setup`): it creates `.env` and a new `APP_KEY` when they are missing (a fresh checkout from git has no `.env`), links `storage` for public files, and runs the database migrations. A new database is also seeded, so the test user exists. Every step only does something when it is needed, so running it again is harmless. A good `APP_KEY` is never replaced (that would log every user out), and the key is never printed.
 
@@ -2313,6 +3193,8 @@ kreft mobile:build --android --api-url http://10.0.2.2:8000
 ```
 
 Plain `http://` is for testing; a published app should always use `https://`.
+
+**Run a mobile command from any folder.** Every `kreft mobile:…` command (and `kreft make:home`) takes `--app <folder>`, which is the same as going into the app first: `kreft mobile:dev --android --app ~/projects/my-app`.
 
 ### Mobile and desktop in one app
 
@@ -2461,7 +3343,7 @@ Layout helpers: classes in `edge.css` such as `edge-row`, `edge-col`, `edge-cent
 
 | Area | Calls |
 |---|---|
-| Platform | `native.platform()` is `'android'`, `'ios'`, `'electron'` or `'web'`; `isNative()`, `isDesktop()`, `isWeb()`. |
+| Platform | `native.platform()` is `'android'`, `'ios'`, `'electron'`, `'tauri'` or `'web'`; `isNative()`, `isDesktop()`, `isWeb()`. |
 | Device | `device.info()` (platform, OS, model, screen), `device.id()`, `device.battery()`, `device.language()`. |
 | Haptics | `haptics.impact('light' \| 'medium' \| 'heavy')`, `haptics.notification('success' \| 'warning' \| 'error')`, `haptics.selection()`, `haptics.vibrate(ms)`. |
 | File | `file.pick({ accept, multiple })`, `file.readText(f)`, `file.readDataUrl(f)`, `file.write(path, data)`, `file.read(path)`, `file.list(dir)`, `file.remove(path)`, `file.save(name, data, mime)`. |
@@ -2501,15 +3383,233 @@ They copy the picture to `assets/` and use Capacitor's asset tool (the first run
 
 ### Publishing your app to Google Play and the App Store
 
-These are the usual Capacitor, Android Studio and Xcode steps. The framework's own tests build and run *debug* apps in the Android emulator; they do not make store builds, so check each step on your own computer.
+A *release build* is the signed file you upload to a store. It is different from the debug app that `kreft mobile:run` and `mobile:dev` install. Follow this list from top to bottom for every new version.
 
-1. **Name it before the first build.** `kreft new` gives the app the id `com.example.<name>`. Set your own reverse-domain id and name in `capacitor.config.json` (`"appId": "com.yourcompany.myapp"`, `"appName"`) **before** you run `kreft mobile:build` for the first time: the id is written into `android/` and `ios/` when they are created. A published app must not keep `com.example`.
+> [!NOTE]
+> **What has been tested.** The Android steps below (setting the id and version, making a keystore, signing, `./gradlew bundleRelease assembleRelease`, and checking the signature) were run on macOS: they produced a signed `.aab` (3.6 MB) and `.apk` (3.9 MB) with the right id and version. Uploading to Google Play was not tried. The iPhone steps are Apple's usual Xcode steps and were **not** run by the Kreft tests (they need a Mac with Xcode and a paid Apple account), so check each one on your own computer.
+
+#### The short way: `kreft mobile:release`
+
+One command makes the signed files for a store, for each platform:
+
+```bash
+kreft mobile:release --android --api-url https://api.your-site.com --create-keystore   # first time: also makes the signing key
+kreft mobile:release --android --api-url https://api.your-site.com --bump              # every later release
+kreft mobile:release --ios --team ABCDE12345 --api-url https://api.your-site.com       # a Mac with Xcode
+kreft mobile:release --harmony --api-url https://api.your-site.com                     # DevEco Studio
+kreft mobile:release --api-url https://api.your-site.com                               # every platform that has a folder
+kreft mobile:release --android --api-url https://api.your-site.com --dry-run           # show every step, change nothing
+```
+
+| Platform | It makes | Needs |
+|---|---|---|
+| Android | `release/android/<name>-<version>-<code>.apk` (to install or send to testers) and `.aab` (for Google Play) | Android Studio, Java 21 to 23 |
+| iOS | `release/ios/<name>.ipa`, from an Xcode archive | A Mac with Xcode, and your Apple **Team ID** (`--team`, or `APPLE_TEAM_ID`) |
+| HarmonyOS | `release/harmony/…hap` (an app package) and `…app` (for AppGallery), from hvigor | DevEco Studio's command line tools (`hvigorw`) and a signing configuration |
+
+What every release does, in order: it checks your options **before** it changes anything, sets the version numbers, builds the site with `--api-url` and copies it into the app, signs the build, then writes the files to `release/<platform>/` and prints each file's size and SHA-256. On Android it also checks the signature of the `.apk` with `apksigner`. The `release/` folder is added to `.gitignore`.
+
+| Option | What it does |
+|---|---|
+| `--api-url <https://…>` | The server the app talks to (or `PUBLIC_API_URL` in `.env`). **A store build must use `https` and a real address**: `http://…`, `localhost`, `10.0.2.2` and addresses inside your network are refused (`--allow-insecure-api` skips this, for a test build). |
+| `--no-api-url` | **The app needs no server** (pages only, no login or database). `PUBLIC_API_URL` in `.env` is ignored and no address is built into the app. Use this when `.env` still holds a test address like `http://10.0.2.2:8000` from an emulator build: the release stops on it, and the message says it comes from `.env`. |
+| `--version <1.2.0>` | The version people see. Default: `version` in `package.json`. |
+| `--build <number>` | The build number the stores compare: Android `versionCode`, the iOS build, the HarmonyOS `versionCode`. |
+| `--bump` | Add 1 to the current build number instead. Every store upload needs a higher number than the last. |
+| `--out <folder>` | Where the files go. Default: `release/`. |
+| `--dry-run` | Show every step and the exact commands. Writes nothing. |
+| `--apk`, `--aab` | Android: only that format. Default: both. |
+| `--create-keystore` | Android: make the signing key (see below). |
+| `--team <ID>`, `--method <m>` | iOS: your Apple Team ID, and how to export: `app-store` (default), `ad-hoc`, `development` or `enterprise`. |
+| `--hap`, `--app` | HarmonyOS: only that file. Default: both. |
+
+#### Why `--api-url`, and do I always need it?
+
+**`--dry-run` isn't required.** It's an optional preview that shows the steps and changes nothing. You only add it when you want to look first. A normal release is just:
+
+```bash
+kreft mobile:release --android --api-url https://api.your-site.com
+```
+
+**`--api-url` is needed for a release because the backend doesn't run inside the phone.** The app holds only your built pages, and those pages have to call a server somewhere. For a store build, Kreft must know the address of that server and bake it into the app. The release command also refuses addresses a phone can't reach, like `http://…`, `localhost` or `10.0.2.2`, so a test address doesn't get shipped by mistake.
+
+**You can avoid typing it:**
+
+- Put it in `.env` once: `PUBLIC_API_URL=https://api.your-site.com`. The release command reads it, so you can drop the flag.
+- If your app needs no server (pages only, no login or database), use `--no-api-url` instead.
+
+**For `kreft mobile:run` and `mobile:dev` you don't need it.** They are for development, and they pick the address for you (the emulator reaches your computer through `10.0.2.2`). Only a release needs the real server address.
+
+**Android signing.** A release build must be signed. `--create-keystore` makes `android/upload-keystore.jks` and `android/keystore.properties` (a random password, readable only by you) **once**, adds the signing to `android/app/build.gradle` and puts the key files in `android/.gitignore`. It never replaces a key that exists. Copy both files somewhere safe **outside the project** (a password manager or an encrypted drive): without them you can never update the app. If you set the signing up by hand as described below, the command recognises it and leaves your `build.gradle` as it is.
+
+**iOS.** The command runs `xcodebuild archive` for the *App* scheme in the *Release* configuration with automatic signing for your team, writes `ExportOptions.plist` and runs `xcodebuild -exportArchive` to make the `.ipa`. Upload an `app-store` build with Transporter or Xcode's Organizer. You must be signed in to your Apple ID in Xcode (*Settings → Accounts*) and have the Apple Developer membership.
+
+**HarmonyOS.** The command runs `kreft harmony:build`, sets the version in `harmony/AppScope/app.json5` and runs hvigor (`assembleHap`, `assembleApp`). Signing is set in DevEco Studio (*File → Project Structure → Signing Configs*, "Automatically generate signature" for a test device, or your AppGallery certificates). Without it the files are made **unsigned**, and the command says so.
+
+> [!WARNING]
+> **What has been tested.** `kreft mobile:release --android` was run for real on macOS, in a new project with no manual setup: the key was made, the signing added, `versionCode` raised with `--bump`, and a signed `.apk` and `.aab` came out (the signature checked with `apksigner`); a second run reused the key. The guards (https, folders, key, Team ID) and the exact Xcode and hvigor command lines are covered by automated tests and shown by `--dry-run`, but **the iOS and HarmonyOS builds themselves were not run**: there is no Xcode or DevEco Studio on the test computer. Run `--dry-run` first, then build, and send what you see if a step fails.
+
+The rest of this guide explains each step by hand, for when you want to do one yourself or the command stops and you need to know why.
+
+#### Before the first release
+
+1. **Give the app its real id and name.** `kreft new` gives it the id `com.example.<name>`, and stores refuse that. In `capacitor.config.json` set `"appId": "com.yourcompany.myapp"` (reverse domain, lowercase letters and digits) and `"appName"` **before** you run `kreft mobile:build` for the first time: the id is written into `android/` and `ios/` when they are created, and it can never change after the app is published. If you must change it later, delete `android/` and `ios/` (nothing in them is yours unless you edited them) and run `kreft mobile:build` again.
 2. **Icon and splash screen.** `kreft mobile:icons logo.png` and `kreft mobile:splash splash.png` (see [App icon and splash screen](#app-icon-and-splash-screen)).
-3. **Point it at your real server.** `kreft mobile:build --android --api-url https://api.your-site.com`. A store app must use `https://`, and your server must allow the app in CORS.
-4. **Version numbers.** Android: `versionCode` (a whole number that grows with every upload) and `versionName` in `android/app/build.gradle`. iOS: *Version* and *Build* in Xcode.
-5. **Android.** `kreft mobile:open --android`, then in Android Studio *Build → Generate Signed App Bundle / APK*. Make a keystore, and keep it and its passwords safe: you need the same one for every update. Upload the `.aab` file in the Google Play Console.
-6. **iPhone.** `kreft mobile:open --ios` (a Mac with Xcode), pick a team, then *Product → Archive* and *Distribute App*. Selling in the App Store needs a paid Apple Developer account. Add the usage texts (camera, location, photos) to `ios/App/App/Info.plist`.
-7. **Before you submit.** Test on a real phone, write the privacy policy the stores ask for, and list only the permissions you use.
+3. **Point the app at your real server.** The backend does not run inside the phone. Build with the address of your server:
+
+   ```bash
+   kreft mobile:build --android --api-url https://api.your-site.com
+   ```
+
+   A store app must use `https://`, and your server must allow the app in CORS. The address is written to `PUBLIC_API_URL` in `.env`. Never ship an address like `http://10.0.2.2:8000` (that is the emulator's way to reach your computer).
+4. **Developer accounts.** Google Play: a one-time fee and identity checks. App Store: the paid Apple Developer Program. Both can take days to approve, so start early.
+
+#### Every release: the version number
+
+A store accepts an upload only if its version number is higher than the one before. Android has two numbers, iOS has two as well:
+
+| | Number the store compares | Number people see |
+|---|---|---|
+| Android (`android/app/build.gradle`, `defaultConfig`) | `versionCode`: a whole number, +1 for **every** upload, even a rejected one | `versionName`: for example `"1.0.1"` |
+| iOS (Xcode, target *App*, *General*) | *Build*: a number that grows for each upload of the same version | *Version*: for example `1.0.1` |
+
+Keep `package.json`'s `version` in step with the number people see.
+
+#### Android: a signed bundle
+
+**1. Make a keystore, once.** The keystore is the key that proves an update comes from you. Run this in `android/` and answer the questions:
+
+```bash
+cd android
+keytool -genkeypair -v -keystore upload-keystore.jks -alias upload -keyalg RSA -keysize 2048 -validity 10000
+```
+
+`keytool` comes with Java (it is in the Java that Android Studio uses). Choose a strong password and write it down.
+
+> [!WARNING]
+> Keep a copy of `upload-keystore.jks` and its passwords somewhere safe and **outside the project** (a password manager, an encrypted drive). Do not put them in git. When you use *Play App Signing* (the default for new apps), Google holds the real app key and a lost upload key can be reset by Google support; without it, a lost keystore means you can never update the app again.
+
+**2. Keep the secrets out of git.** Add these lines to `android/.gitignore` (the generated file does not ignore keystores):
+
+```
+*.jks
+*.keystore
+keystore.properties
+```
+
+**3. Tell Gradle about the keystore.** Make `android/keystore.properties` (a file only you have):
+
+```
+storeFile=../upload-keystore.jks
+storePassword=YOUR_PASSWORD
+keyAlias=upload
+keyPassword=YOUR_PASSWORD
+```
+
+Then edit `android/app/build.gradle`. At the top, under `apply plugin`:
+
+```groovy
+def keystoreProperties = new Properties()
+def keystoreFile = rootProject.file('keystore.properties')
+if (keystoreFile.exists()) {
+    keystoreFile.withInputStream { keystoreProperties.load(it) }
+}
+```
+
+and inside `android { … }`, before `buildTypes`, add `signingConfigs`, and use it in the `release` build type:
+
+```groovy
+    signingConfigs {
+        release {
+            if (keystoreFile.exists()) {
+                storeFile file(keystoreProperties['storeFile'])
+                storePassword keystoreProperties['storePassword']
+                keyAlias keystoreProperties['keyAlias']
+                keyPassword keystoreProperties['keyPassword']
+            }
+        }
+    }
+    buildTypes {
+        release {
+            signingConfig signingConfigs.release
+            minifyEnabled false
+            // …the lines that were already there
+        }
+    }
+```
+
+`storeFile` is read from the `android/app` folder, which is why the path starts with `../`.
+
+**4. Build.** First build the site and copy it into the app (this also puts the Java that Gradle needs in `android/gradle.properties`), then ask Gradle for the release files:
+
+```bash
+kreft mobile:build --android --api-url https://api.your-site.com
+cd android
+./gradlew bundleRelease assembleRelease      # on Windows: gradlew.bat
+```
+
+You get two files:
+
+| File | For |
+|---|---|
+| `android/app/build/outputs/bundle/release/app-release.aab` | **Google Play.** Upload this one. |
+| `android/app/build/outputs/apk/release/app-release.apk` | Installing on a phone yourself, or sending it to a tester. |
+
+Android Studio can make the same files: `kreft mobile:open --android`, then *Build → Generate Signed App Bundle / APK*. Check that the file is signed and has the right id and version:
+
+```bash
+$ANDROID_HOME/build-tools/<version>/apksigner verify --print-certs android/app/build/outputs/apk/release/app-release.apk
+$ANDROID_HOME/build-tools/<version>/aapt2 dump badging android/app/build/outputs/apk/release/app-release.apk | head -1
+```
+
+**5. Try the release build on a real phone before you upload.** A release app behaves differently from the debug one (it talks to your real server, and it is signed). With the phone plugged in and USB debugging on:
+
+```bash
+adb install -r android/app/build/outputs/apk/release/app-release.apk
+```
+
+`-r` replaces an installed copy with the same signature. If a debug copy from `kreft mobile:run` is there, uninstall it first: the signatures differ.
+
+**6. Upload to Google Play.** In the [Play Console](https://play.google.com/console) create the app, then *Testing → Internal testing → Create new release*, accept *Play App Signing* and upload the `.aab`. Fill in the store page, the *Content rating*, the *Data safety* form and the privacy policy link. Test with the internal track first; promote the same release to *Production* when it is good. New personal developer accounts may have to run a closed test with a minimum number of testers for some days before production is allowed; check Google's current rule in the Console.
+
+#### iPhone: archive and upload (a Mac with Xcode)
+
+1. `kreft mobile:build --ios --api-url https://api.your-site.com`, then `kreft mobile:open --ios`.
+2. In Xcode, select the *App* target, *Signing & Capabilities*: tick *Automatically manage signing* and choose your **Team**. The *Bundle Identifier* must be your `appId`.
+3. Set *Version* and *Build* (see above). Add a text for every permission the app asks for (camera, location, photos…) to `ios/App/App/Info.plist`, for example `NSCameraUsageDescription`; Apple rejects an app that asks without explaining.
+4. Choose the device **Any iOS Device (arm64)**, then *Product → Archive*.
+5. In the Organizer window, *Distribute App → App Store Connect → Upload*.
+6. In [App Store Connect](https://appstoreconnect.apple.com) create the app with the same bundle id, wait for the build to finish processing, and test it with *TestFlight* (yourself first, then testers). Then fill in the store page (screenshots for the required device sizes, description, privacy answers), pick the build, and *Submit for Review*.
+
+#### Checklist before every upload
+
+- [ ] The app opens and works on a **real phone**, using the release file, against your real `https://` server.
+- [ ] The id is not `com.example…`, and the version number is higher than the last upload.
+- [ ] `.env` has no test keys; `PUBLIC_API_URL` is your production address.
+- [ ] Only the permissions you use are asked for (check `android/app/src/main/AndroidManifest.xml` and `Info.plist`).
+- [ ] A privacy policy page exists at a public address, and the stores' privacy forms say what the app collects.
+- [ ] The keystore and its passwords are backed up outside the project and are not in git.
+- [ ] You have the store texts and screenshots ready (phone sizes at least; tablets if you support them).
+
+#### Updating a published app
+
+Change the pages, run `kreft mobile:build --android --api-url …` again, raise `versionCode` and `versionName` (Android) or *Build* and *Version* (iOS), build the release file as above, and upload it as a new release. Reviews usually take from some hours to a few days. Only the files inside the app change when you upload; users get them through the store's normal update.
+
+#### Release problems
+
+| Problem | Fix |
+|---|---|
+| `android/keystore.properties or android/upload-keystore.jks already exists` | You passed `--create-keystore` a second time. It never replaces your key (a lost key means you can never update the app). For later releases drop `--create-keystore` and add `--bump`: `kreft mobile:release --android --api-url https://… --bump`. Keep the key files you already have. |
+| `Version code 2 has already been used` (Play) | Raise `versionCode` in `android/app/build.gradle` and build again. |
+| `You uploaded an APK that is not signed` / signed with the wrong key | The `release` build type must have `signingConfig signingConfigs.release`, and `keystore.properties` must exist. After the first upload, always use the same keystore. |
+| `Keystore was tampered with, or password was incorrect` | A wrong `storePassword` or `keyPassword` in `keystore.properties`. |
+| `SDK location not found` | Install Android Studio and set `ANDROID_HOME` (macOS: `~/Library/Android/sdk`), or write `sdk.dir=…` in `android/local.properties`. |
+| `Unsupported class file major version` / `invalid source release: 21` | Gradle runs on the wrong Java. Run `kreft mobile:build --android` first: it writes a fitting Java (21 to 23) to `android/gradle.properties`. |
+| The app opens but shows no data | The build still points at a test server. Build again with `--api-url https://…` and check that your server allows the app in CORS. |
+| `adb install` says `INSTALL_FAILED_UPDATE_INCOMPATIBLE` | A copy signed with another key is installed (for example the debug app). Uninstall it: `adb uninstall com.yourcompany.myapp`. |
+| Play rejects the app for the target API level | Raise `targetSdkVersion` (in `android/variables.gradle`) to what the Console asks, update Capacitor's packages (`kreft update`), and build again. |
+| Apple: `Missing Purpose String in Info.plist` | Add the `NS…UsageDescription` text for that permission and upload a new build. |
+| Apple: `No account for team` / signing fails | Add your Apple ID in Xcode → Settings → Accounts, then choose the team again. |
 
 ### Writing your own edge components
 
@@ -2530,7 +3630,9 @@ The components in `components/edge/` are plain `.kreft` files, so copy one and c
 |---|---|
 | `invalid source release: 21` | Gradle runs on a Java older than 21. `kreft mobile:build`, `mobile:run` and `mobile:dev` fix this for good: they write `org.gradle.java.home=…` into `android/gradle.properties`, so Gradle uses a fitting Java from any terminal and from Android Studio (they never change a line you wrote there). In an app made before that, run `kreft mobile:build --android` once, or add the line yourself. |
 | `Unsupported class file major version 69` (or 68, 70) | Gradle runs on a Java newer than 23. Use Java 21 (see above). |
-| `This folder is not a Kreft app` | You ran a `mobile:` command outside an app, for example in the folder of the framework itself. Go into your app first: `cd my-app`. The command changes nothing when it refuses. |
+| The phone shows "Webpage not available" (`net::ERR_CONNECTION_…`) | The phone cannot reach your computer: its Wi-Fi is off or it is on another network (mobile data cannot reach an address like `192.168.x.x`). Plug it in with the USB cable and turn on *USB debugging*: `kreft mobile:dev` then goes through the cable and needs no Wi-Fi. Otherwise put the phone on the same Wi-Fi as the computer. |
+| A white screen and the error `ReferenceError: Kreftjs is not defined` | `kreftjs.js` did not start, almost always because the browser inside the phone is too old to read it. Update *Android System WebView* and *Chrome* in the Play Store (*Settings → Apps → Android System WebView* shows its version) and reload. The dev error box lists every error and the **first one is the cause** (a `SyntaxError` in `kreftjs.js` means an old browser). In an app made with an older kreft, refresh its runtime with `kreft update --core`. A built app shows "This app could not start…" on the screen instead of a blank page. |
+| `This folder is not a Kreft app` | You ran a `mobile:` command outside an app, for example in the folder of the framework itself (a new terminal tab often starts there). Go into your app first, `cd my-app`, or add `--app /path/to/my-app` to the command. The command changes nothing when it refuses. |
 | `Capacitor is not installed. Run: npm install` | Run `npm install` in the app. |
 | The simulator needs a full Xcode install | Install Xcode, then `sudo xcode-select -s /Applications/Xcode.app/Contents/Developer`. |
 | Nothing opens after `kreft mobile:build` | It only prepares the project. Run `kreft mobile:open --android` and press **Run**, or use `kreft mobile:dev`. |
@@ -2543,6 +3645,7 @@ The components in `components/edge/` are plain `.kreft` files, so copy one and c
 ### Mobile: what to know
 
 - The app is your web app in the phone's WebView. It is not a second, native renderer, so very heavy animation or huge lists need care (use `edge-virtual-list` and `edge-lazy-grid`).
+- A phone needs a reasonably current browser engine, and Android System WebView is updated through the Play Store. The framework's own files use no syntax newer than Chrome 64 (a test checks it; `?.` and `??` are avoided on purpose) and add small stand-ins for a few helpers old engines lack, but some features (such as the `ago` pipe) use newer browser features, so keep *Android System WebView* up to date.
 - The backend never runs inside the phone. Use `--api-url`, API tokens for sign-in (not cookie sessions) and CORS on your server for the app.
 - Android builds work on Mac, Windows and Linux. iOS builds need a Mac with Xcode.
 - Camera, location and photo library on iPhone need a usage text in `ios/App/App/Info.plist`.
@@ -2550,25 +3653,130 @@ The components in `components/edge/` are plain `.kreft` files, so copy one and c
 
 ## Packages
 
-`kreft add` is a safer `npm install`:
+`kreft install`, `kreft i` and `kreft add` use the same npm security pipeline.
 
-```bash
-kreft add pg mysql2                 # install packages
-kreft add -D vitest                 # a development dependency
-kreft add --dry-run some-package    # inspect without installing
-kreft add --allow-scripts better-sqlite3   # allow build scripts for a trusted native package
-kreft add --force dotenv            # ignore a warning
+```sh
+kreft install luxon
+# CI: explicitly allow installation after policy checks
+kreft install luxon --yes
+kreft i @scope/package@1.2.3 --dev
+kreft install luxon --check --json
 ```
 
-What it checks before and after installing:
+### The order of things
 
-1. **Redundancy.** It warns when Kreft already does the job natively (`dotenv`, `cors`, `body-parser`, `node-fetch`…).
-2. **Install scripts.** Packages install with `--ignore-scripts`, so a `postinstall` hook cannot run code, unless you pass `--allow-scripts` or the package is on the short list of known native-build packages.
-3. **Typosquatting.** Names close to popular ones (`axois`, `lodsh`, `crossenv`) stop the install.
-4. **Look-alike characters.** Names with non-ASCII or homoglyph characters are refused, as are shell metacharacters.
-5. **Registry age.** A package published in the last 14 days is flagged.
-6. **Exact versions.** `--save-exact` is the default (`--no-exact` to turn it off).
-7. **Audit.** `npm audit` runs afterwards and reports findings.
+1. **Check.** Kreft resolves the exact versions in a temporary folder and reviews every package: registry identity, integrity, advisories, license and tier. Your project is not touched.
+2. **Ask.** If the review passed, you see the summary and the question. A package that failed the review is blocked and no question is asked.
+3. **Install, only on Allow.** Kreft installs the reviewed packages with their integrity verified and scripts disabled, then updates `package.json`, the lockfile and `node_modules` together.
+4. **Disallow cancels.** Option 2, Enter, an unknown answer, Ctrl+C, EOF or a closed terminal cancel; option 4 also saves a deny rule.
+
+**What a No changes: nothing.** A cancelled install leaves `package.json`, the lockfile, `node_modules`, `kreftjs.config.json` and other project files exactly as they were. npm may still update its external cache or logs while reviewing metadata. The temporary folder is removed, and no report is written either (no `.kreft/` folder appears). The only answers that write anything are the ones that say so: **Always allow** and **Never allow** save a rule in `kreftjs.config.json`.
+
+### What you see
+
+Normal output shows a colored **Package Security Assessment Report** with only the requested package name, exact version and status, followed by the installation choices. Registry progress, dependency lists and advisory details are hidden. If project policy blocks installation, a short reason replaces the confirmation.
+
+- **Every package, one by one,** is written to `.kreft/security/latest.txt` (and `latest.json`) when reporting is enabled, except on cancellation. Add `--verbose` to `kreft install` to see all of it, and every check message, in the terminal.
+
+After security checks pass, interactive CLI installs display the findings and ask what to do with the requested packages:
+
+Like the JavaScript / TypeScript question in `kreft new`, package installation uses a numbered menu after the security check completes. For example, run `kreft add dayjs`, `kreft i dayjs` or `kreft install dayjs`:
+
+```text
+Security checks passed for dayjs@1.11.23. Choose what to do:
+  1) Allow installation once
+  2) Disallow installation once (default)
+  3) Always allow this package in this project
+  4) Never allow this package in this project
+
+Installation [1/2/3/4]:
+```
+
+The version shown is the exact version resolved for that operation.
+
+| Choice | What happens |
+|---|---|
+| `1` — Allow once | Install now after checks pass. No rule is saved; ask again next time. Also accepts `a`, `allow`, `y`, `yes`. |
+| `2` — Disallow once | Cancel without changing project files or writing a report. This is the default for Enter, an unknown answer, EOF or Ctrl+C. Also accepts `d`, `disallow`. |
+| `3` — Always allow | Install now and save the exact reviewed version in `security.allowedPackages`, for example `dayjs@1.11.23`. Future installs of that version still run security checks, then skip the question. Also accepts `r`, `always`. |
+| `4` — Never allow | Cancel and save the package name in `security.deniedPackages`, for example `dayjs`. All versions are blocked on later installs. Also accepts `n`, `never`. |
+
+For several requested packages, the answer applies to the whole batch. Saved choices apply to the requested packages, not automatic approvals of their dependencies. An already allowed batch skips the question only after the full review passes. Use `--yes` / `-y` for unattended CI installs; it never bypasses security policy. IDE terminals and redirected streams can answer the numbered question too. If input is closed or no answer is available, installation visibly cancels. Blocked packages cannot be allowed through this menu; dry runs do not prompt.
+
+The installer copies the manifest, npm lockfile and project `.npmrc` to a temporary sibling directory inside the project. npm resolves a lockfile with scripts disabled. Kreft inspects every resolved entry, including nested duplicates, peer and optional dependencies. npm handles version conflicts and cycles. Registry metadata is fetched once per exact package/version per operation, with bounded retries and timeouts. User npm configuration and scoped registry settings remain applicable. Reports can contain private package metadata; registry credentials are not copied into reports.
+
+Before fetching package bodies, Kreft enforces exact registry identity, strong integrity metadata, license policy and npm advisory thresholds. Any policy failure leaves the project manifest, lockfile and node_modules untouched. A successful review installs in staging using `npm ci --ignore-scripts`, which verifies downloaded bytes against lockfile integrity. Kreft compares the resulting lockfile and installed package identities with the approved graph, then promotes the staged tree with recovery on promotion failure. Platform-specific optional omissions are recorded. Existing node_modules is replaced with the approved tree, so extraneous modules and manual edits are removed. An interrupted process or machine failure during promotion may require manual recovery from `.kreft-node-modules-*`; this is not a crash-atomic multi-file transaction.
+
+Configuration follows the existing JSON configuration convention, in `kreftjs.config.json` (including the existing `config/`, `Config/` and legacy filename lookup conventions):
+
+```json
+{
+  "security": {
+    "enabled": true,
+    "minimumTier": 2,
+    "blockCriticalVulnerabilities": true,
+    "blockHighVulnerabilities": true,
+    "blockMaliciousPackages": true,
+    "ignoreScripts": true,
+    "verifyIntegrity": true,
+    "auditOnInstall": true,
+    "allowUnverified": false,
+    "checkDependencies": true,
+    "checkLicenses": true,
+    "checkMaintenance": true,
+    "failOnUnknownSecurityStatus": true,
+    "deniedLicenses": ["AGPL-3.0-only"],
+    "deniedPackages": ["example-denied", "another-package@1.0.0"],
+    "allowedPackages": ["luxon@3.5.0", "@scope/internal-tool"],
+    "reports": {
+      "enabled": true,
+      "format": ["json", "text"],
+      "directory": ".kreft/security"
+    }
+  }
+}
+```
+
+The deny and allow lists are empty by default; the entries above illustrate organization-specific restrictions. The other settings shown are defaults. Unknown settings and invalid types fail with an error. `enabled`, `ignoreScripts`, `verifyIntegrity` and `checkDependencies` must remain true in this implementation. `--force` and `--yes` never bypass package policy. `--allow-scripts`, `--trusted`, `--no-audit` and `--no-exact` are rejected; script-dependent native packages require a separately reviewed build step. Per-version script exceptions are not yet implemented. Desktop scaffolding (`kreft add electron tauri`) retains its existing separate setup workflow and is not covered by this gatekeeper. Run desktop scaffolding and package installation separately.
+
+### Remembering your decision: allow and deny rules
+
+The prompt's **Always allow** and **Never allow** answers write a rule into `kreftjs.config.json`. You can also edit the rules yourself, without installing anything:
+
+```sh
+kreft install --allow-package luxon@3.5.0        # allow this exact version for good
+kreft install --allow-package @scope/tool        # allow every version of a package
+kreft install --deny-package left-pad            # block a package for good
+kreft install --forget-package left-pad          # remove the rule again (a name removes every version)
+kreft install --packages                         # list the rules (add --json for a machine-readable list)
+```
+
+- **`security.allowedPackages`** lists packages that skip the question. An entry is a package name (any version) or an exact version (`name@1.2.3`). It never holds a range, a tag or a URL.
+- **`security.deniedPackages`** lists packages that are blocked. The same two forms.
+- **Allowing never bypasses the review.** The security check (registry identity, integrity, advisories, license, tier) runs first, exactly as for any package. An allowed package that fails it is still blocked, and nothing is installed. The allow list only saves you the question. In the same way, `--yes` and `--force` never bypass the policy.
+- **Always allow records the exact version** you reviewed, so a new version of the package is reviewed and asked about again.
+- **One package cannot be both.** A configuration that allows and denies the same package (with overlapping versions) is rejected with a message. `--allow-package` on a package you denied removes the deny, and `--deny-package` on an allowed package removes the allow: you changed your mind on purpose, and the command says it did so.
+- **Your file is kept as written.** Kreft edits only the `security` lists. Every other setting, and every `${NAME}` placeholder, stays exactly as you wrote it, and the new file is written in one step so a crash cannot leave half a file. If the file cannot be written, the choice still counts for the current installation and Kreft says it was not saved.
+- A skipped question is recorded in the report as `decisionSource: "allowedPackages"`; an answer at the prompt is `"prompt"`, and a saved choice also has a `remembered` entry.
+
+Commit `kreftjs.config.json` to share the rules with your team, or keep them local: the file is the only place they live.
+
+Classifications:
+
+- **Trusted (Tier 1)** requires verified provenance evidence this implementation cannot supply, so it is never issued. Requiring Tier 1 blocks installation.
+- **Established (Tier 2)** requires matching registry identity/integrity, available advisory results, license evidence and (by default) maintainer/repository evidence. These are registry claims, not proof that code is safe.
+- **Unverified (Tier 3)** indicates missing evidence, deprecation or license expressions requiring manual review. Permit explicitly with `allowUnverified: true` or `minimumTier: 3`. Missing registry/advisory evidence still blocks unless `failOnUnknownSecurityStatus` is also false.
+- **Blocked** means a mandatory configured policy rule failed. Reports give the package, version, graph location, rule and supporting advisory evidence.
+
+Download counts and dependency counts never establish trust. Package age alone never blocks installation. Advertised provenance is reported as unverified. License denial checks SPDX identifier tokens conservatively, including OR expressions; there is no automatic legal interpretation. Maintenance evidence is limited to metadata, not a claim about maintainer trustworthiness.
+
+Reports default to `.kreft/security/latest.json` and `latest.txt`; operations that write reports replace these files. Cancellation preserves any earlier reports. Interactive decisions are recorded in the report as `decision: "allow"`, and a cancellation as `status: "cancelled"` with `policyAllowed: true` (which tells the developer's choice apart from a security block). **A cancellation writes no report file**: see "What a No changes" above. With `--json` the report goes to stdout either way. Other statuses are `approved` (successful review without installation), `installed`, `blocked` and `failed`.
+
+`--json` emits the report to stdout; failures also produce diagnostic stderr and nonzero exit status. `--check` resolves and evaluates without fetching/extracting package bodies, so its approval does not mean artifact bytes have been verified. CI can run `kreft install package --check --json` and inspect the exit status before an actual install.
+
+This version supports standalone npm projects with lockfile versions 2 and 3. Aliases, git/file/URL sources, npm overrides, workspaces, npm shrinkwrap and other package managers fail explicitly. They require additional resolution and verification support; they are not silently converted to npm. npm registry advisory availability is required by default. No advisory database guarantees complete malware or vulnerability detection. Source review, cryptographic provenance verification, historical dependency-change analysis and a dedicated malicious-package feed remain future work.
+
+Validation: `node --test test/package-rules.test.js` covers the allow and deny rules, the prompt answers, the command-line flags and the guarantee that an allowed package is still reviewed. `node --test test/package-gatekeeper.test.js` exercises policy decisions, malicious specifications, advisory and license blocking, missing evidence, graph mismatch, dry runs, exact pinning and project preservation on failure. Resolution uses npm's documented [lockfile behavior](https://docs.npmjs.com/cli/commands/npm-install/) and [npm ci semantics](https://docs.npmjs.com/cli/commands/npm-ci/).
 
 ## MCP for AI agents
 
@@ -2875,6 +4083,8 @@ Set these in `.env` (never commit it). Variables that start with `PUBLIC_` are c
 |---|---|
 | `TRUSTED_PROXIES`, `TRUSTED_PROXY_HOPS` | Which proxies' `X-Forwarded-For` is believed, and how many stand in front with `*`. |
 | `KREFT_ALLOWED_HOSTS` | Extra host names `kreft dev` answers to. |
+| `MCP_DATABASE_RESTRICTED` | Set to `true` when the MCP connection uses a database user that can read only the tables it should see. Without an engine-enforced read protection (SQLite on Node.js 24+ has one) the `query_database` tool is turned off; the other MCP tools stay on. |
+| `KREFT_ALLOWED_ORIGINS` | Full origins (like `https://app.example.com,http://localhost:5173`) whose plain HTML forms may post to your API. A form sent from any other web site, or from the same host on another port, is refused (this stops login CSRF). JSON requests are not affected. |
 | `MCP_TOKEN`, `MCP_ALLOWED_ORIGIN`, `MCP_QUERY_TIMEOUT_MS` | MCP endpoint token, one extra allowed browser origin, and the query time limit. |
 | `MAIL_URL`, `MAIL_FROM` | `smtp://user:password@host:587` sends real email (needs `kreft add nodemailer`). |
 | `LOG_LEVEL`, `LOG_CHANNEL` | `debug`, `info`, `notice`, `warning`, `error`, `critical`. |

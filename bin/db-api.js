@@ -134,9 +134,10 @@ function createDbApi(db, { tables: allow = null, production = false, prefix = '/
 
   async function handler(req, res, urlPath) {
     const url = new URL(req.url, 'http://x');
-    const parts = urlPath.slice(prefix.length).split('/').filter(Boolean).map(decodeURIComponent);
-    const [name, id, extra] = parts;
     const method = req.method.toUpperCase();
+    // urlPath is already decoded by the server: decoding it again would turn "%2541" into "A" and a lone "%" into an error
+    const parts = urlPath.slice(prefix.length).split('/').filter(Boolean);
+    const [name, id, extra] = parts;
     try {
       const all = await tables();
       if (!name) return send(res, 200, [...all.keys()]);

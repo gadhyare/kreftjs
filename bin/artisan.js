@@ -1575,6 +1575,14 @@ commands['make:admin'] = async function (args) {
   });
 };
 
+make.harmony = function (args) {
+  return require('./harmony.js').init(args);
+};
+
+make.tauri = function (args) {
+  return require('./tauri.js').init(args);
+};
+
 make.electron = function (args) {
   return require('./electron.js').init(args);
 };

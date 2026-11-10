@@ -1,0 +1,6 @@
+{
+	// Settings for .kreft files (Preferences > Settings - Syntax Specific overrides these)
+	"tab_size": 2,
+	"translate_tabs_to_spaces": true,
+	"auto_complete_selector": "text.html.kreft - comment"
+}

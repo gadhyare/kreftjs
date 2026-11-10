@@ -53,3 +53,35 @@ test('cookie login: planted XSRF cookie is refused, the derived one works; seede
     fs.rmSync(dir, { recursive: true, force: true });
   }
 });
+
+test('login: a form another web site submits is refused, the same site and JSON clients still work', { timeout: 90000 }, async () => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'kreft-loginform-'));
+  let server;
+  try {
+    const made = spawnSync(process.execPath, [CLI, 'new', 'app', '--js', '--auth', '--db', 'sqlite'], { cwd: dir, encoding: 'utf8', input: '' });
+    assert.strictEqual(made.status, 0, made.stderr);
+    const app = path.join(dir, 'app');
+    const port = await freePort();
+    server = spawn(process.execPath, [CLI, 'dev', '--port', String(port), '--seed'], { cwd: app, stdio: 'ignore' });
+    const base = `http://127.0.0.1:${port}`;
+    for (let i = 0; i < 100; i++) { try { await fetch(base + '/api/user'); break; } catch (_) { await sleep(200); } }
+    const form = (headers) => fetch(base + '/api/login', { method: 'POST', headers: { 'content-type': 'application/x-www-form-urlencoded', ...headers }, body: 'email=test%40example.com&password=password' });
+    const evil = await form({ origin: 'https://evil.example' });
+    assert.strictEqual(evil.status, 403, 'a form from another site');
+    assert.deepStrictEqual(evil.headers.getSetCookie(), [], 'no session is created for it');
+    // the same host on another port is another program
+    const otherPort = await form({ origin: `http://127.0.0.1:${port + 1}` });
+    assert.strictEqual(otherPort.status, 403, 'the same host on another port is another program');
+    const alias = await form({ origin: `http://localhost:${port}` });
+    assert.strictEqual(alias.status, 200, 'localhost and 127.0.0.1 on the same port are one server');
+    const same = await form({ origin: base });
+    assert.strictEqual(same.status, 200, 'the same site');
+    const plain = await form({});
+    assert.strictEqual(plain.status, 200, 'no Origin: a script or curl');
+    const json = await fetch(base + '/api/login', { method: 'POST', headers: { 'content-type': 'application/json', origin: 'https://app.example' }, body: JSON.stringify({ email: 'test@example.com', password: 'password' }) });
+    assert.strictEqual(json.status, 200, 'JSON clients of another origin are for CORS to decide, as before');
+  } finally {
+    if (server) server.kill();
+    fs.rmSync(dir, { recursive: true, force: true });
+  }
+});

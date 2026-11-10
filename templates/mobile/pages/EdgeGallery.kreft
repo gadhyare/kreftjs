@@ -53,7 +53,7 @@ action askText() { Kreftjs.native.dialog.prompt('Your name?', { title: 'Hello', 
 action sheetOpts() { Kreftjs.native.dialog.actionSheet({ title: 'Photo', options: [{ label: 'Take photo', value: 'cam' }, { label: 'Choose from library', value: 'lib' }, { label: 'Remove', value: 'rm', danger: true }] }).then((v) => { log = 'sheet → ' + v }) }
 action pickFile() { Kreftjs.native.file.pick({ accept: 'image/*' }).then((f) => { log = f.length ? 'file → ' + f[0].name + ' (' + f[0].size + ' bytes)' : 'no file' }) }
 action where() { Kreftjs.native.position.get().then((p) => { log = p ? 'position → ' + p.coords.latitude.toFixed(4) + ', ' + p.coords.longitude.toFixed(4) : 'position not available' }) }
-action recolor() { edge.setTop({ bg: '#111827', color: '#ffffff' }); edge.setBottom({ bg: '#111827', color: '#9ca3af', activeColor: '#ffffff', indicator: 'line' }) }
+action recolor() { edge.setTop({ bg: '#ffffff', color: '#111827', borderColor: '#e4e4e7' }); edge.setBottom({ bg: '#ffffff', color: '#71717a', activeColor: '#2563eb', indicatorColor: '#eff6ff', borderColor: '#e4e4e7', indicator: 'line' }) }
 action floatBar() { edge.setBottom({ floating: true, labels: 'active', indicator: 'pill' }) }
 action actions() { edge.setTop({ title: 'Components', center: true, right: [{ icon: 'search', id: 'search', onTap: () => Kreftjs.native.dialog.toast('Search') }, { icon: 'bell', id: 'bell', badge: 3, onTap: () => Kreftjs.native.dialog.toast('3 new') }] }) }
 action plain() { edge.reset(); edge.setBottom({ items: edge.bottom.items }) }
@@ -153,7 +153,7 @@ on ready { edge.setTop({ title: 'Components' }) }
     <section k-if="tab === 'native'" class="sec">
       <edge-column gap={10}>
         <h3>Bars (top and bottom stay fixed)</h3>
-        <edge-row wrap><edge-button label="Dark colours" size="sm" variant="tonal" @click="recolor()"></edge-button><edge-button label="Floating bar" size="sm" variant="tonal" @click="floatBar()"></edge-button><edge-button label="Top actions" size="sm" variant="tonal" @click="actions()"></edge-button><edge-button label="Reset" size="sm" variant="outline" @click="plain()"></edge-button></edge-row>
+        <edge-row wrap><edge-button label="Light colours" size="sm" variant="tonal" @click="recolor()"></edge-button><edge-button label="Floating bar" size="sm" variant="tonal" @click="floatBar()"></edge-button><edge-button label="Top actions" size="sm" variant="tonal" @click="actions()"></edge-button><edge-button label="Reset" size="sm" variant="outline" @click="plain()"></edge-button></edge-row>
         <h3>Device and system</h3>
         <edge-button label="Device info" variant="outline" icon="phone" @click="showInfo()"></edge-button><p class="muted">{info}</p>
         <edge-button label="Network" variant="outline" icon="wifi" @click="showNet()"></edge-button><p class="muted">{net}</p>

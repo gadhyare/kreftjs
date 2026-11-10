@@ -1,7 +1,7 @@
 # Kreft for Zed
 
 Highlighting for `.kreft` (and legacy `.kreftjs`) component files: markup, `k-*` / `@event` / `:bind`
-attributes, and the embedded `<script>` (JavaScript) and `<style>` (CSS) blocks.
+attributes, and the embedded `<script>` (JavaScript) and `<style>` (CSS) blocks. Emmet is built in.
 
 ## Install (dev extension)
 
@@ -9,6 +9,22 @@ attributes, and the embedded `<script>` (JavaScript) and `<style>` (CSS) blocks.
 2. Select this folder (`editors/zed`).
 
 Zed downloads the tree-sitter HTML grammar and compiles it, so Rust (via `rustup`) must be installed.
+
+As a file: `kreft editor zed --download` writes a zip; unzip it and pick the `kreft-zed` folder.
+
+## Emmet
+
+The extension starts the Emmet language server for `.kreft` files by itself (Zed downloads it with npm the first
+time, so the first file needs the internet). You do not need the separate Emmet extension or any setting.
+
+- in `<view>`: type `ul>li.item*3` and accept the completion
+- in `<style>`: CSS abbreviations such as `m10`, `df`, `bgc`
+
+To turn it off, add this to Zed's `settings.json`:
+
+```json
+"languages": { "Kreft": { "language_servers": ["!kreft-emmet"] } }
+```
 
 ## Limits
 

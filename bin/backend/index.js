@@ -25,11 +25,27 @@ const { createSchema } = require('./schema.js');
 // require('kreftjs/server') works in a project even when Kreft is only installed globally
 const SERVER_ENTRY = path.join(__dirname, '..', '..', 'server.js');
 let aliased = false;
+let currentLog = null;   // where the warnings of the route file loading go (set by createBackend)
 function installAlias() {
   if (aliased) return;
   aliased = true;
   const original = Module._resolveFilename;
   require('./typescript.js').registerTypeScript(process.cwd()); // .ts files in routes/, app/, database/
+  // A controller file that was deleted or renamed must not take the whole API down with it (login included): routes/api.js
+  // still loads, a warning names the file, and only the routes of that controller answer with an error.
+  const originalLoad = Module._load;
+  Module._load = function (request, parent, ...rest) {
+    try {
+      return originalLoad.call(this, request, parent, ...rest);
+    } catch (e) {
+      const where = String(request).replace(/\\/g, '/');
+      const m = e && e.code === 'MODULE_NOT_FOUND' && where.match(/app\/Http\/Controllers\/(.+)$/);
+      if (!m || !String(e.message).includes(request) || !currentLog) throw e;
+      const name = m[1].replace(/\.(c?js|ts)$/, '');
+      currentLog.warn(`  Warning: the controller ${name} was not found (${request}). Its routes answer with an error until the file exists; the other routes work.`);
+      return class MissingController { static get missing() { return name; } };
+    }
+  };
   Module._resolveFilename = function (request, ...rest) {
     // kreft/server and @kreft/server are the earlier Kreft names: older projects still require them
     if (['kreftjs/server', '@kreftjs/server', 'kreft/server', '@kreft/server'].includes(request)) return SERVER_ENTRY;
@@ -97,6 +113,7 @@ function createBackend(baseDir, { db = null, production = false, log = console, 
   const { startAutoGarbageCollector } = require('./gc.js');
   startAutoGarbageCollector({ thresholdMB: Number(process.env.AUTO_GC_THRESHOLD_MB) || 200, log: !isProd && process.env.VERBOSE_GC === '1' });
   installAlias();
+  currentLog = log;
   setBaseDir(baseDir);
   if (db) setConnection(db);
   const routesFile = findFile(path.join(baseDir, 'routes', 'api'));
@@ -125,6 +142,7 @@ function createBackend(baseDir, { db = null, production = false, log = console, 
       kernel = kfile ? { middleware: [], aliases: {}, ...(await loadModuleAsync(kfile)) } : { middleware: [], aliases: {} };
       const fn = await loadModuleAsync(routesFile);
       if (typeof fn === 'function') fn(Route); // module.exports = (Route) => { … } works too
+      for (const r of Route.list()) if (Array.isArray(r.action) && r.action[0] == null) log.warn(`  Warning: ${[].concat(r.methods).join('|')} ${r.uri} has an undefined controller (a require() or import returned nothing). That route answers with an error.`);
     } catch (e) {
       loadError = e;
       log.error(`\n  Error in your backend: ${e.stack || e}\n`);
@@ -215,6 +233,9 @@ function createBackend(baseDir, { db = null, production = false, log = console, 
     if (Array.isArray(action)) {
       [Controller, method] = action;
       if (typeof Controller === 'string') Controller = await resolveController(Controller, ns);
+      // a module written as ES / TypeScript arrives as { default: Controller }
+      if (Controller && typeof Controller === 'object' && typeof Controller.default === 'function') Controller = Controller.default;
+      if (Controller == null) throw new Error('The controller of this route is undefined: a require() or import of it returned nothing. Check the path and the export of the controller file.');
     } else if (typeof action === 'string') {
       const [cname, m] = action.split('@');
       Controller = await resolveController(cname, ns);

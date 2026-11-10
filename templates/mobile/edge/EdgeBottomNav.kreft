@@ -3,7 +3,8 @@
      items      [{ label, icon | text | src, to, id, badge, disabled, onTap }]   (an item with `to` opens that page and is active on it)
      active     the id of the active item, for items without `to`
      labels     'always' | 'active' | 'never'          indicator  'pill' | 'line' | 'none'
-     bg / color / activeColor / height   colours and height in px      border  the line above      floating  a rounded bar with a gap
+     bg / color / activeColor / height   colours and height in px      border  the line above (borderColor: its colour)      floating  a rounded bar with a gap
+     indicatorColor   the colour behind the active icon (indicator 'pill') or the line above it (indicator 'line')
      blur       frosted glass      haptics  a small buzz on tap (phone)
      @select    sends the tapped item -->
 prop items = []
@@ -13,6 +14,8 @@ prop indicator = 'pill'
 prop bg = ''
 prop color = ''
 prop activeColor = ''
+prop indicatorColor = ''
+prop borderColor = ''
 prop height = 0
 prop border = true
 prop floating = false
@@ -21,7 +24,7 @@ prop haptics = true
 event select
 
 derive navClass = 'nav ind-' + indicator + ' lab-' + labels + (border ? ' border' : '') + (floating ? ' floating' : '') + (blur ? ' blur' : '')
-derive vars = ({ '--edge-bottom-bg': bg || null, '--edge-bottom-fg': color || null, '--edge-bottom-active': activeColor || null, '--edge-bottom-height': height ? height + 'px' : null })
+derive vars = ({ '--edge-bottom-bg': bg || null, '--edge-bottom-fg': color || null, '--edge-bottom-active': activeColor || null, '--edge-bottom-indicator': indicatorColor || null, '--edge-bottom-border': borderColor || null, '--edge-bottom-height': height ? height + 'px' : null })
 
 action isOn(it) {
   if (it.to) {

@@ -1,9 +1,16 @@
 {
   "files.associations": {
-    "*.kreftjs": "kreft"
+    "*.kreftjs": "kreftjs",
+    "*.kreft": "kreftjs"
   },
   "[kreft]": {
     "editor.defaultFormatter": "kreft.kreftjs",
     "editor.formatOnSave": true
+  },
+  "[kreftjs]": {
+    "editor.defaultFormatter": "kreft.kreftjs"
+  },
+  "emmet.includeLanguages": {
+    "kreftjs": "html"
   }
 }

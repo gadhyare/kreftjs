@@ -1,11 +1,19 @@
 id = "kreft"
 name = "Kreft"
-description = "Syntax highlighting for Kreft .kreft component files."
-version = "0.1.0"
+description = "Syntax highlighting and Emmet for Kreft .kreft component files."
+version = "0.2.0"
 schema_version = 1
 authors = ["Maxamuud Xuseen"]
-repository = "https://github.com/gadhyare/somjs"
+repository = "https://github.com/gadhyare/kreftjs"
 
 [grammars.html]
 repository = "https://github.com/tree-sitter/tree-sitter-html"
 commit = "73a3947324f6efddf9e17c0ea58d454843590cc0"
+
+# Emmet in .kreft files: src/lib.rs starts the Emmet language server, and the files are sent to it as HTML.
+[language_servers.kreft-emmet]
+name = "Kreft Emmet"
+languages = ["Kreft"]
+
+[language_servers.kreft-emmet.language_ids]
+"Kreft" = "html"

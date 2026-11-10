@@ -1,6 +1,6 @@
 <!-- The bar at the top of the screen. Everything about it can be changed.
      <edge-top-bar title="Cart" back bg="#111" color="#fff" right={[{ icon: 'search', id: 'search' }]} @action="onAction"></edge-top-bar>
-     title / subtitle       the text            center     centre the title      border    the line under the bar
+     title / subtitle       the text            center     centre the title      border    the line under the bar (borderColor: its colour)
      bg / color / height    colours, and the height in px (the notch area is added)  elevated  a shadow     blur  frosted glass
      left / right           buttons: [{ icon, text, src, label, id, badge, onTap }]
      back                   shows the back arrow (it goes back in history, or send @back yourself with autoBack={false})
@@ -12,6 +12,7 @@ prop autoBack = true
 prop bg = ''
 prop color = ''
 prop border = true
+prop borderColor = ''
 prop height = 0
 prop center = false
 prop elevated = false
@@ -21,7 +22,7 @@ prop right = []
 event back
 event action
 
-derive vars = ({ '--edge-top-bg': bg || null, '--edge-top-fg': color || null, '--edge-top-height': height ? height + 'px' : null })
+derive vars = ({ '--edge-top-bg': bg || null, '--edge-top-fg': color || null, '--edge-top-border': borderColor || null, '--edge-top-height': height ? height + 'px' : null })
 
 action goBack() {
   send('back')

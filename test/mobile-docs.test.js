@@ -52,7 +52,7 @@ test('the documented Java range is the one the CLI enforces', () => {
 
 test('mobile:dev shares the dev server on the network and allows the phone host names', () => {
   const mobile = fs.readFileSync(path.join(root, 'bin', 'mobile.js'), 'utf8');
-  assert.match(mobile, /'dev', '--seed', '--host', '0\.0\.0\.0', '--port', port/, 'a new database is seeded');
+  assert.match(mobile, /'dev', '--seed', \.\.\.mode\.bind, '--port', port/, 'a new database is seeded');
   assert.match(mobile, /--no-setup/, 'the first-run setup can be skipped');
   assert.match(mobile, /setupApp\(root\)/, 'and runs before the server starts');
   assert.match(mobile, /KREFT_ALLOWED_HOSTS: allowed/);
@@ -83,9 +83,15 @@ test('the root README, the generated README and the types know about the phone a
 });
 
 test('the docs describe what mobile:dev really does, as checked on the emulator', () => {
-  assert.match(docs, /\| `kreft mobile:dev \[--android\] \[--ios\] \[--target id\] \[--no-setup\]` \|/);
-  assert.match(docs, /picks the running emulator by itself, uses `10\.0\.2\.2`/);
+  assert.match(docs, /\| `kreft mobile:dev \[--android\] \[--ios\] \[--target id\] \[--lan\] \[--no-setup\]` \|/);
+  assert.match(docs, /picks the running device by itself/);
+  assert.match(docs, /Through the cable \(the default for Android\)/);
+  assert.match(docs, /`adb reverse`/);
+  assert.match(docs, /`10\.0\.2\.2` for an emulator/);
   assert.match(docs, /takes the next free port if 8000 is busy/);
+  assert.match(docs, /\| The phone shows "Webpage not available"/, 'the troubleshooting row for the screen a phone off Wi-Fi shows');
+  assert.match(chapter, /Webpage not available/);
+  assert.match(chapter, /adb reverse/);
   assert.match(docs, /live reload with `kreft mobile:dev` \(a saved edit shows in the running app within seconds\)/);
   assert.doesNotMatch(docs, /native plugins are checked in the Android emulator; iOS has not/, 'the old, narrower caveat is gone');
 });
@@ -100,7 +106,7 @@ test('the Arabic book has the mobile chapter, listed in its index, naming every 
   assert.match(chapter, /^# الفصل الحادي والعشرون: /m);
   const names = [...cli.matchAll(/^\s+'(mobile:[a-z]+|make:home|make:mobile)':/gm)].map((m) => m[1]);
   for (const n of names) assert.ok(chapter.includes('kreft ' + n) || chapter.includes('`' + n + '`') || chapter.includes('`kreft ' + n.replace('mobile:', 'mobile:')), n + ' is not in chapter 21');
-  for (const must of ['kreft mobile:run', '10.0.2.2', 'edge.setTop', 'Kreftjs.native', 'edge-splash', 'org.gradle.java.home', 'Generate Signed App Bundle', '--api-url', 'mobile:setup']) assert.ok(chapter.includes(must), 'chapter 21 must mention ' + must);
+  for (const must of ['Kreftjs is not defined', 'kreft mobile:run', '10.0.2.2', 'edge.setTop', 'Kreftjs.native', 'edge-splash', 'org.gradle.java.home', 'Generate Signed App Bundle', '--api-url', 'mobile:setup']) assert.ok(chapter.includes(must), 'chapter 21 must mention ' + must);
   assert.match(chapter, /لم يُجرَّب/, 'it says plainly what was not tested');
 });
 
@@ -120,4 +126,29 @@ test('the example in chapter 21 compiles and uses only parts that exist', () => 
   assert.strictEqual(b.status, 0, b.stdout + b.stderr);
   assert.ok(fs.readFileSync(path.join(app, 'dist', 'app.js'), 'utf8').includes('edge-list'), 'the page is in the build');
   for (const tag of m[1].match(/<edge-[a-z-]+/g)) assert.ok(fs.existsSync(path.join(app, 'frontend', 'components', 'edge', tag.slice(1).split('-').map((p) => p[0].toUpperCase() + p.slice(1)).join('') + '.kreft')), tag + ' exists');
+});
+
+test('the docs explain the white screen on an old phone, in English and in the Arabic chapter', () => {
+  assert.match(docs, /\| A white screen and the error `ReferenceError: Kreftjs is not defined` \|/);
+  assert.match(docs, /the \*\*first one is the cause\*\*/);
+  assert.match(docs, /kreft update --core/);
+  assert.match(docs, /no syntax newer than Chrome 64/);
+  assert.match(chapter, /ReferenceError: Kreftjs is not defined/);
+  assert.match(chapter, /Android System WebView/);
+});
+
+test('the docs and chapter 21 tell people they can pass --app', () => {
+  assert.match(docs, /takes `--app <folder>`/);
+  assert.match(docs, /kreft mobile:dev --android --app/);
+  assert.match(chapter, /--app/);
+});
+
+test('the release guide covers signing, the bundle, versions, iOS and the checklist', () => {
+  const guide = docs.split('### Publishing your app to Google Play and the App Store')[1].split('### Writing your own edge components')[0];
+  for (const needle of ['keytool -genkeypair', 'keystore.properties', 'signingConfigs', './gradlew bundleRelease assembleRelease',
+    'app-release.aab', 'versionCode', 'adb install -r', 'Product → Archive', 'TestFlight', 'Checklist before every upload', 'com.example', '--api-url']) {
+    assert.ok(guide.includes(needle), 'the release guide must mention ' + needle);
+  }
+  const readme = fs.readFileSync(path.join(root, 'README.md'), 'utf8');
+  assert.ok(readme.includes('#publishing-your-app-to-google-play-and-the-app-store'), 'the root README links to the release guide');
 });

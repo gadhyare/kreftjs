@@ -208,5 +208,79 @@ test('mobile:dev picks a free port and the running device by itself', async () =
   assert.ok(Array.isArray(m.runningAndroid()));
   const src = fs.readFileSync(path.join(__dirname, '..', 'bin', 'mobile.js'), 'utf8');
   assert.match(src, /'10\.0\.2\.2' : \(ip \? ip\.address/, 'the emulator uses its own name for this computer');
-  assert.match(src, /'--live-reload', '--host', liveHost, '--port', port/, 'the same port and host go to the server and to the app');
+  assert.match(src, /'--live-reload', '--host', mode\.host, '--port', port/, 'the same port and host go to the server and to the app');
+});
+
+test('mobile:dev goes through the USB cable for Android devices, and through the Wi-Fi only when it has to', () => {
+  const m = require('../bin/mobile.js');
+  const ip = { address: '192.168.1.5' };
+  assert.deepStrictEqual(JSON.parse(JSON.stringify(m.liveMode({ plat: 'android', devices: ['abc'], ip }))), { kind: 'usb', host: 'localhost', bind: [] }, 'a device adb sees: the cable, and the server stays on this computer only');
+  assert.deepStrictEqual(JSON.parse(JSON.stringify(m.liveMode({ plat: 'android', devices: [], ip }))), { kind: 'lan', host: '192.168.1.5', bind: ['--host', '0.0.0.0'] }, 'no device yet: the Wi-Fi address');
+  assert.strictEqual(m.liveMode({ plat: 'android', devices: ['abc'], ip, lan: true }).kind, 'lan', '--lan forces the Wi-Fi');
+  assert.strictEqual(m.liveMode({ plat: 'android', devices: [], ip, target: 'emulator-5554' }).host, '10.0.2.2', 'an emulator without a tunnel uses its own name for this computer');
+  assert.strictEqual(m.liveMode({ plat: 'ios', devices: ['abc'], ip }).kind, 'lan', 'iOS has no adb');
+  assert.strictEqual(m.adbReverse('no-such-device', 9), false, 'a device that is not there gives false, not an exception');
+  assert.strictEqual(m.adbUnreverse('no-such-device', 9), false);
+  const src = fs.readFileSync(path.join(__dirname, '..', 'bin', 'mobile.js'), 'utf8');
+  assert.match(src, /'dev', '--seed', \.\.\.mode\.bind, '--port', port/, 'the server is shared on the network only in Wi-Fi mode');
+  assert.match(src, /for \(const d of reversed\) adbUnreverse\(d, port\)/, 'the tunnels are removed when it stops');
+  assert.match(src, /if \(!reversed\.length\) mode = liveMode/, 'if adb cannot open the tunnel it falls back to the Wi-Fi');
+  assert.match(src, /target && devices\.includes\(target\) \? \[target\] : devices/, 'with --target only that device gets a tunnel');
+  assert.match(src, /await build\(\['--' \+ plat\], \{ quiet: true \}\)/, 'a new app: mobile:dev prepares the native project first');
+});
+
+test('--app runs a mobile command for an app from any folder, and says so when the folder is wrong', () => {
+  const dir = tmp();
+  assert.strictEqual(run(['new', 'a1', '--js', '--mobile', '--auth'], dir).status, 0);
+  const appDir = path.join(dir, 'a1');
+  const elsewhere = tmp(); // not an app
+  const plain = run(['mobile:setup'], elsewhere);
+  assert.notStrictEqual(plain.status, 0, 'without --app a non-app folder is refused');
+  assert.match(plain.stdout + plain.stderr, /not a Kreft app/);
+  const ok = run(['mobile:setup', '--app', appDir], elsewhere);
+  assert.strictEqual(ok.status, 0, ok.stdout + ok.stderr);
+  assert.match(ok.stdout, /APP_KEY is set/);
+  assert.match(ok.stdout, /database: 4 migrations ran/, 'it worked on the app, not on the folder it was started in');
+  assert.ok(fs.existsSync(path.join(appDir, 'backend', 'database')), 'the work happened in the app');
+  assert.deepStrictEqual(fs.readdirSync(elsewhere), [], 'and nothing was written where it was started');
+  const order = run(['--app', appDir, 'mobile:setup'], elsewhere);
+  assert.ok(order.stdout.length >= 0);
+  const missing = run(['mobile:setup', '--app', path.join(dir, 'nope')], elsewhere);
+  assert.notStrictEqual(missing.status, 0);
+  assert.match(missing.stderr + missing.stdout, /Could not use the app folder .*it does not exist/);
+  const bare = run(['mobile:setup', '--app'], elsewhere);
+  assert.notStrictEqual(bare.status, 0);
+  assert.match(bare.stderr + bare.stdout, /--app needs the app folder/);
+  const notKreft = run(['mobile:setup', '--app', elsewhere], elsewhere);
+  assert.match(notKreft.stdout + notKreft.stderr, /not a Kreft app/, 'a folder that is not an app is still refused');
+});
+
+test('the Android window background is made dark once, and never over the person\'s own', () => {
+  const m = require('../bin/mobile.js');
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'kreft-bg-'));
+  const res = path.join(dir, 'android', 'app', 'src', 'main', 'res', 'values');
+  fs.mkdirSync(res, { recursive: true });
+  const f = path.join(res, 'styles.xml');
+  fs.writeFileSync(f, '<resources>\n    <style name="AppTheme.NoActionBar" parent="Theme.AppCompat.DayNight.NoActionBar">\n    </style>\n</resources>');
+  assert.strictEqual(m.darkWindowBackground(dir), true);
+  assert.match(fs.readFileSync(f, 'utf8'), /android:windowBackground">#111827/);
+  assert.strictEqual(m.darkWindowBackground(dir), false, 'a second run changes nothing');
+  assert.strictEqual(m.darkWindowBackground(path.join(dir, 'nowhere')), false);
+});
+
+test('the dev client adds no DevTools button to the phone app (it has no floating button at all; Alt+Shift+D opens the panel)', () => {
+  const src = fs.readFileSync(path.join(__dirname, '..', 'tools', 'dev-client.js'), 'utf8');
+  assert.doesNotMatch(src, /data-kreft-devtools-button/);
+  assert.match(src, /Alt\+Shift\+D/);
+});
+
+test('freePort skips a port another server already answers on', async () => {
+  const m = require('../bin/mobile.js');
+  const net = require('net');
+  const srv = net.createServer();
+  await new Promise((r) => srv.listen(0, '127.0.0.1', r));
+  const busy = srv.address().port;
+  const got = await m.freePort(busy);
+  srv.close();
+  assert.notStrictEqual(got, busy);
 });

@@ -1,0 +1,250 @@
+<!-- Platforms: where a Kreft app can run. Desktop (Electron, Tauri), phones and tablets (iOS, Android, HarmonyOS) and TV (coming soon).
+     Status chips say what Kreft has really tested: "Tested" was run for real, "Not tested here" is supported by the same code but was not run by Kreft. -->
+layout plain
+
+state tab = 'desktop'
+state rt = 'electron'
+state copied = ''
+
+state systems = ['macOS', 'Linux', 'Windows']
+state runtimes = [
+  { id: 'electron', name: 'Electron', pitch: 'Ships Chromium, so the page is the same on every system. Installers are about 100 MB.',
+    needs: 'Node.js only', add: 'kreft add electron', dev: 'kreft electron:dev', build: 'kreft electron:build', file: 'config/electron.config.js',
+    out: { macOS: '.dmg · .zip', Linux: 'AppImage · .deb · .rpm', Windows: 'NSIS installer · portable .exe' },
+    flags: { macOS: '--mac', Linux: '--linux', Windows: '--win' },
+    status: { macOS: 'tested', Linux: 'untested', Windows: 'untested' } },
+  { id: 'tauri', name: 'Tauri', pitch: 'Uses the web view the system already has, so installers are a few megabytes. The native part is Rust.',
+    needs: 'Node.js and Rust', add: 'kreft add tauri', dev: 'kreft tauri:dev', build: 'kreft tauri:build', file: 'config/tauri.config.js',
+    out: { macOS: '.app · .dmg', Linux: 'AppImage · .deb · .rpm', Windows: 'NSIS installer · .msi' },
+    flags: { macOS: '--bundles app,dmg', Linux: '--bundles appimage,deb', Windows: '--bundles nsis,msi' },
+    status: { macOS: 'tested', Linux: 'untested', Windows: 'untested' } },
+]
+state phones = [
+  { id: 'ios', name: 'iOS', how: 'Capacitor', needs: 'A Mac with Xcode', run: 'kreft mobile:run --ios', ship: 'App Store, an .ipa from an Xcode archive', release: 'kreft mobile:release --ios --team ABCDE12345', status: 'untested',
+    note: 'Same project as Android. Not run by Kreft: its tests need an Android emulator.' },
+  { id: 'android', name: 'Android', how: 'Capacitor', needs: 'Android Studio, Java 21 to 23', run: 'kreft mobile:run --android', ship: 'Google Play (.aab) or testers (.apk)', release: 'kreft mobile:release --android --create-keystore', status: 'tested',
+    note: 'Run on the emulator, and a signed release bundle and APK were built.' },
+  { id: 'harmony', name: 'HarmonyOS', how: 'ArkTS web view', needs: 'DevEco Studio', run: 'kreft harmony:build', ship: 'AppGallery, a signed .hap and .app', release: 'kreft mobile:release --harmony', status: 'untested',
+    note: 'The project and the site are checked on a computer. Not opened in DevEco Studio yet.' },
+]
+state soon = [
+  { name: 'Android TV', text: 'The Android app with a remote-control (D-pad) focus ring.' },
+  { name: 'Apple tvOS', text: 'A tvOS shell around the same pages.' },
+  { name: 'LG webOS', text: 'A packaged web app for LG TVs.' },
+  { name: 'Samsung Tizen', text: 'A packaged web app for Samsung TVs.' },
+]
+
+derive current = runtimes.find((r) => r.id === rt)
+
+action pick(id) { rt = id }
+action show(name) { tab = name }
+action copy(text) {
+  navigator.clipboard && navigator.clipboard.writeText(text)
+  copied = text
+  setTimeout(() => { if (copied === text) copied = '' }, 1400)
+}
+action label(status) { return status === 'tested' ? 'Tested' : 'Not tested here' }
+
+<view>
+  <div class="plat">
+    <section class="intro">
+      <p class="kicker">Platforms</p>
+      <h1>One codebase. <span class="grad-text">Every screen.</span></h1>
+      <p class="lead">Write your pages once in <code>.kreft</code> files. Ship them as a website, a desktop app for macOS, Linux and Windows, and a phone or tablet app for iOS, Android and HarmonyOS. TV apps are next.</p>
+      <div class="legend" aria-label="What the labels mean">
+        <span class="chip ok">Tested</span><span class="legend-text">run for real by Kreft's own tests</span>
+        <span class="chip untested">Not tested here</span><span class="legend-text">the same code, not run by Kreft on that system</span>
+        <span class="chip soon">Coming soon</span><span class="legend-text">planned, not available yet</span>
+      </div>
+    </section>
+
+    <div class="tabs" role="tablist" aria-label="Platform type">
+      <button role="tab" class="tab {tab === 'desktop' ? 'on' : ''}" aria-selected={tab === 'desktop' ? 'true' : 'false'} @click="show('desktop')">
+        <span class="tab-title">Desktop</span><span class="tab-sub">macOS · Linux · Windows</span>
+      </button>
+      <button role="tab" class="tab {tab === 'mobile' ? 'on' : ''}" aria-selected={tab === 'mobile' ? 'true' : 'false'} @click="show('mobile')">
+        <span class="tab-title">Mobile</span><span class="tab-sub">iOS · Android · HarmonyOS</span>
+      </button>
+      <button role="tab" class="tab {tab === 'tv' ? 'on' : ''}" aria-selected={tab === 'tv' ? 'true' : 'false'} @click="show('tv')">
+        <span class="tab-title">TV <span class="chip soon tiny">Soon</span></span><span class="tab-sub">Android TV · tvOS · webOS · Tizen</span>
+      </button>
+    </div>
+
+    <!-- DESKTOP -->
+    <section k-if="tab === 'desktop'" class="panel" role="tabpanel">
+      <div class="runtime-pick" role="group" aria-label="Runtime">
+        {for r in runtimes key r.id}
+          <button class="runtime {rt === r.id ? 'on' : ''}" @click="pick(r.id)" aria-pressed={rt === r.id ? 'true' : 'false'}>{r.name}</button>
+        {/for}
+      </div>
+      <p class="pitch">{current.pitch} <span class="muted">Needs: {current.needs}.</span></p>
+
+      <div class="matrix">
+        {for os in systems key os}
+          <article class="os-card">
+            <header>
+              <h3>{os}</h3>
+              <span class="chip {current.status[os] === 'tested' ? 'ok' : 'untested'}">{label(current.status[os])}</span>
+            </header>
+            <p class="out"><span class="out-label">Makes</span>{current.out[os]}</p>
+            <p class="cmd-line"><code>{current.build} {current.flags[os]}</code></p>
+          </article>
+        {/for}
+      </div>
+
+      <div class="steps">
+        <div class="step"><span class="n">1</span><div><strong>Add it</strong><p>One command writes the settings file, the native files and the scripts.</p>
+          <div class="term"><code>{current.add}</code><button class="sm" @click="copy(current.add)">{copied === current.add ? 'Copied' : 'Copy'}</button></div></div></div>
+        <div class="step"><span class="n">2</span><div><strong>Run it</strong><p>Opens the app in its own window, with hot reload.</p>
+          <div class="term"><code>{current.dev}</code><button class="sm" @click="copy(current.dev)">{copied === current.dev ? 'Copied' : 'Copy'}</button></div></div></div>
+        <div class="step"><span class="n">3</span><div><strong>Change it in one file</strong><p>Window, menu, DevTools, security, tray, updates and installers are all in <code>{current.file}</code>.</p>
+          <kreft-link to="/docs" class="more">Read the desktop configuration</kreft-link></div></div>
+      </div>
+
+      <div class="defaults">
+        <h3>Safe by default</h3>
+        <ul>
+          <li><strong>Menu hidden.</strong> The native menu bar is off until you ask for it.</li>
+          <li><strong>DevTools</strong> work while you build, stay closed at start, and are off in the installed app.</li>
+          <li><strong>Electron</strong> keeps context isolation and the sandbox on, and Node.js away from your pages.</li>
+          <li><strong>Mistakes are caught early.</strong> Every option is checked, and the message says what to change.</li>
+        </ul>
+      </div>
+    </section>
+
+    <!-- MOBILE -->
+    <section k-if="tab === 'mobile'" class="panel" role="tabpanel">
+      <p class="pitch">The same pages run inside a native shell. iOS and Android use Capacitor; HarmonyOS uses a native ArkTS project with a full-screen web view. Add a phone UI kit of 42 components and the native API (camera, files, share, haptics) when you want it.</p>
+      <div class="phones">
+        {for p in phones key p.id}
+          <article class="phone-card">
+            <header>
+              <h3>{p.name}</h3>
+              <span class="chip {p.status === 'tested' ? 'ok' : 'untested'}">{label(p.status)}</span>
+            </header>
+            <p class="how">{p.how} · needs {p.needs}</p>
+            <div class="term"><code>{p.run}</code><button class="sm" @click="copy(p.run)">{copied === p.run ? 'Copied' : 'Copy'}</button></div>
+            <p class="out"><span class="out-label">Ship</span>{p.ship}</p>
+            <div class="term"><code>{p.release}</code><button class="sm" @click="copy(p.release)">{copied === p.release ? 'Copied' : 'Copy'}</button></div>
+            <p class="note">{p.note}</p>
+          </article>
+        {/for}
+      </div>
+      <div class="defaults">
+        <h3>Start a phone app</h3>
+        <div class="term"><code>kreft new my-app --mobile</code><button class="sm" @click="copy('kreft new my-app --mobile')">{copied === 'kreft new my-app --mobile' ? 'Copied' : 'Copy'}</button></div>
+        <p>Or add it later: <code>kreft mobile:init</code> for iOS and Android, <code>kreft harmony:init</code> for HarmonyOS. <kreft-link to="/docs" class="more">Read the release guide for Google Play and the App Store</kreft-link></p>
+      </div>
+    </section>
+
+    <!-- TV -->
+    <section k-if="tab === 'tv'" class="panel" role="tabpanel">
+      <div class="soon-banner">
+        <span class="chip soon">Coming soon</span>
+        <h2>TV apps are not available yet</h2>
+        <p>Kreft has no TV support today: no TV packaging and no remote-control navigation. This is what is planned. There is no release date, and nothing here is promised until it ships and is tested.</p>
+      </div>
+      <div class="soon-grid">
+        {for t in soon key t.name}
+          <article class="soon-card">
+            <h3>{t.name}</h3>
+            <p>{t.text}</p>
+            <span class="chip soon">Planned</span>
+          </article>
+        {/for}
+      </div>
+      <div class="defaults">
+        <h3>Meanwhile</h3>
+        <p>Your pages already work in any browser, so a TV with a web browser can open your website. That is not a packaged TV app and has no remote-control focus handling.</p>
+      </div>
+    </section>
+
+    <section class="cta">
+      <h2>Ready to build?</h2>
+      <div class="term"><code>kreft new my-app --db sqlite</code><button class="sm" @click="copy('kreft new my-app --db sqlite')">{copied === 'kreft new my-app --db sqlite' ? 'Copied' : 'Copy'}</button></div>
+      <p class="cta-links"><kreft-link to="/docs">Documentation</kreft-link><kreft-link to="/basics">Examples</kreft-link><kreft-link to="/playground">Playground</kreft-link></p>
+    </section>
+  </div>
+</view>
+
+<style scoped>
+.plat { padding: 48px 0 72px; font-family: var(--font); }
+.intro { max-width: 760px; margin-bottom: 36px; }
+.intro h1 { font-size: clamp(36px, 5.6vw, 60px); line-height: 1.04; letter-spacing: -0.045em; margin-bottom: 16px; }
+.intro .lead { font-size: 18px; max-width: 640px; }
+.legend { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 10px; margin-top: 8px; }
+.legend-text { font-size: 12.5px; color: var(--muted); margin-right: 12px; }
+
+.tabs { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; margin-bottom: 28px; }
+.tab { height: auto; flex-direction: column; align-items: flex-start; gap: 3px; padding: 16px 18px; border-radius: var(--radius-lg); text-align: left; white-space: normal; background: var(--card); box-shadow: var(--shadow-sm); }
+.tab-title { font-size: 17px; font-weight: 700; letter-spacing: -0.02em; display: inline-flex; align-items: center; gap: 8px; }
+.tab-sub { font-size: 12.5px; font-weight: 400; color: var(--muted); }
+.tab.on { border-color: var(--primary); box-shadow: 0 0 0 3px color-mix(in srgb, var(--primary) 16%, transparent), var(--shadow-md); }
+.tab.on .tab-title { color: var(--primary); }
+.tiny { height: 19px; padding: 0 7px; font-size: 10.5px; }
+
+.panel { margin-bottom: 52px; }
+.pitch { font-size: 16.5px; line-height: 1.55; max-width: 760px; margin-bottom: 22px; }
+.runtime-pick { display: inline-flex; padding: 4px; gap: 4px; background: var(--accent); border: 1px solid var(--border); border-radius: 999px; margin-bottom: 18px; }
+.runtime { height: 34px; padding: 0 20px; border-radius: 999px; border-color: transparent; background: transparent; box-shadow: none; color: var(--muted); font-weight: 600; }
+.runtime.on { background: var(--card); color: var(--foreground); box-shadow: var(--shadow-md); }
+
+.matrix, .phones, .soon-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 16px; margin-bottom: 28px; }
+.soon-grid { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+.os-card, .phone-card, .soon-card { background: var(--card); border: 1px solid var(--card-border); border-radius: var(--radius-lg); box-shadow: var(--shadow-md); padding: 22px; min-width: 0; }
+.os-card header, .phone-card header { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-bottom: 12px; }
+.os-card h3, .phone-card h3, .soon-card h3 { margin: 0; font-size: 20px; letter-spacing: -0.03em; }
+.out { display: flex; gap: 10px; align-items: baseline; font-size: 13.5px; margin: 0 0 12px; }
+.out-label { font-family: var(--mono); font-size: 10.5px; text-transform: uppercase; letter-spacing: .08em; color: var(--muted); min-width: 44px; }
+.cmd-line { margin: 0; }
+.cmd-line code { display: block; overflow-x: auto; white-space: nowrap; padding: 8px 10px; }
+.how { color: var(--muted); font-size: 13px; margin-bottom: 12px; }
+.note { margin: 10px 0 0; font-size: 12.5px; color: var(--muted); line-height: 1.5; }
+.soon-card { border-style: dashed; box-shadow: none; background: color-mix(in srgb, var(--warm-bg) 45%, var(--card)); }
+.soon-card p { font-size: 13.5px; color: var(--muted); margin: 8px 0 14px; }
+
+.steps { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 16px; margin-bottom: 28px; }
+.step { display: flex; gap: 14px; background: var(--accent); border: 1px solid var(--border); border-radius: var(--radius-lg); padding: 20px; min-width: 0; }
+.step > div { min-width: 0; flex: 1; }
+.step p { font-size: 13.5px; color: var(--muted); margin: 4px 0 12px; }
+.n { flex: none; width: 28px; height: 28px; border-radius: 50%; background: var(--primary); color: var(--primary-foreground); font-weight: 700; font-size: 13px; display: grid; place-items: center; }
+.more { font-size: 13.5px; font-weight: 600; text-decoration: none; }
+
+.term { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 8px 8px 8px 14px; background: var(--terminal-bg); color: var(--terminal-fg); border-radius: var(--radius); min-width: 0; }
+.term code { background: none; border: none; color: inherit; padding: 0; font-size: 13px; overflow-x: auto; white-space: nowrap; min-width: 0; }
+.term .sm { background: rgba(255, 255, 255, 0.1); border-color: rgba(255, 255, 255, 0.18); color: #fff; box-shadow: none; }
+.term .sm:hover { background: rgba(255, 255, 255, 0.2); color: #fff; }
+
+.defaults { background: var(--card); border: 1px solid var(--card-border); border-radius: var(--radius-lg); padding: 24px; box-shadow: var(--shadow-sm); }
+.defaults h3 { margin-bottom: 10px; }
+.defaults ul { margin: 0; padding-left: 20px; display: grid; gap: 8px; font-size: 14px; }
+.defaults p { font-size: 14px; }
+
+.soon-banner { background: var(--warm-bg); border: 1px solid color-mix(in srgb, var(--warm) 30%, transparent); border-radius: var(--radius-lg); padding: 28px; margin-bottom: 24px; }
+.soon-banner h2 { margin: 12px 0 8px; }
+.soon-banner p { margin: 0; max-width: 680px; color: var(--foreground); }
+
+.cta { text-align: center; padding: 44px 24px; border-radius: 24px; background: var(--card); border: 1px solid var(--card-border); box-shadow: var(--shadow-lg); }
+.cta .term { max-width: 460px; margin: 18px auto; text-align: left; }
+.cta-links { display: flex; justify-content: center; gap: 24px; margin: 0; }
+.cta-links a { font-weight: 600; text-decoration: none; }
+
+@media (max-width: 1000px) {
+  .soon-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .steps { grid-template-columns: minmax(0, 1fr); }
+}
+@media (max-width: 760px) {
+  .plat { padding: 28px 0 48px; }
+  .matrix, .phones { grid-template-columns: minmax(0, 1fr); }
+  .tabs { grid-template-columns: minmax(0, 1fr); gap: 8px; }
+  .tab { padding: 12px 14px; }
+  .intro .lead { font-size: 16px; }
+}
+@media (max-width: 480px) {
+  .soon-grid { grid-template-columns: minmax(0, 1fr); }
+  .runtime-pick { display: flex; }
+  .runtime { flex: 1; padding: 0 8px; }
+  .cta { padding: 32px 16px; }
+  .cta-links { flex-wrap: wrap; gap: 14px; }
+}
+</style>

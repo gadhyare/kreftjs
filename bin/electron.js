@@ -2,285 +2,33 @@
  * Electron.js Desktop Support for Kreft
  *
  * Commands:
- *   kreft electron:init     Add Electron files to an existing project (alias: kreft make:electron)
+ *   kreft add electron      Add Electron to this project: config/electron.config.js, electron/, scripts, packages (npm install)
+ *   kreft electron:init     The same without installing the packages (alias: kreft make:electron)
  *   kreft electron:dev      Run the app in an Electron desktop window only (hidden server, no browser, no URL)
- *   kreft electron:build    Build static bundle (kreft build) and package desktop installer (electron-builder)
+ *   kreft electron:build    Build the static bundle (kreft build) and make the installers (electron-builder)
+ *   kreft electron:config   Check config/electron.config.js and print the final settings (--json)
  *
  * CLI flag:
  *   kreft new my-app --electron
+ *
+ * Every setting lives in config/electron.config.js (see bin/desktop/). electron/main.js and electron/preload.js are
+ * generated bootstrap files that read it: they are not edited.
  */
 const fs = require('fs');
 const path = require('path');
-const { start: spawn } = require('./win-spawn.js');
+const { start: spawn, runSync } = require('./win-spawn.js');
+const desktop = require('./desktop/config.js');
+const adapter = require('./desktop/electron-adapter.js');
 
 function getProjectRoot(start = process.cwd()) {
   const lay = require('./layout.js').layout(start);
   return lay.split ? lay.project : start;
 }
 
-const TEMPLATES = {
-  main: () => `const { app, BrowserWindow, Menu, ipcMain, dialog, shell } = require('electron');
-const path = require('path');
-const http = require('http');
+const TEMPLATES = adapter.TEMPLATES;
 
-// Dev: the app's own server runs hidden on a private port of this computer, only this window uses it.
-const isDev = !app.isPackaged || process.env.NODE_ENV === 'development';
-const DEV_PORT = process.env.PORT || 8000;
-const DEV_URL = \`http://localhost:\${DEV_PORT}\`;
-
-// Electron DevTools sidebar configuration:
-// Control with ELECTRON_DEVTOOLS, KREFT_ELECTRON_DEVTOOLS or CLI flags:
-//   ELECTRON_DEVTOOLS=true | 1 | right | show     -> open DevTools as right sidebar
-//   ELECTRON_DEVTOOLS=bottom | left | detach     -> open DevTools in chosen position
-//   ELECTRON_DEVTOOLS=false | 0 | hide | off     -> hide DevTools
-function getDevToolsConfig() {
-  const arg = process.argv.find((a) => a.startsWith('--devtools='));
-  const raw = (arg ? arg.split('=')[1] : null) ||
-    (process.argv.includes('--devtools') ? 'right' : null) ||
-    (process.argv.includes('--no-devtools') ? 'false' : null) ||
-    process.env.ELECTRON_DEVTOOLS ||
-    process.env.KREFT_ELECTRON_DEVTOOLS ||
-    '';
-  const val = String(raw).trim().toLowerCase();
-  if (!val) return { show: false, mode: 'right' };
-  if (['false', '0', 'hide', 'off', 'no'].includes(val)) return { show: false, mode: 'right' };
-  const mode = ['bottom', 'left', 'detach', 'undocked'].includes(val) ? (val === 'undocked' ? 'detach' : val) : 'right';
-  return { show: true, mode };
-}
-
-// Window menu (File, Edit, View…):
-//   ELECTRON_MENU=show   (default) menu bar visible
-//   ELECTRON_MENU=auto   hidden, press Alt to show it (Windows / Linux)
-//   ELECTRON_MENU=hide   no menu at all
-// Change it while running from the page:  window.kreftDesktop.setMenu('show' | 'auto' | 'hide')
-let menuMode = String(process.env.ELECTRON_MENU || 'show').toLowerCase();
-let defaultMenu = null; // Electron's own menu, read once the app is ready
-function applyMenu(mode) {
-  menuMode = ['show', 'auto', 'hide'].includes(mode) ? mode : 'show';
-  if (!defaultMenu) defaultMenu = Menu.getApplicationMenu();
-  if (menuMode === 'hide') {
-    // macOS keeps one app menu (with Quit) because the system needs it; Windows and Linux lose the bar
-    Menu.setApplicationMenu(process.platform === 'darwin'
-      ? Menu.buildFromTemplate([{ role: 'appMenu' }])
-      : null);
-  } else {
-    Menu.setApplicationMenu(defaultMenu);
-  }
-  if (mainWindow && process.platform !== 'darwin') {
-    if (menuMode === 'hide') mainWindow.removeMenu();
-    else mainWindow.setMenu(defaultMenu);
-    mainWindow.setAutoHideMenuBar(menuMode === 'auto');
-    mainWindow.setMenuBarVisibility(menuMode === 'show');
-  }
-}
-
-// App icon: build/icon.png (512x512 or bigger). electron-builder makes .icns / .ico from it.
-const ICON = path.join(__dirname, '..', 'build', 'icon.png');
-
-let mainWindow = null;
-
-function waitForServer(url, timeout = 15000) {
-  const start = Date.now();
-  return new Promise((resolve) => {
-    const check = () => {
-      http.get(url, (res) => {
-        if (res.statusCode < 500) return resolve(true);
-        retry();
-      }).on('error', retry);
-    };
-    const retry = () => {
-      if (Date.now() - start > timeout) return resolve(false);
-      setTimeout(check, 100); // the window opens as soon as the dev server answers
-    };
-    check();
-  });
-}
-
-async function createWindow() {
-  mainWindow = new BrowserWindow({
-    width: 1200,
-    height: 800,
-    minWidth: 800,
-    minHeight: 600,
-    // High-precision brutalist geometry (zero border radius on window edges where platform allows)
-    frame: true,
-    backgroundColor: '#ffffff',
-    show: false,
-    icon: require('fs').existsSync(ICON) ? ICON : undefined,
-    autoHideMenuBar: menuMode === 'auto',
-    webPreferences: {
-      preload: path.join(__dirname, 'preload.js'),
-      contextIsolation: true,
-      nodeIntegration: false,
-      sandbox: true,
-      spellcheck: false,
-    },
-  });
-
-  mainWindow.once('ready-to-show', () => {
-    applyMenu(menuMode);
-    mainWindow.show();
-  });
-
-  // Open external links in default system browser, never inside the Electron window
-  mainWindow.webContents.setWindowOpenHandler(({ url }) => {
-    try {
-      const parsed = new URL(url);
-      if (parsed.protocol === 'http:' || parsed.protocol === 'https:') {
-        shell.openExternal(url);
-      }
-    } catch (_) {}
-    return { action: 'deny' };
-  });
-
-  // Block navigation away from the local application origin
-  mainWindow.webContents.on('will-navigate', (event, targetUrl) => {
-    try {
-      const parsed = new URL(targetUrl);
-      if (isDev && parsed.origin === new URL(DEV_URL).origin) return;
-      if (!isDev && parsed.protocol === 'file:') {
-        const distRoot = path.resolve(__dirname, '..', 'dist');
-        const targetPath = path.resolve(decodeURIComponent(parsed.pathname));
-        if (targetPath === distRoot || targetPath.startsWith(distRoot + path.sep)) return;
-      }
-      event.preventDefault();
-      if (parsed.protocol === 'http:' || parsed.protocol === 'https:') {
-        shell.openExternal(targetUrl);
-      }
-    } catch (_) {
-      event.preventDefault();
-    }
-  });
-
-  const devTools = getDevToolsConfig();
-
-  if (isDev) {
-    await waitForServer(DEV_URL);
-    await mainWindow.loadURL(DEV_URL);
-    if (devTools.show) {
-      mainWindow.webContents.openDevTools({ mode: devTools.mode });
-    }
-    // F12 or Cmd+Option+I toggles DevTools
-    mainWindow.webContents.on('before-input-event', (event, input) => {
-      if (input.key === 'F12' || (input.control && input.shift && input.key.toLowerCase() === 'i')) {
-        mainWindow.webContents.toggleDevTools();
-      }
-    });
-  } else {
-    // Production: load static bundle from dist/
-    const distPath = path.join(__dirname, '..', 'dist', 'index.html');
-    await mainWindow.loadFile(distPath);
-    if (devTools.show) {
-      mainWindow.webContents.openDevTools({ mode: devTools.mode });
-    }
-  }
-
-  mainWindow.on('closed', () => {
-    mainWindow = null;
-  });
-}
-
-// IPC Handlers: Safe desktop bridge exposed to Kreft frontend
-ipcMain.handle('kreft:app-info', () => ({
-  name: app.getName(),
-  version: app.getVersion(),
-  platform: process.platform,
-  arch: process.arch,
-  isPackaged: app.isPackaged,
-}));
-
-ipcMain.handle('kreft:minimize', () => {
-  if (mainWindow) mainWindow.minimize();
-});
-
-ipcMain.handle('kreft:maximize', () => {
-  if (!mainWindow) return;
-  if (mainWindow.isMaximized()) mainWindow.unmaximize();
-  else mainWindow.maximize();
-});
-
-ipcMain.handle('kreft:close', () => {
-  if (mainWindow) mainWindow.close();
-});
-
-ipcMain.handle('kreft:menu', (_, mode) => {
-  if (mode !== undefined) applyMenu(String(mode));
-  return menuMode;
-});
-
-ipcMain.handle('kreft:devtools:open', (_, mode) => {
-  if (mainWindow) mainWindow.webContents.openDevTools({ mode: mode || 'right' });
-});
-
-ipcMain.handle('kreft:devtools:close', () => {
-  if (mainWindow) mainWindow.webContents.closeDevTools();
-});
-
-ipcMain.handle('kreft:devtools:toggle', () => {
-  if (mainWindow) mainWindow.webContents.toggleDevTools();
-});
-
-function pickAllowed(obj, allowed) {
-  const out = {};
-  if (!obj || typeof obj !== 'object') return out;
-  for (const k of allowed) {
-    if (Object.prototype.hasOwnProperty.call(obj, k) && obj[k] !== undefined) out[k] = obj[k];
-  }
-  return out;
-}
-
-ipcMain.handle('kreft:dialog:message', async (_, options) => {
-  const safeOpts = pickAllowed(options, ['type', 'buttons', 'defaultId', 'title', 'message', 'detail', 'cancelId', 'noLink']);
-  return mainWindow ? dialog.showMessageBox(mainWindow, safeOpts) : dialog.showMessageBox(safeOpts);
-});
-
-ipcMain.handle('kreft:dialog:open', async (_, options) => {
-  const safeOpts = pickAllowed(options, ['title', 'defaultPath', 'buttonLabel', 'filters', 'properties', 'message']);
-  return mainWindow ? dialog.showOpenDialog(mainWindow, safeOpts) : dialog.showOpenDialog(safeOpts);
-});
-
-ipcMain.handle('kreft:dialog:save', async (_, options) => {
-  const safeOpts = pickAllowed(options, ['title', 'defaultPath', 'buttonLabel', 'filters', 'message', 'nameFieldLabel', 'showsTagField']);
-  return mainWindow ? dialog.showSaveDialog(mainWindow, safeOpts) : dialog.showSaveDialog(safeOpts);
-});
-
-app.whenReady().then(() => {
-  applyMenu(menuMode);
-  createWindow();
-
-  app.on('activate', () => {
-    if (BrowserWindow.getAllWindows().length === 0) createWindow();
-  });
-});
-
-app.on('window-all-closed', () => {
-  if (isDev || process.platform !== 'darwin') app.quit();
-});
-`,
-
-  preload: () => `const { contextBridge, ipcRenderer } = require('electron');
-
-// Expose safe desktop bridge onto window.kreftDesktop
-const desktop = {
-  isElectron: true,
-  getInfo: () => ipcRenderer.invoke('kreft:app-info'),
-  minimize: () => ipcRenderer.invoke('kreft:minimize'),
-  maximize: () => ipcRenderer.invoke('kreft:maximize'),
-  close: () => ipcRenderer.invoke('kreft:close'),
-  getMenu: () => ipcRenderer.invoke('kreft:menu'),
-  setMenu: (mode) => ipcRenderer.invoke('kreft:menu', mode),
-  openDevTools: (mode) => ipcRenderer.invoke('kreft:devtools:open', mode),
-  closeDevTools: () => ipcRenderer.invoke('kreft:devtools:close'),
-  toggleDevTools: () => ipcRenderer.invoke('kreft:devtools:toggle'),
-  showMessageBox: (options) => ipcRenderer.invoke('kreft:dialog:message', options),
-  showOpenDialog: (options) => ipcRenderer.invoke('kreft:dialog:open', options),
-  showSaveDialog: (options) => ipcRenderer.invoke('kreft:dialog:save', options),
-};
-contextBridge.exposeInMainWorld('kreftDesktop', desktop);
-
-contextBridge.exposeInMainWorld('__KREFT_ELECTRON__', true);
-`,
-};
+const ELECTRON_VERSION = '^34.2.0';
+const BUILDER_VERSION = '^25.1.8';
 
 // A new project's index.html loads Google Fonts: a style sheet from another site that the browser must download before it
 // draws anything (about 0.6 s on a first visit, and a failed request when offline). A desktop app does not need it.
@@ -297,26 +45,8 @@ function dropWebFonts(root) {
   return path.relative(root, file);
 }
 
-// electron-builder needs a description, a homepage, an author with an e-mail and a Linux maintainer (.deb / .rpm).
-// Missing ones are filled from git config (name, e-mail); edit them in package.json.
-function ensureMeta(pkg) {
-  const git = (k) => { try { return require('child_process').execSync('git config ' + k, { stdio: ['ignore', 'pipe', 'ignore'] }).toString().trim(); } catch (_) { return ''; } };
-  let changed = false;
-  if (!pkg.description) { pkg.description = (pkg.build && pkg.build.productName) || pkg.name || 'Kreft desktop app'; changed = true; }
-  if (!pkg.homepage) { pkg.homepage = 'https://kreftjs.com'; changed = true; }
-  const hasMail = pkg.author && (typeof pkg.author === 'object' ? pkg.author.email : /<[^>]+@[^>]+>/.test(pkg.author));
-  if (!hasMail) {
-    const name = (pkg.author && (typeof pkg.author === 'object' ? pkg.author.name : String(pkg.author).replace(/<.*>/, '').trim())) || git('user.name') || pkg.name || 'App';
-    pkg.author = { name, email: git('user.email') || 'you@example.com' };
-    changed = true;
-  }
-  if (pkg.build) {
-    pkg.build.linux = pkg.build.linux || {};
-    if (!pkg.build.linux.maintainer) { pkg.build.linux.maintainer = `${pkg.author.name} <${pkg.author.email}>`; changed = true; }
-  }
-  return changed;
-}
-
+// Adds the files and package.json entries. Files that exist are never overwritten, except the generated bootstrap
+// (it carries a "kreft-template" line) and an old hand-written main.js, which is saved as .bak first.
 function init(args = []) {
   const target = typeof args === 'string' ? args : (args[0] && !args[0].startsWith('-') ? args[0] : process.cwd());
   const root = getProjectRoot(target);
@@ -326,69 +56,48 @@ function init(args = []) {
     process.exit(1);
   }
 
-  const electronDir = path.join(root, 'electron');
-  fs.mkdirSync(electronDir, { recursive: true });
+  const created = [];
+  const notes = adapter.writeBootstrap(root);
+  created.push('electron/main.js', 'electron/preload.js');
 
-  const mainPath = path.join(electronDir, 'main.js');
-  const preloadPath = path.join(electronDir, 'preload.js');
+  // the settings file: created when missing, an existing one is left alone (kreft add asks before it replaces one)
+  if (!desktop.configFile(root, 'electron')) {
+    const file = path.join(root, 'config', 'electron.config.js');
+    fs.mkdirSync(path.dirname(file), { recursive: true });
+    fs.writeFileSync(file, desktop.template('electron', desktop.isEsmProject(root)));
+    created.unshift('config/electron.config.js');
+  }
 
-  const wroteMain = !fs.existsSync(mainPath);
-  if (wroteMain) fs.writeFileSync(mainPath, TEMPLATES.main());
-  const wrotePreload = !fs.existsSync(preloadPath);
-  if (wrotePreload) fs.writeFileSync(preloadPath, TEMPLATES.preload());
-
-  // Update package.json
   const pkg = JSON.parse(fs.readFileSync(pkgFile, 'utf8'));
   pkg.main = 'electron/main.js';
   pkg.scripts = pkg.scripts || {};
-  pkg.scripts['electron'] = 'kreft electron';
-  pkg.scripts['electron:dev'] = 'kreft electron:dev';
-  pkg.scripts['electron:build'] = 'kreft electron:build';
-  pkg.scripts['electron:build:mac'] = 'kreft electron:build --mac';
-  pkg.scripts['electron:build:win'] = 'kreft electron:build --win';
-  pkg.scripts['electron:build:linux'] = 'kreft electron:build --linux';
-  pkg.scripts['electron:build:all'] = 'kreft electron:build --mac --win --linux';
-
+  Object.assign(pkg.scripts, {
+    'electron': 'kreft electron',
+    'electron:dev': 'kreft electron:dev',
+    'electron:build': 'kreft electron:build',
+    'electron:build:mac': 'kreft electron:build --mac',
+    'electron:build:win': 'kreft electron:build --win',
+    'electron:build:linux': 'kreft electron:build --linux',
+    'electron:build:all': 'kreft electron:build --mac --win --linux',
+  });
   pkg.devDependencies = pkg.devDependencies || {};
-  if (!pkg.devDependencies['electron']) pkg.devDependencies['electron'] = '^34.2.0';
-  if (!pkg.devDependencies['electron-builder']) pkg.devDependencies['electron-builder'] = '^25.1.8';
-
-  pkg.build = pkg.build || {
-    appId: `com.kreftjs.${(pkg.name || 'app').toLowerCase().replace(/[^a-z0-9]/g, '')}`,
-    productName: pkg.name ? pkg.name.replace(/-/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase()) : 'Kreft Desktop',
-    directories: { output: 'dist-electron', buildResources: 'build' },
-    files: ['dist/**/*', 'electron/**/*', 'build/icon.png', 'package.json'],
-    mac: { target: ['dmg', 'zip'], category: 'public.app-category.developer-tools', icon: 'build/icon.png' },
-    win: { target: ['nsis', 'portable'], icon: 'build/icon.png' },
-    nsis: { oneClick: false, allowToChangeInstallationDirectory: true },
-    linux: { target: ['AppImage', 'deb', 'rpm'], category: 'Utility', icon: 'build/icon.png' },
-  };
+  if (!pkg.devDependencies['electron']) pkg.devDependencies['electron'] = ELECTRON_VERSION;
+  if (!pkg.devDependencies['electron-builder']) pkg.devDependencies['electron-builder'] = BUILDER_VERSION;
+  fs.writeFileSync(pkgFile, JSON.stringify(pkg, null, 2) + '\n');
 
   // The app icon: replace build/icon.png with your own (square PNG, 512x512 or bigger)
-  const iconFile = path.join(root, 'build', 'icon.png');
-  let wroteIcon = false;
-  if (!fs.existsSync(iconFile)) {
-    const logo = path.join(__dirname, '..', 'assets', 'logo-mark.png');
-    if (fs.existsSync(logo)) {
-      fs.mkdirSync(path.dirname(iconFile), { recursive: true });
-      fs.copyFileSync(logo, iconFile);
-      wroteIcon = true;
-    }
-  }
-
-  ensureMeta(pkg);
-  fs.writeFileSync(pkgFile, JSON.stringify(pkg, null, 2) + '\n');
+  if (require('./app-icon.js').ensureIcon(root).made) created.push('build/icon.png  (the app icon: replace it with your own, square PNG 512x512 or bigger)');
 
   const droppedFonts = dropWebFonts(root);
 
   console.log(`
   Electron configured for Kreft:
-    CREATED  electron/main.js
-    CREATED  electron/preload.js${wroteIcon ? `
-    CREATED  build/icon.png  (the app icon: replace it with your own, square PNG 512x512 or bigger)` : ''}
+${created.map((f) => '    CREATED  ' + f).join('\n')}
     UPDATED  package.json  (scripts: electron, electron:dev, electron:build)${droppedFonts ? `
     UPDATED  ${droppedFonts}  (removed the Google Fonts links: a desktop app should start without the network; the system fonts are used)` : ''}
+${notes.map((n) => '    NOTE     ' + n).join('\n')}
 
+  Every setting (window, menu, DevTools, security, tray, updates, installers) is in config/electron.config.js.
   Next:
     npm install            (install electron & electron-builder)
     kreft electron:dev       (start dev server & launch desktop window)
@@ -421,6 +130,37 @@ function resolveElectronBinary(root) {
   return 'electron';
 }
 
+// npm asks the project which install scripts may run (allowScripts). Electron's downloads the app binary, so the version that is
+// installed is allowed, the way `npm approve-scripts` writes it (an exact version: npm ignores ranges). A later version is a new decision.
+// An entry the developer wrote, even false, stays as it is. Returns true when package.json was changed.
+function approveElectronScript(root) {
+  let installed;
+  try { installed = JSON.parse(fs.readFileSync(path.join(root, 'node_modules', 'electron', 'package.json'), 'utf8')).version; } catch (_) { return false; }
+  if (!/^\d+\.\d+\.\d+$/.test(String(installed))) return false;
+  const file = path.join(root, 'package.json');
+  const pkg = JSON.parse(fs.readFileSync(file, 'utf8'));
+  if (!pkg.allowScripts || typeof pkg.allowScripts !== 'object' || Array.isArray(pkg.allowScripts)) pkg.allowScripts = {};
+  if (Object.keys(pkg.allowScripts).some((k) => k === 'electron' || k.startsWith('electron@'))) return false;
+  pkg.allowScripts[`electron@${installed}`] = true;
+  fs.writeFileSync(file, JSON.stringify(pkg, null, 2) + '\n');
+  return true;
+}
+
+// Electron downloads its app binary in its install script. Where npm did not run that script (a newer npm that asks first,
+// --ignore-scripts, a failed download), the first start would end in "Electron failed to install correctly". Run it here.
+function ensureElectronBinary(root, run = runSync) {
+  const dir = path.join(root, 'node_modules', 'electron');
+  const installer = path.join(dir, 'install.js');
+  if (!fs.existsSync(installer)) return { ok: false, reason: 'missing' };
+  const pathTxt = path.join(dir, 'path.txt');
+  const have = () => { try { return fs.existsSync(path.join(dir, 'dist', fs.readFileSync(pathTxt, 'utf8').trim())); } catch (_) { return false; } };
+  if (have()) return { ok: true, downloaded: false };
+  console.log('  Downloading the Electron app (npm did not run its install script)…');
+  const r = run(process.execPath, [installer], { cwd: dir, stdio: 'inherit' });
+  if (r.error || r.status || !have()) return { ok: false, reason: 'failed' };
+  return { ok: true, downloaded: true };
+}
+
 function resolveBuilderBinary(root) {
   const local = path.join(root, 'node_modules', '.bin', process.platform === 'win32' ? 'electron-builder.cmd' : 'electron-builder');
   if (fs.existsSync(local)) return local;
@@ -447,31 +187,36 @@ function help() {
   Kreft + Electron: your app as a desktop program (Windows, macOS, Linux)
 
   Commands
+    kreft add electron            Add desktop support to this app: config/electron.config.js, electron/, scripts, packages
+        --force                   Replace an existing config/electron.config.js (without it, you are asked; never replaced silently)
+        --no-install              Do not run npm install
     kreft new <name> --electron   A new app with desktop support
-    kreft electron:init           Add desktop support to an existing app (alias: kreft make:electron)
-                                  Writes electron/main.js, electron/preload.js, build/icon.png and the build block
-                                  in package.json. Files that exist are never overwritten.
+    kreft electron:init           Like add, without npm install (alias: kreft make:electron)
+                                  Files that exist are never overwritten (the generated electron/main.js is brought up to date).
     kreft electron                Open the app in its own window: no browser, no URL (alias: kreft electron:dev)
-        --devtools[=right|bottom|left|detach]   Open DevTools     --no-devtools   Do not
+        --devtools[=right|bottom|left|detach]   Open DevTools at start    --no-devtools   Do not
+        --menu=hidden|visible|auto              The window menu
+        --set group.option=value  Change any setting for this run, like --set window.width=1000
         --port <number>           Private port for the hidden dev server (default: the next free one)
     kreft electron:build          Build the app (kreft build --base ./) and make installers in dist-electron/
         --mac --win --linux       Choose the systems (more electron-builder flags work: --arm64, --x64, --dir)
+    kreft electron:config         Check config/electron.config.js and print the final settings (--json for machines)
     npm run electron:build:mac    .dmg and .zip
     npm run electron:build:win    NSIS installer and portable .exe
     npm run electron:build:linux  AppImage, .deb and .rpm
     npm run electron:build:all    All three
     kreft electron:help           This text
 
-  Window menu     ELECTRON_MENU=show (default) | auto (Alt shows it) | hide
-                  From a page: kreftDesktop.setMenu('hide'), kreftDesktop.getMenu()
-                  (macOS always keeps one app menu with Quit)
-  DevTools        ELECTRON_DEVTOOLS=right|bottom|left|detach|false, or F12 / Ctrl+Shift+I
+  Settings        config/electron.config.js: app, window, menu, contextMenu, devtools, webview, security, tray,
+                  notifications, updates, packaging. Last wins: defaults, kreftjs.config.json ("desktop"), the file,
+                  environment (KREFT_ELECTRON_WINDOW_WIDTH=1000), command line (--set window.width=1000).
+  Window menu     hidden by default. menu.visibility: 'visible' | 'auto' (Alt shows it). From a page: kreftDesktop.setMenu('visible')
+                  (macOS always keeps one app menu with Quit and an Edit menu)
+  DevTools        allowed while you work, closed at start (devtools.openOnStart), not in the installed app (devtools.production)
+                  F12 or Ctrl+Shift+I toggles them where they are allowed
   App icon        build/icon.png, a square PNG of 512x512 or more (.icns and .ico are made from it)
-  App name        build.productName and build.appId in package.json
-  Installer info  description, homepage, author (with e-mail) and build.linux.maintainer in package.json
-                  (missing ones are filled in from git when you build; check them)
-  From a page     if (Kreftjs.isElectron) kreftDesktop.getInfo(), minimize(), maximize(), close(),
-                  showMessageBox(), showOpenDialog(), showSaveDialog(), openDevTools()
+  From a page     if (Kreftjs.isElectron) kreftDesktop.getInfo(), minimize(), maximize(), close(), notify(),
+                  showMessageBox(), showOpenDialog(), showSaveDialog(), openDevTools(), onMenu(), onTray()
 
   Good to know
     - Build each system on that system. On a Mac, .deb and .rpm fail: build them on Linux.
@@ -482,8 +227,17 @@ function help() {
               "electron-builder is not installed" -> kreft add -D electron-builder
               White window in the app -> run electron:build again (it needs --base ./)
 
-  Full guide: docs/README.md, "Desktop apps with Electron"
+  Full guide: docs/README.md, "Desktop apps with Electron" and "Desktop configuration"
 `);
+}
+
+// kreft electron:config: check the file and show the result
+async function configCommand(args = []) {
+  const root = getProjectRoot();
+  const r = await desktop.resolveOrExit('electron', root, { args, quiet: false });
+  if (args.includes('--json')) { console.log(JSON.stringify(r.config, null, 2)); return; }
+  console.log(`  Electron configuration is valid.\n  Layers used (last wins): defaults${r.layers.length ? ', ' + r.layers.join(', ') : ''}\n`);
+  console.log(JSON.stringify(r.config, null, 2));
 }
 
 function dev(args = []) {
@@ -493,30 +247,28 @@ function dev(args = []) {
   return freePort(Number(process.env.PORT) || 8000).then((port) => startDev(args, port));
 }
 
-function startDev(args, port) {
+async function startDev(args, port) {
   const root = getProjectRoot();
-  const electronMain = path.join(root, 'electron', 'main.js');
-  if (!fs.existsSync(electronMain)) {
+  if (!fs.existsSync(path.join(root, 'electron', 'main.js'))) {
     console.log('  Electron files not found. Initializing…');
     init();
   }
+  // check config/electron.config.js (and the environment and flags) and give the window the result
+  const r = await desktop.resolveOrExit('electron', root, { args, mode: 'development' });
+  adapter.writeBootstrap(root);
+  adapter.writeRuntimeFiles(root, r.config);
 
   // Load .env if present
   try { require('./env.js').load(root); } catch (_) {}
 
-  const bin = resolveElectronBinary(root);
-
-  // Extract devtools settings from CLI args or environment
-  let devToolsEnv = process.env.ELECTRON_DEVTOOLS || process.env.KREFT_ELECTRON_DEVTOOLS || '';
-  const devToolsArg = args.find((a) => a === '--devtools' || a.startsWith('--devtools=') || a === '--no-devtools');
-  if (devToolsArg) {
-    if (devToolsArg === '--devtools') devToolsEnv = 'right';
-    else if (devToolsArg === '--no-devtools') devToolsEnv = 'false';
-    else devToolsEnv = devToolsArg.split('=')[1] || 'right';
+  const ensured = ensureElectronBinary(root);
+  if (ensured.reason === 'failed') {
+    console.error('\n  The Electron app could not be downloaded. Check your internet connection, then run:\n    node node_modules/electron/install.js\n  or:  npm rebuild electron\n');
+    process.exit(1);
   }
-
-  const serverArgs = args.filter((a) => a !== '--devtools' && !a.startsWith('--devtools=') && a !== '--no-devtools');
-  if (!serverArgs.some((a) => a === '--port' || a === '-p')) serverArgs.push('--port', String(port));
+  const bin = resolveElectronBinary(root);
+  const serverArgs = r.rest.filter((a, i, all) => a !== '--port' && a !== '-p' && all[i - 1] !== '--port' && all[i - 1] !== '-p');
+  serverArgs.push('--port', String(port));
 
   // 1. Start dev server child process
   console.log('  Starting the Kreft desktop window…');
@@ -530,17 +282,10 @@ function startDev(args, port) {
   // 2. Launch Electron after small pause
   let electronProcess = null;
   setTimeout(() => {
-    const electronArgs = ['.'];
-    if (devToolsArg) electronArgs.push(devToolsArg);
-    electronProcess = spawn(bin, electronArgs, {
+    electronProcess = spawn(bin, ['.'], {
       cwd: root,
       stdio: 'inherit',
-      env: {
-        ...process.env,
-        NODE_ENV: 'development',
-        PORT: String(port),
-        ...(devToolsEnv ? { ELECTRON_DEVTOOLS: devToolsEnv } : {}),
-      },
+      env: { ...process.env, NODE_ENV: 'development', PORT: String(port) },
     });
 
     electronProcess.on('exit', (code) => {
@@ -576,29 +321,53 @@ function startDev(args, port) {
   process.on('SIGTERM', cleanup);
 }
 
-function build(args = []) {
+// The options of `kreft electron:build` that belong to electron-builder, and the rest, which belong to `kreft build` (the site).
+// An option that takes a value (--publish never) goes with its value, whichever side it is on.
+// --mac / --win / --linux take optional targets that electron-builder reads too (--win nsis, --mac dmg zip),
+// so the words that follow them go to electron-builder, not to the site build.
+const BUILDER_PLATFORM = /^--(mac|win|linux)$/;
+const BUILDER_FLAG = /^--(dir|x64|arm64|ia32|armv7l|universal)$/;
+const BUILDER_WITH_VALUE = /^(--publish|-p|--prepackaged|--pd|--projectDir)$/;
+const BUILDER_INLINE = /^(--publish=.+|-p=.+|--prepackaged=.+|--pd=.+|--projectDir=.+|-c\.[^=\s]+=.*|--config\.[^=\s]+=.*)$/;
+function splitBuildArgs(args = []) {
+  const builder = [], site = [];
+  for (let i = 0; i < args.length; i++) {
+    const a = args[i];
+    if (BUILDER_PLATFORM.test(a)) {
+      builder.push(a);
+      // the targets that follow belong to electron-builder too: --win nsis, --mac dmg zip, --linux AppImage deb
+      while (args[i + 1] !== undefined && !String(args[i + 1]).startsWith('-')) builder.push(args[++i]);
+    } else if (BUILDER_FLAG.test(a) || BUILDER_INLINE.test(a)) builder.push(a);
+    else if (BUILDER_WITH_VALUE.test(a)) {
+      builder.push(a);
+      if (args[i + 1] !== undefined && !String(args[i + 1]).startsWith('-')) builder.push(args[++i]);
+    } else site.push(a);
+  }
+  return { builder, site };
+}
+
+async function build(args = []) {
   // --all is a Kreft shortcut for --mac --win --linux (electron-builder has no such flag)
   if (args.includes('--all')) args = [...args.filter((a) => a !== '--all'), ...['--mac', '--win', '--linux'].filter((p) => !args.includes(p))];
   const root = getProjectRoot();
-  const electronMain = path.join(root, 'electron', 'main.js');
-  if (!fs.existsSync(electronMain)) {
+  if (!fs.existsSync(path.join(root, 'electron', 'main.js'))) {
     console.log('  Electron files not found. Initializing…');
     init();
   }
 
-  try {
-    const f = path.join(root, 'package.json');
-    const pkg = JSON.parse(fs.readFileSync(f, 'utf8'));
-    if (ensureMeta(pkg)) {
-      fs.writeFileSync(f, JSON.stringify(pkg, null, 2) + '\n');
-      console.log('  Added description / author / Linux maintainer to package.json (needed for installers). Please check them.');
-    }
-  } catch (_) {}
+  // check the settings first: a mistake should stop the build before it spends minutes
+  const r = await desktop.resolveOrExit('electron', root, { args, mode: 'production' });
+  if (!r.config.security.csp) console.warn('  Note: security.csp is not set, so the installed app has no Content-Security-Policy. Set it in config/electron.config.js for releases, like "default-src \'self\'" (add the sites your app uses).');
+  adapter.writeBootstrap(root);
+  adapter.writeRuntimeFiles(root, r.config);
+  const pkg = desktop.readPackage(root);
+  if (pkg.build) console.log('  Note: the "build" block in package.json is ignored. The installers are made from config/electron.config.js.');
 
   // 1. Build Kreft frontend for desktop with relative base
   console.log('\n  Step 1: Building Kreft static bundle with relative base (./)…');
   const kreftCli = path.join(__dirname, 'kreftjs.js');
-  const buildProc = spawn(process.execPath, [kreftCli, 'build', '--base', './', ...args.filter((a) => !/^--(mac|win|linux|dir|x64|arm64|ia32|armv7l|universal|publish.*)$/.test(a))], {
+  const split = splitBuildArgs(r.rest);
+  const buildProc = spawn(process.execPath, [kreftCli, 'build', '--base', './', ...split.site], {
     cwd: root,
     stdio: 'inherit',
   });
@@ -612,7 +381,7 @@ function build(args = []) {
     // 2. Run electron-builder
     console.log('\n  Step 2: Packaging desktop executable with electron-builder…');
     const builderBin = resolveBuilderBinary(root);
-    const packProc = spawn(builderBin, args, {
+    const packProc = spawn(builderBin, ['--config', 'electron/builder.config.json', ...split.builder], {
       cwd: root,
       stdio: 'inherit',
     });
@@ -631,10 +400,16 @@ function build(args = []) {
 }
 
 module.exports = {
+  ELECTRON_VERSION,
+  BUILDER_VERSION,
   init,
+  ensureElectronBinary,
+  approveElectronScript,
   help,
   dev,
   run: dev,
   build,
+  config: configCommand,
+  splitBuildArgs,
   TEMPLATES,
 };

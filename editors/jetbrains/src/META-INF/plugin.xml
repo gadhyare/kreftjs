@@ -1,0 +1,33 @@
+<idea-plugin>
+  <id>com.kreft.jetbrains</id>
+  <name>Kreft</name>
+  <version>0.1.0</version>
+  <vendor url="https://github.com/gadhyare/kreftjs">Kreft</vendor>
+  <description><![CDATA[
+    <p>Support for <a href="https://github.com/gadhyare/kreftjs">Kreft</a> <code>.kreft</code> component files
+    (and <code>.kreftjs</code> files from the 0.0.x betas) in WebStorm, PhpStorm, IntelliJ IDEA, PyCharm, RubyMine,
+    GoLand, Rider and Android Studio.</p>
+    <ul>
+      <li><b>Colors and completion</b>: a .kreft file is opened as HTML, so the &lt;view&gt; markup, the CSS in
+      &lt;style&gt; and the JavaScript in &lt;script&gt; are highlighted and completed.</li>
+      <li><b>Emmet</b>: type <code>ul&gt;li.item*3</code> in &lt;view&gt; or <code>m10</code>, <code>df</code> in
+      &lt;style&gt; and press Tab.</li>
+      <li><b>Live templates</b>: <code>kreftjs</code>, <code>state</code>, <code>action</code>, <code>for</code>,
+      <code>kreft-wait</code> and more, then Tab.</li>
+    </ul>
+  ]]></description>
+  <change-notes><![CDATA[
+    <p>0.1.0: the first version. .kreft files as HTML, Emmet, live templates.</p>
+  ]]></change-notes>
+  <idea-version since-build="223"/>
+
+  <depends>com.intellij.modules.platform</depends>
+  <depends>com.intellij.modules.xml</depends>
+
+  <extensions defaultExtensionNs="com.intellij">
+    <!-- no implementationClass: this adds the two extensions to the IDE's own HTML file type, Emmet included -->
+    <fileType name="HTML" extensions="kreft;kreftjs"/>
+    <!-- written by build.js from editors/vscode/snippets/kreftjs.json -->
+    <defaultLiveTemplates file="/liveTemplates/Kreft.xml"/>
+  </extensions>
+</idea-plugin>

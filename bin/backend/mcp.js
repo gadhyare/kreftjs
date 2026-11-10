@@ -57,6 +57,13 @@ class McpServer {
       }
       // What is checked below is the SQL without its 'string literals', so a value can't hide or fake a name
       const code = cleanSql.replace(/'(?:[^']|'')*'/g, "''");
+      // SQLite reads 'name' in single quotes as a table or column name where a name is expected (users.'password', FROM 'sessions').
+      // Such a name is judged like any other: it is looked at as it is written, not removed with the string literals.
+      const NAME_SPOTS = /(?:\.\s*|\b(?:from|join|using|table|into|update|as)[\s(]*)'((?:[^']|'')*)'/gi;
+      const asNames = [...cleanSql.matchAll(NAME_SPOTS)].map((m) => m[1]);
+      // a name in a FROM list after a comma (FROM users, 'sessions'): a quoted text before any WHERE / GROUP / ORDER is a name
+      for (const m of cleanSql.matchAll(/,\s*'((?:[^']|'')*)'/g)) { if (/\bfrom\b/i.test(cleanSql.slice(0, m.index)) && !/\b(where|group|order|having|limit|union)\b/i.test(cleanSql.slice(0, m.index))) asNames.push(m[1]); }
+      const quotedNames = asNames.join(' ');
       // Mutations, files, sleeping, locks, and statements that make something new (SELECT … INTO)
       const DANGEROUS_SQL_RE = /\b(insert|update|delete|drop|alter|create|truncate|replace|grant|revoke|pragma|attach|detach|vacuum|reindex|analyze|copy|call|exec|execute|into|set_config|set|load_file|load_extension|writefile|readfile|edit|fts3_tokenizer|lo_\w+|dblink\w*|pg_(?:read|write|ls|sleep|terminate|cancel|reload|stat)\w*|sys_eval|xp_cmdshell|sleep|benchmark|randomblob|zeroblob|generate_series|for\s+(?:update|share|no\s+key\s+update|key\s+share)|lock|outfile|dumpfile)\b/i;
       if (DANGEROUS_SQL_RE.test(code)) {
@@ -65,16 +72,16 @@ class McpServer {
       // Credentials stay out of reach whatever they are renamed to (SELECT password AS p …)
       const SECRET_NAME_RE = /(password|passwd|secret|token|api_?key|private_?key|recovery_?code|credential|salt|hash|authentication)/i;
       const SECRET_TABLE_RE = /\b(personal_access_tokens|password_reset_tokens|password_resets|sessions|failed_jobs|jobs)\b/i;
-      if (SECRET_TABLE_RE.test(code)) {
+      if (SECRET_TABLE_RE.test(code) || SECRET_TABLE_RE.test(quotedNames)) {
         throw new Error('Access denied: this table holds credentials or queued payloads and is not readable via MCP.');
       }
       // The database server's own accounts, sessions and settings are not the app's data (mysql.user holds account hashes,
       // processlist other people's SQL): the app's tables and information_schema.tables / columns are what MCP is for
       const SERVER_INTERNALS_RE = /\b(?:mysql|performance_schema|sys)["`]?\s*\.|\binformation_schema["`]?\s*\.\s*["`]?(?:processlist|user_privileges|schema_privileges|table_privileges|column_privileges|user_attributes|innodb_\w+)|\b(?:pg_authid|pg_shadow|pg_roles|pg_auth_members|pg_user_mappings?|pg_stat_activity|pg_stat_ssl|pg_hba_file_rules|pg_file_settings|pg_settings)\b/i;
-      if (SERVER_INTERNALS_RE.test(code)) {
+      if (SERVER_INTERNALS_RE.test(code) || SERVER_INTERNALS_RE.test(quotedNames)) {
         throw new Error('Access denied: the database server\'s own accounts, sessions and settings are not readable via MCP.');
       }
-      if (SECRET_NAME_RE.test(code)) {
+      if (SECRET_NAME_RE.test(code) || SECRET_NAME_RE.test(quotedNames)) {
         throw new Error('Access denied: columns holding credentials cannot be named in MCP queries (SELECT * hides them).');
       }
       // Whole rows packed into one value (to_json(users), row(…)) would carry hidden columns along
@@ -90,7 +97,24 @@ class McpServer {
       let results = [];
       let timer;
       const guarded = DB.transaction(async () => {
-        results = await DB.select(cleanSql + ` LIMIT ${cappedLimit}`);
+        // SQLite: the engine refuses the credential tables and reads the credential columns as NULL, whatever the SQL looks like.
+        // (The guard is on only while the statement runs, in this same turn: nothing else can use the connection meanwhile.)
+        const conn = require('./query.js').getConnection();
+        const release = typeof conn.guardReads === 'function' ? conn.guardReads((table, column) => {
+          if (SECRET_TABLE_RE.test(table) || /^(?:sqlite_master|sqlite_schema|sqlite_temp_master)$/i.test(table) && /sql/i.test(column)) return 'deny';
+          if (column && SECRET_NAME_RE.test(column)) return 'null';
+          return 'ok';
+        }) : null;
+        // Reading the text of a query is not enough to keep credentials out (SQL can be written in too many ways). Without a
+        // protection that the database engine itself enforces, this tool is off, and the other MCP tools stay available.
+        // For MySQL / PostgreSQL: connect MCP with a database user that can read only the tables it should see (or views), then
+        // set MCP_DATABASE_RESTRICTED=true to say so.
+        if (!release && process.env.MCP_DATABASE_RESTRICTED !== 'true') {
+          throw new Error('query_database is turned off: this database has no read protection enforced by the engine itself (SQLite on Node.js 24 or newer has it). Use a database user that can read only the tables MCP may see, then set MCP_DATABASE_RESTRICTED=true.');
+        }
+        let pending;
+        try { pending = DB.select(cleanSql + ` LIMIT ${cappedLimit}`); } finally { if (release) release(); }
+        results = await pending;
         throw UNDO;
       }).catch((e) => { if (e !== UNDO) throw e; });
       const timedOut = new Promise((_, reject) => { timer = setTimeout(() => reject(new Error(`Query stopped: it took longer than ${limitMs} ms.`)), limitMs); });

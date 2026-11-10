@@ -362,7 +362,7 @@ export default routes;
         collectExpressions(sp.template, fns);
       }
       const precompiledSrc = [...fns]
-        .map(([key, fnSrc]) => `F[${JSON.stringify(key)}] = ${fnSrc};`)
+        .map(([key, fnSrc]) => `F[${JSON.stringify(key)}] = (0, eval)(${JSON.stringify('(' + fnSrc + ')')});`)   // "with" is not allowed in module code: these are made as ordinary (sloppy) functions
         .join('\n');
 
       const runCode = 'with ($scope) {\n' + sp.code + '\n}';
@@ -375,9 +375,8 @@ ${styleImports}
 var F = (typeof window !== 'undefined' && window.Kreftjs && window.Kreftjs.__precompiled) || {};
 ${precompiledSrc}
 
-var __run = function ($scope, $h) {
-${runCode}
-};
+// "with" is not allowed in a module (strict mode), so the function is made the way the runtime makes it
+var __run = new Function('$scope', '$h', ${JSON.stringify(runCode)});
 
 var __def = Kreftjs.__makeDef({
   name: ${JSON.stringify(sp.name)},

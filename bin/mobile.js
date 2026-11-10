@@ -43,6 +43,7 @@ function configFor(root) {
     webDir: 'dist',
     server: { androidScheme: 'https' },
     android: { adjustMarginsForEdgeToEdge: 'force' }, // Android 15+ draws apps under the status bar: keep the page below it
+    backgroundColor: '#111827', // what shows in the strips around the bars (behind the status bar and the gesture bar): the colour of the bars
   };
 }
 
@@ -130,6 +131,9 @@ function setApiUrl(root, url) {
   txt = /^PUBLIC_API_URL=.*$/m.test(txt) ? txt.replace(/^PUBLIC_API_URL=.*$/m, line) : txt + (txt && !txt.endsWith('\n') ? '\n' : '') + line + '\n';
   fs.writeFileSync(file, txt);
   console.log('  PUBLIC_API_URL=' + url + ' (in .env)');
+  // A PUBLIC_API_URL set in the terminal would win over .env when the site is built. The address given on the command line is the one to use.
+  if (process.env.PUBLIC_API_URL && process.env.PUBLIC_API_URL !== url) console.log(`  Note: this terminal has PUBLIC_API_URL=${process.env.PUBLIC_API_URL}. The address you gave is used instead.`);
+  process.env.PUBLIC_API_URL = url;
 }
 
 // Capacitor 7 projects use Gradle 8.11: it needs Java 21 to build Android, and cannot start on Java 24 or newer
@@ -167,6 +171,19 @@ function findJava21() {
 }
 // Write org.gradle.java.home into android/gradle.properties, so Gradle uses a fitting Java from any terminal and from Android Studio,
 // whatever JAVA_HOME says. Never changes a line the person wrote.
+// The strips behind the status bar and the gesture bar show the Android window background (white by default): make it dark, like the bars.
+// Only added once: if you set your own android:windowBackground in styles.xml it is left alone.
+function darkWindowBackground(root, color = '#111827') {
+  const f = path.join(root, 'android', 'app', 'src', 'main', 'res', 'values', 'styles.xml');
+  if (!fs.existsSync(f)) return false;
+  const x = fs.readFileSync(f, 'utf8');
+  if (x.includes('android:windowBackground')) return false;
+  const y = x.replace(/(<style name="AppTheme\.NoActionBar"[^>]*>)/, `$1\n        <item name="android:windowBackground">${color}</item>`);
+  if (y === x) return false;
+  fs.writeFileSync(f, y);
+  return true;
+}
+
 function pinGradleJava(root, home) {
   const file = path.join(root, 'android', 'gradle.properties');
   if (!home || !fs.existsSync(file)) return false;
@@ -242,7 +259,7 @@ async function build(args = [], opts = {}) {
       if (c) process.exit(c);
     }
   }
-  if (fs.existsSync(path.join(root, 'android'))) pinGradleJava(root, androidEnv().JAVA_HOME);
+  if (fs.existsSync(path.join(root, 'android'))) { pinGradleJava(root, androidEnv().JAVA_HOME); darkWindowBackground(root); }
   console.log('\n  Step 2: Copying the build into the native projects…');
   const c = await run(cap, ['sync', ...plats], root);
   if (c) process.exit(c);
@@ -275,12 +292,26 @@ async function open(args = []) {
 }
 
 // ---- a free port, and the one running emulator or phone: no questions when there is nothing to choose ----
+// Is something already answering on this port? (Binding 0.0.0.0 can succeed on macOS even when another server holds localhost:PORT.)
+function answers(port) {
+  const net = require('net');
+  const one = (host) => new Promise((resolve) => {
+    const c = net.connect({ port, host });
+    const done = (v) => { c.destroy(); resolve(v); };
+    c.setTimeout(500, () => done(false));
+    c.once('connect', () => done(true));
+    c.once('error', () => done(false));
+  });
+  return Promise.all([one('127.0.0.1'), one('::1')]).then((r) => r.some(Boolean));
+}
 function freePort(start, tries = 20) {
   const net = require('net');
   return new Promise((resolve) => {
-    const attempt = (p, left) => {
+    const attempt = async (p, left) => {
+      const next = () => (left > 0 ? attempt(p + 1, left - 1) : resolve(start));
+      if (await answers(p)) return next();
       const srv = net.createServer();
-      srv.once('error', () => (left > 0 ? attempt(p + 1, left - 1) : resolve(start)));
+      srv.once('error', next);
       srv.once('listening', () => srv.close(() => resolve(p)));
       srv.listen(p, '0.0.0.0');
     };
@@ -357,6 +388,22 @@ function setup(args = []) {
   return steps;
 }
 
+// How the app reaches the dev server while you work:
+//   usb  an Android phone or emulator that adb can see: `adb reverse` makes the phone's localhost:PORT lead to this computer, through the
+//        cable. No Wi-Fi is needed, it works behind any firewall, and the dev server listens on this computer only.
+//   lan  iOS, no device connected yet, or --lan: this computer's address on the Wi-Fi (10.0.2.2 for an emulator); the server is shared on the network.
+function liveMode({ plat, devices = [], ip = null, target = null, lan = false }) {
+  if (plat === 'android' && !lan && devices.length) return { kind: 'usb', host: 'localhost', bind: [] };
+  const host = target && /^emulator-/.test(target) ? '10.0.2.2' : (ip ? ip.address : 'localhost');
+  return { kind: 'lan', host, bind: ['--host', '0.0.0.0'] };
+}
+function adbRun(id, args) {
+  const r = require('child_process').spawnSync(adbBin(), ['-s', id, ...args], { encoding: 'utf8' });
+  return !r.error && r.status === 0;
+}
+const adbReverse = (id, port) => adbRun(id, ['reverse', `tcp:${port}`, `tcp:${port}`]);
+const adbUnreverse = (id, port) => adbRun(id, ['reverse', '--remove', `tcp:${port}`]);
+
 async function dev(args = []) {
   const root = projectRoot();
   requireApp(root);
@@ -364,22 +411,48 @@ async function dev(args = []) {
   if (!cap) { console.error('\n  Capacitor is not installed. Run:  npm install\n'); process.exit(1); }
   const plat = platforms(args)[0] || 'android';
   if (!args.includes('--no-setup')) { console.log('\n  First-run setup (skip with --no-setup)'); for (const st of setupApp(root)) console.log(`    ${st.ok ? '✔' : '✖'} ${st.text}`); }
-  if (fs.existsSync(path.join(root, 'android'))) pinGradleJava(root, androidEnv().JAVA_HOME);
+  // a new app has no android/ or ios/ yet, and `cap run` needs the project and a built dist/: prepare them once (the same steps as mobile:build)
+  if (!fs.existsSync(path.join(root, plat)) || !fs.existsSync(path.join(root, 'dist', 'index.html'))) {
+    console.log(`\n  The ${plat} project is not ready yet: preparing it (once)…`);
+    await build(['--' + plat], { quiet: true });
+  }
+  if (fs.existsSync(path.join(root, 'android'))) { pinGradleJava(root, androidEnv().JAVA_HOME); darkWindowBackground(root); }
   const wanted = Number(process.env.PORT) || 8000;
   const port = String(await freePort(wanted));
   if (Number(port) !== wanted) console.log(`  Port ${wanted} is busy: using ${port}`);
   const ip = Object.values(require('os').networkInterfaces()).flat().find((n) => n && n.family === 'IPv4' && !n.internal);
   const target = pickTarget(args, plat);
-  // the Android emulator reaches this computer as 10.0.2.2; a phone needs this computer's address on the Wi-Fi
-  const liveHost = target && /^emulator-/.test(target) ? '10.0.2.2' : (ip ? ip.address : 'localhost');
-  console.log(`  Dev server: http://${liveHost}:${port}${liveHost === '10.0.2.2' ? '  (how the emulator reaches this computer)' : '  (the phone must be on the same network)'}`);
-  // the dev server answers only this computer by default: share it on the network (--host) and allow the names the phone uses to reach it
-  const allowed = [ip && ip.address, '10.0.2.2', process.env.KREFT_ALLOWED_HOSTS].filter(Boolean).join(','); // 10.0.2.2 is how the Android emulator names this computer
-  const server = spawn(process.execPath, [path.join(__dirname, 'kreftjs.js'), 'dev', '--seed', '--host', '0.0.0.0', '--port', port], { cwd: root, stdio: 'inherit', env: { ...process.env, PORT: port, KREFT_ALLOWED_HOSTS: allowed } });
-  const stop = () => { try { server.kill('SIGTERM'); } catch (_) {} process.exit(0); };
+  const devices = plat === 'android' ? runningAndroid() : [];
+  const lan = args.includes('--lan');
+  let mode = liveMode({ plat, devices, ip, target, lan });
+  const reversed = [];
+  if (mode.kind === 'usb') {
+    for (const d of (target && devices.includes(target) ? [target] : devices)) if (adbReverse(d, port)) reversed.push(d); // --target: only that device
+    if (!reversed.length) mode = liveMode({ plat, devices: [], ip, target, lan }); // adb would not open the tunnel: use the network instead
+  }
+  if (mode.kind === 'usb') console.log(`  Dev server: http://localhost:${port}  (${reversed.join(', ')} reaches this computer through the USB cable: no Wi-Fi needed, and the server is not open to your network)`);
+  else console.log(`  Dev server: http://${mode.host}:${port}  (${mode.host === '10.0.2.2' ? 'how the emulator reaches this computer' : 'the phone must be on the same Wi-Fi as this computer'}; the server is open to your network)`);
+  // on the network the server must also answer the names the phone uses (10.0.2.2 is how the Android emulator names this computer)
+  const allowed = [ip && ip.address, '10.0.2.2', process.env.KREFT_ALLOWED_HOSTS].filter(Boolean).join(',');
+  const server = spawn(process.execPath, [path.join(__dirname, 'kreftjs.js'), 'dev', '--seed', ...mode.bind, '--port', port], { cwd: root, stdio: 'inherit', env: { ...process.env, PORT: port, ...(mode.kind === 'lan' ? { KREFT_ALLOWED_HOSTS: allowed } : {}) } });
+  // Capacitor's deploy can restart adb, which drops the USB tunnel: keep it open, and restart the app once if it had to be re-opened
+  let keeper = null;
+  let appPkg = null;
+  try { appPkg = JSON.parse(fs.readFileSync(path.join(root, 'capacitor.config.json'), 'utf8')).appId; } catch (_) { /* no config */ }
+  if (reversed.length) {
+    const has = (d) => { const r = require('child_process').spawnSync(adbBin(), ['-s', d, 'reverse', '--list'], { encoding: 'utf8' }); return !r.error && r.stdout.includes(`tcp:${port}`); };
+    keeper = setInterval(() => {
+      for (const d of reversed) {
+        if (has(d)) continue;
+        if (adbReverse(d, port) && appPkg) adbRun(d, ['shell', 'am', 'start', '-S', '-n', `${appPkg}/.MainActivity`]);
+      }
+    }, 2000);
+  }
+  const cleanup = () => { if (keeper) clearInterval(keeper); try { server.kill('SIGTERM'); } catch (_) {} for (const d of reversed) adbUnreverse(d, port); };
+  const stop = () => { cleanup(); process.exit(0); };
   process.on('SIGINT', stop); process.on('SIGTERM', stop);
-  const c = await run(cap, ['run', plat, '--live-reload', '--host', liveHost, '--port', port, ...(target ? ['--target', target] : [])], root);
-  try { server.kill('SIGTERM'); } catch (_) {}
+  const c = await run(cap, ['run', plat, '--live-reload', '--host', mode.host, '--port', port, ...(target ? ['--target', target] : [])], root);
+  cleanup();
   process.exit(c);
 }
 
@@ -436,8 +509,10 @@ function help() {
     kreft mobile:init                  add Capacitor to this project
     kreft mobile:build --android       build the site and sync it into android/   (--ios for iOS; no flag: both that exist)
     kreft mobile:build --api-url https://api.example.com
+    kreft mobile:release --android --api-url https://api.example.com --create-keystore   a signed .apk and .aab (--ios, --harmony: see kreft mobile:release --help)
                                        the address of your server (the backend does not run inside the phone)
     kreft mobile:run --android         build, then install and start the app on an emulator or phone (--ios; --target <id> picks the device)
+    kreft mobile:dev --android         live reload: the phone reaches your computer through the USB cable (--lan: through the Wi-Fi instead)
     kreft mobile:setup                 first-run setup: APP_KEY (key:generate), storage:link and migrate; safe to run again
     kreft mobile:open --android        open Android Studio (--ios: Xcode)
     kreft mobile:icons logo.png --bg "#ffffff"     make the app icon in every size (a 1024x1024 PNG)
@@ -449,4 +524,4 @@ function help() {
 `);
 }
 
-module.exports = { freePort, pickTarget, runningAndroid, RETIRE_SW, PLUGINS, appKeyState, setupApp, setup, pinGradleJava, run: runApp, pngSize, assetPlan, init, icons: (a) => assetsCmd('icons', a), splash: (a) => assetsCmd('splash', a), build, open, dev, help, appId, configFor, androidEnv, javaMajor, findJava21 };
+module.exports = { darkWindowBackground, liveMode, adbReverse, adbUnreverse, freePort, pickTarget, runningAndroid, RETIRE_SW, PLUGINS, appKeyState, setupApp, setup, pinGradleJava, run: runApp, pngSize, assetPlan, init, icons: (a) => assetsCmd('icons', a), splash: (a) => assetsCmd('splash', a), build, open, dev, help, appId, configFor, androidEnv, javaMajor, findJava21 };

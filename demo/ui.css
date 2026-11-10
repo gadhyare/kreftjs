@@ -1,38 +1,49 @@
 /*
- * ui.css: Clean, eye-friendly design system inspired by shadcn/ui (Zinc palette).
- * Subtle 1px zinc borders, smooth 6px/8px radii, crisp Geist/Inter typography, and dark mode.
+ * ui.css: the "Horizon" design system.
+ * A cool, bright canvas, cobalt as the brand colour with a cyan accent, generous 12/18px radii, soft layered shadows,
+ * tight display type, and a deep-navy dark mode. Orange is only for "coming soon".
+ * The class names and colour variables are the same as before, so every page takes the new look at once.
  */
 
 :root {
   color-scheme: light;
-  --background: #ffffff;
-  --foreground: #09090b;
+  --background: #f5f7fb;
+  --foreground: #0a1020;
   --card: #ffffff;
-  --card-border: #e4e4e7;
-  --primary: #18181b;
-  --primary-hover: #27272a;
-  --primary-foreground: #fafafa;
-  --accent: #f4f4f5;
-  --accent-strong: #e4e4e7;
-  --muted: #52525b;
-  --border: #e4e4e7;
-  --border-subtle: #f4f4f5;
-  --input: #e4e4e7;
-  --ring: #18181b;
-  --radius: 6px;
-  --radius-lg: 8px;
+  --card-border: #e2e8f1;
+  --primary: #2f5bff;
+  --primary-2: #0a9bd6;
+  --primary-hover: #1f46e0;
+  --primary-foreground: #ffffff;
+  --accent: #edf1f8;
+  --accent-strong: #dfe6f1;
+  --muted: #55627a;
+  --border: #e2e8f1;
+  --border-subtle: #eef2f8;
+  --input: #d6deeb;
+  --ring: #2f5bff;
+  --radius: 12px;
+  --radius-lg: 18px;
   --destructive: #dc2626;
   --destructive-bg: #fef2f2;
-  --success: #059669;
-  --success-bg: #ecfdf5;
-  --terminal-bg: #09090b;
-  --terminal-fg: #f4f4f5;
+  --success: #0b9a6b;
+  --success-bg: #e8f8f1;
+  --warm: #e8590c;
+  --warm-bg: #fff1e8;
+  --terminal-bg: #0a1020;
+  --terminal-fg: #e7eefc;
+  --shadow-sm: 0 1px 2px rgba(10, 16, 32, 0.05);
+  --shadow-md: 0 1px 2px rgba(10, 16, 32, 0.04), 0 8px 24px rgba(10, 16, 32, 0.06);
+  --shadow-lg: 0 2px 4px rgba(10, 16, 32, 0.04), 0 18px 48px rgba(32, 60, 140, 0.14);
+  --glow-a: rgba(47, 91, 255, 0.12);
+  --glow-b: rgba(10, 155, 214, 0.10);
   --font: 'Geist', 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
   --mono: 'Geist Mono', 'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
   /* compatibility aliases */
   --ink: var(--foreground);
   --ember: var(--primary);
   --fog: var(--background);
+  --brand: linear-gradient(120deg, var(--primary), var(--primary-2));
   /* one page width for every Kreft page (like Bootstrap's .container) */
   --container: 1240px;
   --container-pad: 28px;
@@ -40,52 +51,68 @@
 
 @media (prefers-color-scheme: dark) {
   :root:not([data-theme="light"]) {
-    color-scheme: dark;
-    --background: #09090b;
-    --foreground: #fafafa;
-    --card: #09090b;
-    --card-border: #27272a;
-    --primary: #fafafa;
-    --primary-hover: #e4e4e7;
-    --primary-foreground: #18181b;
-    --accent: #18181b;
-    --accent-strong: #27272a;
-    --muted: #a1a1aa;
-    --border: #27272a;
-    --border-subtle: #18181b;
-    --input: #27272a;
-    --ring: #d4d4d8;
-    --destructive: #ef4444;
-    --destructive-bg: #450a0a;
-    --success: #10b981;
-    --success-bg: #064e3b;
-    --terminal-bg: #09090b;
-    --terminal-fg: #f4f4f5;
+  color-scheme: dark;
+  --background: #060a14;
+  --foreground: #eef3fc;
+  --card: #0d1424;
+  --card-border: #1b2740;
+  --primary: #5b82ff;
+  --primary-2: #22d3ee;
+  --primary-hover: #7d9bff;
+  --primary-foreground: #060a14;
+  --accent: #101a2e;
+  --accent-strong: #1b2740;
+  --muted: #8d9bb5;
+  --border: #1b2740;
+  --border-subtle: #111a2c;
+  --input: #223250;
+  --ring: #7d9bff;
+  --destructive: #f87171;
+  --destructive-bg: #3b0d0d;
+  --success: #34d399;
+  --success-bg: #06382b;
+  --warm: #fb923c;
+  --warm-bg: #3a1c0a;
+  --terminal-bg: #050912;
+  --terminal-fg: #e7eefc;
+  --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.4);
+  --shadow-md: 0 1px 2px rgba(0, 0, 0, 0.35), 0 8px 24px rgba(0, 0, 0, 0.35);
+  --shadow-lg: 0 2px 4px rgba(0, 0, 0, 0.4), 0 18px 48px rgba(0, 0, 0, 0.55);
+  --glow-a: rgba(91, 130, 255, 0.16);
+  --glow-b: rgba(34, 211, 238, 0.10);
   }
 }
 
 :root[data-theme="dark"], [data-theme="dark"], html.dark, .dark, [data-bs-theme="dark"] {
   color-scheme: dark;
-  --background: #09090b;
-  --foreground: #fafafa;
-  --card: #09090b;
-  --card-border: #27272a;
-  --primary: #fafafa;
-  --primary-hover: #e4e4e7;
-  --primary-foreground: #18181b;
-  --accent: #18181b;
-  --accent-strong: #27272a;
-  --muted: #a1a1aa;
-  --border: #27272a;
-  --border-subtle: #18181b;
-  --input: #27272a;
-  --ring: #d4d4d8;
-  --destructive: #ef4444;
-  --destructive-bg: #450a0a;
-  --success: #10b981;
-  --success-bg: #064e3b;
-  --terminal-bg: #09090b;
-  --terminal-fg: #f4f4f5;
+  --background: #060a14;
+  --foreground: #eef3fc;
+  --card: #0d1424;
+  --card-border: #1b2740;
+  --primary: #5b82ff;
+  --primary-2: #22d3ee;
+  --primary-hover: #7d9bff;
+  --primary-foreground: #060a14;
+  --accent: #101a2e;
+  --accent-strong: #1b2740;
+  --muted: #8d9bb5;
+  --border: #1b2740;
+  --border-subtle: #111a2c;
+  --input: #223250;
+  --ring: #7d9bff;
+  --destructive: #f87171;
+  --destructive-bg: #3b0d0d;
+  --success: #34d399;
+  --success-bg: #06382b;
+  --warm: #fb923c;
+  --warm-bg: #3a1c0a;
+  --terminal-bg: #050912;
+  --terminal-fg: #e7eefc;
+  --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.4);
+  --shadow-md: 0 1px 2px rgba(0, 0, 0, 0.35), 0 8px 24px rgba(0, 0, 0, 0.35);
+  --shadow-lg: 0 2px 4px rgba(0, 0, 0, 0.4), 0 18px 48px rgba(0, 0, 0, 0.55);
+  --glow-a: rgba(91, 130, 255, 0.16);
+  --glow-b: rgba(34, 211, 238, 0.10);
   /* UI library compatibility bridge */
   --bs-body-bg: var(--background);
   --bs-body-color: var(--foreground);
@@ -98,26 +125,36 @@
 
 :root[data-theme="light"], [data-theme="light"], html.light, .light, [data-bs-theme="light"] {
   color-scheme: light;
-  --background: #ffffff;
-  --foreground: #09090b;
+  --background: #f5f7fb;
+  --foreground: #0a1020;
   --card: #ffffff;
-  --card-border: #e4e4e7;
-  --primary: #18181b;
-  --primary-hover: #27272a;
-  --primary-foreground: #fafafa;
-  --accent: #f4f4f5;
-  --accent-strong: #e4e4e7;
-  --muted: #52525b;
-  --border: #e4e4e7;
-  --border-subtle: #f4f4f5;
-  --input: #e4e4e7;
-  --ring: #18181b;
+  --card-border: #e2e8f1;
+  --primary: #2f5bff;
+  --primary-2: #0a9bd6;
+  --primary-hover: #1f46e0;
+  --primary-foreground: #ffffff;
+  --accent: #edf1f8;
+  --accent-strong: #dfe6f1;
+  --muted: #55627a;
+  --border: #e2e8f1;
+  --border-subtle: #eef2f8;
+  --input: #d6deeb;
+  --ring: #2f5bff;
+  --radius: 12px;
+  --radius-lg: 18px;
   --destructive: #dc2626;
   --destructive-bg: #fef2f2;
-  --success: #059669;
-  --success-bg: #ecfdf5;
-  --terminal-bg: #09090b;
-  --terminal-fg: #f4f4f5;
+  --success: #0b9a6b;
+  --success-bg: #e8f8f1;
+  --warm: #e8590c;
+  --warm-bg: #fff1e8;
+  --terminal-bg: #0a1020;
+  --terminal-fg: #e7eefc;
+  --shadow-sm: 0 1px 2px rgba(10, 16, 32, 0.05);
+  --shadow-md: 0 1px 2px rgba(10, 16, 32, 0.04), 0 8px 24px rgba(10, 16, 32, 0.06);
+  --shadow-lg: 0 2px 4px rgba(10, 16, 32, 0.04), 0 18px 48px rgba(32, 60, 140, 0.14);
+  --glow-a: rgba(47, 91, 255, 0.12);
+  --glow-b: rgba(10, 155, 214, 0.10);
   /* UI library compatibility bridge */
   --bs-body-bg: var(--background);
   --bs-body-color: var(--foreground);
@@ -157,6 +194,11 @@ body {
   line-height: 1.65;
   letter-spacing: -0.011em;
   background-color: var(--background);
+  background-image:
+    radial-gradient(900px 480px at 8% -180px, var(--glow-a), transparent 70%),
+    radial-gradient(800px 460px at 96% -140px, var(--glow-b), transparent 70%);
+  background-repeat: no-repeat;
+  background-attachment: fixed;
   color: var(--foreground);
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
@@ -171,18 +213,18 @@ h1, h2, h3, h4, h5, h6 {
   color: var(--foreground);
 }
 
-h1 { font-size: clamp(30px, 4vw, 40px); font-weight: 800; letter-spacing: -0.035em; }
-h2 { font-size: 24px; font-weight: 700; letter-spacing: -0.025em; }
+h1 { font-size: clamp(32px, 4.4vw, 46px); font-weight: 800; letter-spacing: -0.04em; line-height: 1.1; }
+h2 { font-size: 26px; font-weight: 700; letter-spacing: -0.03em; }
 h3 { font-size: 18px; font-weight: 600; letter-spacing: -0.015em; }
 h4 { font-size: 15px; font-weight: 600; }
 
 p { margin: 0 0 16px; color: var(--foreground); }
-a { color: var(--foreground); font-weight: 500; text-underline-offset: 4px; transition: color .15s ease, background .15s ease; }
-a:hover { color: var(--foreground); }
+a { color: var(--primary); font-weight: 500; text-underline-offset: 4px; transition: color .15s ease, background .15s ease; }
+a:hover { color: var(--primary-hover); }
 hr { border: 0; border-top: 1px solid var(--border); margin: 32px 0; }
-::selection { background: var(--accent-strong); color: var(--foreground); }
+::selection { background: color-mix(in srgb, var(--primary) 22%, transparent); color: var(--foreground); }
 
-/* ---- shadcn/ui Buttons ---- */
+/* ---- Buttons ---- */
 button, .btn {
   display: inline-flex;
   align-items: center;
@@ -198,10 +240,10 @@ button, .btn {
   background: var(--background);
   border: 1px solid var(--border);
   border-radius: var(--radius);
-  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.03);
+  box-shadow: var(--shadow-sm);
   cursor: pointer;
   text-decoration: none;
-  transition: background .15s ease, border-color .15s ease, color .15s ease;
+  transition: background .15s ease, border-color .15s ease, color .15s ease, box-shadow .15s ease, transform .1s ease;
   user-select: none;
 }
 
@@ -216,15 +258,16 @@ button:active, .btn:active {
 
 button.primary, .btn.primary {
   background: var(--primary);
-  border-color: var(--primary);
+  border-color: transparent;
   color: var(--primary-foreground);
+  box-shadow: 0 1px 2px color-mix(in srgb, var(--primary) 40%, transparent), inset 0 1px 0 rgba(255, 255, 255, 0.18);
 }
 
 button.primary:hover, .btn.primary:hover {
   background: var(--primary-hover);
-  border-color: var(--primary-hover);
+  border-color: transparent;
   color: var(--primary-foreground);
-  opacity: 0.92;
+  box-shadow: 0 6px 18px color-mix(in srgb, var(--primary) 38%, transparent);
 }
 
 button.secondary, .btn.secondary {
@@ -235,7 +278,7 @@ button.secondary, .btn.secondary {
 
 button.secondary:hover, .btn.secondary:hover {
   background: var(--accent-strong);
-  border-color: var(--foreground);
+  border-color: var(--accent-strong);
 }
 
 button.ghost, .btn.ghost {
@@ -273,12 +316,13 @@ dialog {
   background: var(--card);
   color: var(--foreground);
   border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
   padding: 24px;
   max-width: min(90vw, 540px);
   width: 100%;
 }
 dialog::backdrop {
-  background: rgba(0, 0, 0, 0.65);
+  background: rgba(6, 10, 20, 0.66);
   backdrop-filter: blur(4px);
 }
 
@@ -320,18 +364,18 @@ input::placeholder, textarea::placeholder { color: var(--muted); opacity: 0.7; }
 
 input:focus-visible, select:focus-visible, textarea:focus-visible {
   outline: none;
-  border-color: #71717a;
-  box-shadow: 0 0 0 3px rgba(24, 24, 27, 0.08);
+  border-color: var(--ring);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--primary) 14%, transparent);
   background: var(--background);
 }
 
-/* ---- shadcn/ui Cards ---- */
+/* ---- Cards ---- */
 .card {
   background: var(--card);
   color: var(--foreground);
   border: 1px solid var(--card-border);
   border-radius: var(--radius-lg);
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.02);
+  box-shadow: var(--shadow-md);
   padding: 24px;
   margin-bottom: 16px;
   position: relative;
@@ -349,7 +393,7 @@ input:focus-visible, select:focus-visible, textarea:focus-visible {
   font-size: 11.5px;
   font-weight: 600;
   border: 1px solid var(--border);
-  border-radius: 5px;
+  border-radius: 999px;
   background: var(--accent);
   color: var(--foreground);
   text-decoration: none;
@@ -357,7 +401,7 @@ input:focus-visible, select:focus-visible, textarea:focus-visible {
 
 .badge.solid {
   background: var(--primary);
-  border-color: var(--primary);
+  border-color: transparent;
   color: var(--primary-foreground);
 }
 
@@ -369,6 +413,7 @@ input:focus-visible, select:focus-visible, textarea:focus-visible {
 
 .alert {
   border: 1px solid var(--border);
+  border-radius: var(--radius);
   padding: 14px 18px;
   margin: 16px 0;
   font-size: 13px;
@@ -391,6 +436,7 @@ code, kbd, .kbd {
 code {
   background: var(--accent);
   border: 1px solid var(--border);
+  border-radius: 5px;
   padding: 2px 6px;
   color: var(--foreground);
 }
@@ -399,6 +445,7 @@ kbd, .kbd {
   padding: 2px 6px;
   border: 1px solid var(--border);
   background: var(--accent);
+  border-radius: 5px;
   font-size: 11px;
 }
 
@@ -407,6 +454,7 @@ pre {
   background: var(--terminal-bg);
   color: var(--terminal-fg);
   border: 1px solid var(--border);
+  border-radius: var(--radius);
   padding: 18px 20px;
   overflow-x: auto;
   font-size: 13px;
@@ -432,6 +480,7 @@ pre code {
   background: var(--terminal-bg);
   color: var(--terminal-fg);
   border: 1px solid var(--border);
+  border-radius: var(--radius);
   font-family: var(--mono);
   font-size: 13px;
 }
@@ -456,6 +505,7 @@ pre code {
   background: rgba(255, 255, 255, 0.1);
   border: 1px solid rgba(255, 255, 255, 0.2);
   color: #ffffff;
+  border-radius: 6px;
   cursor: pointer;
 }
 
@@ -470,6 +520,7 @@ table, .table {
   border-collapse: collapse;
   font-size: 13px;
   border: 1px solid var(--border);
+  border-radius: var(--radius);
   background: var(--card);
   color: var(--foreground);
 }
@@ -515,3 +566,11 @@ tbody tr:hover {
     animation: none !important;
   }
 }
+
+/* ---- Horizon extras: used by the start page, the platforms page and the docs ---- */
+.kicker { margin: 0 0 10px; font-family: var(--mono); font-size: 11.5px; font-weight: 600; letter-spacing: .08em; text-transform: uppercase; color: var(--primary); }
+.grad-text { background: var(--brand); -webkit-background-clip: text; background-clip: text; color: transparent; -webkit-text-fill-color: transparent; }
+.chip { display: inline-flex; align-items: center; gap: 6px; height: 24px; padding: 0 10px; font-size: 12px; font-weight: 600; border-radius: 999px; border: 1px solid var(--border); background: var(--card); color: var(--foreground); }
+.chip.ok { color: var(--success); background: var(--success-bg); border-color: color-mix(in srgb, var(--success) 35%, transparent); }
+.chip.soon { color: var(--warm); background: var(--warm-bg); border-color: color-mix(in srgb, var(--warm) 38%, transparent); }
+.chip.untested { color: var(--muted); background: var(--accent); }

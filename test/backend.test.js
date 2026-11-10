@@ -38,7 +38,7 @@ test('namespace: resolves classes in split project layout (backend/app) from pro
   }
 });
 
-test('resolveAction: executes class methods and handles prototype and undefined controller errors', async () => {
+test('a route whose controller is undefined is named in a warning and answers with an error, the other routes keep working', async () => {
   const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'kreft-action-'));
   try {
     const backendDir = path.join(tmp, 'backend');
@@ -46,26 +46,22 @@ test('resolveAction: executes class methods and handles prototype and undefined 
     fs.mkdirSync(path.join(backendDir, 'app', 'Http', 'Controllers'), { recursive: true });
     fs.writeFileSync(path.join(backendDir, 'routes', 'api.js'), `
       const { Route } = require('kreftjs/server');
-      module.exports = (Route) => {};
+      class GoodController { async index() { return { done: true }; } }
+      Route.get('/good', [GoodController, 'index']);
+      Route.get('/bad', [undefined, 'index']);
     `);
-
-    const backend = createBackend(backendDir, { db: 'sqlite::memory:' });
+    const warnings = [];
+    const backend = createBackend(backendDir, { db: 'sqlite::memory:', log: { error() {}, warn: (m) => warnings.push(m), info() {}, log() {} } });
     assert.ok(backend, 'backend created');
-
-    // Test resolveAction directly
-    const { Route } = require('../bin/backend/index.js');
-
-    class GoodController {
-      async index() { return { done: true }; }
-    }
-
-    Route.get('/test-good', [GoodController, 'index']);
-
-    // Undefined controller error check
-    assert.throws(() => {
-      Route.get('/test-bad', [undefined, 'index']);
-      // We will trigger handler
-    }, /undefined/i, 'undefined controller caught when registered or resolved');
+    await backend.ready();
+    const call = async (url) => {
+      let status = null, body = null;
+      await backend({ method: 'GET', url, headers: { host: 'localhost' } }, { writeHead(s) { status = s; }, setHeader() {}, end(b) { body = b; } }, url);
+      return { status, body: String(body || '') };
+    };
+    assert.strictEqual((await call('/api/good')).status, 200);
+    assert.strictEqual((await call('/api/bad')).status, 500);
+    assert.ok(warnings.some((w) => /\/bad has an undefined controller/.test(w)), 'the warning names the route: ' + warnings.join(' | '));
   } finally {
     fs.rmSync(tmp, { recursive: true, force: true });
   }
@@ -209,7 +205,7 @@ test('resolveAction & namespace: resolves Admin controllers (DashboardController
       const { DashboardController } = namespace('App\\\\Http\\\\Controllers\\\\Admin');
       Route.get('/admin/stats', [DashboardController, 'index']);
       Route.get('/admin/stats-wrapped', [{ default: DashboardController }, 'index']);
-      Route.get('/admin/stats-auto', [undefined, 'index']);
+      Route.get('/admin/stats-auto', [undefined, 'index']);   // a require() that returned nothing
     `);
 
     const backend = createBackend(path.join(tmp, 'backend'), { db: 'sqlite::memory:' });
@@ -249,9 +245,7 @@ test('resolveAction & namespace: resolves Admin controllers (DashboardController
       end(b) { body3 = b; }
     }, '/api/admin/stats-auto');
 
-    assert.strictEqual(status3, 200, 'status is 200 with auto-recovery');
-    const json3 = JSON.parse(body3.toString());
-    assert.strictEqual(json3.users, 10, 'returned stats with auto-recovery');
+    assert.strictEqual(status3, 500, 'an undefined controller is an error on its own route, not a guess');
   } finally {
     process.chdir(prevCwd);
     fs.rmSync(tmp, { recursive: true, force: true });

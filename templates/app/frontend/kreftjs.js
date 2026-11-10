@@ -1,5 +1,5 @@
 /*!
- * Kreft v0.0.27-beta — reactive by nature
+ * Kreft v0.0.39-beta — reactive by nature
  * The .kreft component language (state · derive · action · when · watch · on),
  * { } views with k-if / k-each / k-model, components, slots, router, stores,
  * share / receive, event bus and a template engine.
@@ -7,6 +7,22 @@
  */
 (function (global) {
   'use strict';
+
+  // Older phone browsers (before about Chrome 73) lack a few helpers; these small stand-ins are only added when they are missing.
+  const lack = (obj, name, fn) => { if (!obj[name]) Object.defineProperty(obj, name, { value: fn, writable: true, configurable: true }); };
+  lack(Object, 'fromEntries', function (entries) { const o = {}; for (const e of entries) o[e[0]] = e[1]; return o; });
+  lack(Array.prototype, 'flat', function (depth) {
+    const d = depth === undefined ? 1 : depth, out = [];
+    (function walk(list, level) { for (let i = 0; i < list.length; i++) { if (Array.isArray(list[i]) && level > 0) walk(list[i], level - 1); else if (i in list) out.push(list[i]); } })(this, d);
+    return out;
+  });
+  lack(Array.prototype, 'flatMap', function (fn, thisArg) { return Array.prototype.flat.call(Array.prototype.map.call(this, fn, thisArg), 1); });
+  lack(String.prototype, 'matchAll', function (re) {
+    const g = re.global ? new RegExp(re.source, re.flags) : new RegExp(re.source, re.flags + 'g'), out = [], str = String(this);
+    let m;
+    while ((m = g.exec(str)) !== null) { out.push(m); if (m[0] === '') g.lastIndex++; }
+    return out[Symbol.iterator]();
+  });
 
   /* ================================================================
    * Utils
@@ -467,7 +483,11 @@
       else oldValue = e.run();
     } else if (flush === 'post') queuePostJob(() => e.run());
     else e.run();
-    return () => e.stop();
+    // stopping a watcher also runs the cleanup its last run registered (onCleanup), once
+    return () => {
+      e.stop();
+      if (cleanup) { const c = cleanup; cleanup = undefined; try { c(); } catch (err) { console.error('[Kreft error] in watcher cleanup', err); } }
+    };
   }
   const watch = (source, cb, options) => doWatch(source, cb, options);
   const watchEffect = (fn, options) => doWatch(fn, null, options);
@@ -788,7 +808,7 @@
 
   function slug(text, sep = '-') {
     const escapedSep = String(sep).replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-    return String(text ?? '')
+    return String(text == null ? '' : text)
       .normalize('NFKD')
       .replace(/[\u0300-\u036f]/g, '')
       .toLowerCase()
@@ -1270,11 +1290,13 @@
     if (r === undefined) { r = interpToExprRaw(str); if (interpExprCache.size > 5000) interpExprCache.clear(); interpExprCache.set(str, r); }
     return r;
   }
+  // the expression of an attribute or text: the whole value when it is one {expr}, else the `…${expr}…` text, else null
+  function exprOf(value) { const e = exactBrace(value); return e != null ? e : interpToExpr(value); }
   function interpToExprRaw(str) {
     const parts = splitInterp(str);
     if (!parts.some((p) => p.expr != null)) return null;
     return '`' + parts.map((p) => (p.expr != null
-      ? '${(' + p.expr + ') ?? ""}'
+      ? '${(function (v) { return v == null ? "" : v; })(' + p.expr + ')}'
       : p.text.replace(/[`\\]/g, '\\$&').replace(/\$\{/g, '\\${'))).join('') + '`';
   }
 
@@ -1429,7 +1451,7 @@
         else bindCustomDirective(el, dir, arg, mods, value, scope, inst);
       } else if (value.includes('{') && !name.startsWith('on')) {
         // title={expr} keeps the value as is; class="btn {x}" builds a string
-        const expr = exactBrace(value) ?? interpToExpr(value);
+        const expr = exprOf(value);
         if (expr != null) { el.removeAttribute(name); bindAttr(el, name, expr, scope); }
       }
     }
@@ -1811,7 +1833,7 @@
   function parseSelector(expr) {
     const m = SELECTOR_RE.exec(expr);
     if (!m) return null;
-    return { x: m[1], y: m[2], yes: m[3] ?? m[4], no: m[5] ?? m[6] };
+    return { x: m[1], y: m[2], yes: m[3] != null ? m[3] : m[4], no: m[5] != null ? m[5] : m[6] };
   }
   function buildPlan(root, inst) {
     const ops = [];
@@ -1835,7 +1857,7 @@
         if (c0 === 58) ops.push({ k: 2, path, name, arg: name.slice(1), expr: value });
         else if (c0 === 64) ops.push({ k: 3, path, name, ev: name.slice(1), expr: stripBrace(value) });
         else if (value.includes('{') && !name.startsWith('on')) {
-          const expr = exactBrace(value) ?? interpToExpr(value);
+          const expr = exprOf(value);
           if (expr != null) ops.push({ k: 2, path, name, arg: name, expr, sel: name === 'class' ? parseSelector(expr) : null });
         }
       }
@@ -2265,8 +2287,8 @@
         renderEffect(() => { slotProps[k] = evaluate(scope, value, el); });
       } else if (an === 'k-bind') {
         renderEffect(() => Object.assign(slotProps, evaluate(scope, value, el) || {}));
-      } else if (value.includes('{') && (exactBrace(value) ?? interpToExpr(value)) != null) {
-        const expr = exactBrace(value) ?? interpToExpr(value);
+      } else if (value.includes('{') && exprOf(value) != null) {
+        const expr = exprOf(value);
         renderEffect(() => { slotProps[camelize(an)] = evaluate(scope, expr, el); });
       } else slotProps[camelize(an)] = value;
     }
@@ -3022,7 +3044,7 @@
       else if (name.startsWith('k-bind:')) { key = name.slice(7); dynamic = true; }
       else if (name.startsWith('k-')) { warn(`Directive "${name}" is not supported on components.`); continue; }
       else if (value.includes('{')) { // title={expr} or title="Hi {name}"
-        const expr = exactBrace(value) ?? interpToExpr(value);
+        const expr = exprOf(value);
         if (expr != null) { value = expr; dynamic = true; }
       }
       key = key.split('.')[0];
@@ -4609,8 +4631,8 @@
           try {
             res = fn.apply(this, args);
           } catch (err) {
-            errorRef.value = (err && (err.data?.message || err.message)) || String(err);
-            errorsRef.value = (err && (err.data?.errors || err.errors)) || null;
+            errorRef.value = (err && ((err.data && err.data.message) || err.message)) || String(err);
+            errorsRef.value = (err && ((err.data && err.data.errors) || err.errors)) || null;
             throw err;
           }
           if (res && typeof res.then === 'function') {
@@ -4622,8 +4644,8 @@
               },
               (err) => {
                 loadingRef.value = false;
-                errorRef.value = (err && (err.data?.message || err.message)) || String(err);
-                errorsRef.value = (err && (err.data?.errors || err.errors)) || null;
+                errorRef.value = (err && ((err.data && err.data.message) || err.message)) || String(err);
+                errorsRef.value = (err && ((err.data && err.data.errors) || err.errors)) || null;
                 throw err;
               }
             );
@@ -4656,9 +4678,11 @@
       receive: (k, f, hasFallback) => { raw[k] = hasFallback ? receive(k, f()) : receive(k); },
       when: (cond, fn) => doWatch(() => !!cond(), (yes) => { if (yes) fn(); }, { immediate: true }),
       watch: (source, fn) => {
+        // A watched object is followed all the way down. Changing it in place leaves the same object, so each run hands the
+        // watcher a new wrapper: that is what tells it something changed (the callback still gets the object itself).
         let deep;
-        doWatch(() => { const v = source(); if (deep === undefined) deep = isObject(v); return deep ? traverse(v) : v; },
-          (value, old) => fn(value, old));
+        doWatch(() => { const v = source(); if (deep === undefined) deep = isObject(v); return deep ? { value: traverse(v) } : v; },
+          (value, old) => (deep ? fn(value.value, old && old.value) : fn(value, old)));
       },
       on: (name, fn) => {
         if (name === 'start') starts.push(fn);
@@ -5068,7 +5092,7 @@
           targetName = to.name;
           const rec = records.find((r) => r.name === to.name);
           if (!rec) { warn(`No route named "${to.name}".`); path = '/'; }
-          else path = rec.path.replace(/:(\w+)\??/g, (_, k) => encodeURIComponent((to.params || {})[k] ?? '')).replace(/\/+$/, '') || '/';
+          else path = rec.path.replace(/:(\w+)\??/g, (_, k) => encodeURIComponent((to.params || {})[k] == null ? '' : (to.params || {})[k])).replace(/\/+$/, '') || '/';
         } else {
           path = to.path || '/';
         }
@@ -5648,13 +5672,17 @@
     stores, storeLog, busLog,
   };
 
-  const VERSION = '0.0.27-beta';
+  const VERSION = '0.0.39-beta';
   const Kreftjs = {
     version: VERSION,
     // PUBLIC_ values from .env (kreft dev and kreft build put them here); never secrets
     get env() { return Object.freeze({ ...((typeof window !== 'undefined' && window.__KREFT_ENV__) || {}) }); },
     get isVite() {
       return Boolean(typeof window !== 'undefined' && window.__KREFT_VITE__);
+    },
+    // true inside a Tauri window (kreft tauri:dev, or an installed Tauri app)
+    get isTauri() {
+      return Boolean(typeof window !== 'undefined' && (window.__TAURI__ || window.__TAURI_INTERNALS__));
     },
     get isElectron() {
       return Boolean(

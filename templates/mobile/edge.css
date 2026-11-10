@@ -27,7 +27,7 @@
   --edge-bottom-bg: var(--edge-bg);
   --edge-bottom-fg: var(--edge-muted);
   --edge-bottom-active: var(--edge-fg);
-  --edge-bottom-indicator: var(--edge-surface);
+  --edge-bottom-indicator: rgba(127, 127, 127, 0.22);   /* a see-through grey: the icon stays readable on a light or a dark bar */
   --edge-bottom-border: var(--edge-border);
   --edge-bottom-height: 64px;
   /* animated splash */

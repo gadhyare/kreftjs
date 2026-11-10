@@ -351,6 +351,8 @@ export interface KreftStatic {
   readonly env: Readonly<Record<string, string>>
   /** true when running inside an Electron desktop window */
   readonly isElectron: boolean
+  /** true inside a Tauri window. */
+  readonly isTauri: boolean
   /** Native desktop bridge methods (minimize, maximize, dialogs) when running in Electron */
   readonly desktop: DesktopBridge | null
   /** true when running with Vite (dev server or production build) */
@@ -528,6 +530,20 @@ export interface KreftServerContext {
 
 export interface DesktopBridge {
   readonly isElectron: boolean
+  /** Call your own function registered in electron/custom.js with ipcMain.handle('app:name', …). Only "app:" channels work. */
+  invoke(channel: `app:${string}`, ...args: unknown[]): Promise<any>
+  /** Listen to an event your electron/custom.js sends with win.webContents.send('app:name', …). Returns a function that stops listening. */
+  on(channel: `app:${string}`, callback: (payload: any) => void): () => void
+  /** Show a system notification (needs notifications.enabled in config/electron.config.js). */
+  notify(title: string, body?: string): Promise<boolean>
+  /** A menu entry with an id was clicked. */
+  onMenu(callback: (id: string) => void): () => void
+  /** A tray entry with action "emit" was clicked. */
+  onTray(callback: (id: string) => void): () => void
+  /** Update events: update-available, update-not-available, update-downloaded, error. */
+  onUpdate(callback: (event: { event: string; info: { version: string } | null }) => void): () => void
+  checkForUpdates(): Promise<boolean>
+  installUpdate(): Promise<void>
   getInfo(): Promise<{ name: string; version: string; platform: string; arch: string; isPackaged: boolean }>
   minimize(): Promise<void>
   maximize(): Promise<void>
@@ -547,7 +563,7 @@ export interface InactivityTimerOptions {
 }
 
 /* ---- kreftjs-native.js (the phone UI kit: kreft mobile:ui, or kreft new --mobile) ---- */
-export interface NativeDeviceInfo { platform: 'android' | 'ios' | 'electron' | 'web'; operatingSystem: string; osVersion: string; model: string; manufacturer: string; isVirtual: boolean; webViewVersion: string; screen: { width: number; height: number; pixelRatio: number }; [key: string]: any }
+export interface NativeDeviceInfo { platform: 'android' | 'ios' | 'electron' | 'tauri' | 'web'; operatingSystem: string; osVersion: string; model: string; manufacturer: string; isVirtual: boolean; webViewVersion: string; screen: { width: number; height: number; pixelRatio: number }; [key: string]: any }
 export interface NativePosition { timestamp: number; coords: { latitude: number; longitude: number; accuracy: number; altitude?: number | null; speed?: number | null; heading?: number | null } }
 export interface NativeDialogs {
   alert(message: string, options?: { title?: string; button?: string }): Promise<void>
@@ -557,7 +573,7 @@ export interface NativeDialogs {
   toast(message: string, options?: { tone?: 'success' | 'error' | ''; position?: 'top' | 'bottom'; duration?: number }): void
 }
 export interface Native {
-  platform(): 'android' | 'ios' | 'electron' | 'web'
+  platform(): 'android' | 'ios' | 'electron' | 'tauri' | 'web'
   isNative(): boolean
   isDesktop(): boolean
   isWeb(): boolean
@@ -582,7 +598,7 @@ export interface Native {
     paste(): Promise<string>
     network(): Promise<{ connected: boolean; connectionType: string }>
     app(): Promise<{ name: string; id: string; build: string; version: string }>
-    statusBar(options: { color?: string; style?: 'light' | 'dark'; overlay?: boolean }): Promise<void>
+    statusBar(options: { color?: string; style?: 'light' | 'dark' | 'auto'; overlay?: boolean }): Promise<void>
     keyboard: { show(): Promise<any>; hide(): Promise<any> }
     hideSplash(): Promise<any>
     exit(): Promise<any>
@@ -598,11 +614,13 @@ export interface Native {
   back(): boolean
   safeArea(): { top: number; right: number; bottom: number; left: number }
   asset(path: string): string
+  /** true for a dark colour, false for a light one, null when it is not #rgb or #rrggbb */
+  isDarkColor(color: string): boolean | null
 }
 export interface EdgeButtonDef { icon?: string; text?: string; src?: string; label?: string; showLabel?: boolean; id?: string; badge?: number | string | boolean; disabled?: boolean; to?: string; onTap?: (item: EdgeButtonDef) => void }
 export interface EdgeStore {
-  top: { show: boolean; title: string; subtitle: string; back: boolean | 'auto'; bg: string; color: string; border: boolean; height: number; center: boolean; elevated: boolean; blur: boolean; left: EdgeButtonDef[]; right: EdgeButtonDef[] }
-  bottom: { show: boolean; items: EdgeButtonDef[]; bg: string; color: string; active: string; activeColor?: string; indicator: 'pill' | 'line' | 'none'; labels: 'always' | 'active' | 'never'; border: boolean; height: number; floating: boolean; blur: boolean; haptics: boolean }
+  top: { show: boolean; title: string; subtitle: string; back: boolean | 'auto'; bg: string; color: string; border: boolean; borderColor: string; height: number; center: boolean; elevated: boolean; blur: boolean; left: EdgeButtonDef[]; right: EdgeButtonDef[] }
+  bottom: { show: boolean; items: EdgeButtonDef[]; bg: string; color: string; active: string; activeColor: string; indicatorColor: string; borderColor: string; indicator: 'pill' | 'line' | 'none'; labels: 'always' | 'active' | 'never'; border: boolean; height: number; floating: boolean; blur: boolean; haptics: boolean }
   setTop(options: Partial<EdgeStore['top']>): void
   setBottom(options: Partial<EdgeStore['bottom']>): void
   reset(): void

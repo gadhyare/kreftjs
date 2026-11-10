@@ -1,0 +1,22 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 640 640" width="640" height="640" role="img" aria-label="Kreft">
+  <defs>
+    <linearGradient id="kreft-o" gradientUnits="userSpaceOnUse" x1="510" y1="617" x2="1005" y2="192">
+      <stop offset="0" stop-color="#fb5f02"/>
+      <stop offset="1" stop-color="#ffac00"/>
+    </linearGradient>
+    <linearGradient id="kreft-s" gradientUnits="userSpaceOnUse" x1="700" y1="500" x2="830" y2="520">
+      <stop offset="0" stop-color="#c42b00"/>
+      <stop offset="1" stop-color="#c42b00" stop-opacity="0"/>
+    </linearGradient>
+  </defs>
+  <rect width="640" height="640" rx="140" fill="#fff"/>
+  <g transform="translate(320 320) scale(0.86) translate(-751.5 -403)">
+    <!-- the stem -->
+    <path d="M498 300 Q498 280 515 268 L620 190 Q632 186 636 198 L636 375 L525 480 Q510 495 508 512 L508 612 Q508 618 500 618 L498 606 Z" fill="#2b2b2b"/>
+    <!-- the lower arm -->
+    <path d="M790 410 L998 608 Q1002 614 994 617 L800 617 Q790 617 780 608 L685 515 Z" fill="url(#kreft-o)"/>
+    <path d="M685 515 L790 410 L860 478 L770 548 Z" fill="url(#kreft-s)"/>
+    <!-- the big diagonal band -->
+    <path d="M808 203 Q820 192 838 192 L996 192 Q1008 193 1003 204 L685 515 L592 607 Q584 617 570 617 L512 617 Q508 617 508 610 L508 512 Q510 495 525 480 Z" fill="url(#kreft-o)"/>
+  </g>
+</svg>

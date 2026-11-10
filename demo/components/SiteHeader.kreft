@@ -1,4 +1,4 @@
-<!-- The bar at the top of both layouts. Recreated to match Image 1 & Image 3 -->
+<!-- The bar at the top of both layouts: the brand, four links (Examples leaves on small phones), the theme switch and the cart. -->
 use cart
 prop menu = false
 prop open = false
@@ -13,7 +13,8 @@ event toggle
       <kreft-link to="/" class="brand"><img class="mark" src="logo-mark.svg" alt="" width="22" height="22">kreft</kreft-link>
       <nav class="top {menu ? 'hide-small' : ''}" aria-label="Main">
         <kreft-link to="/docs">Docs</kreft-link>
-        <kreft-link to="/playground">Playground</kreft-link>
+        <kreft-link to="/platforms">Platforms</kreft-link>
+        <kreft-link to="/playground" class="nav-mid">Playground</kreft-link>
         <kreft-link to="/basics" class="nav-extra">Examples</kreft-link>
       </nav>
       <div class="end">
@@ -33,10 +34,10 @@ event toggle
   position: sticky;
   top: 0;
   z-index: 50;
-  height: 60px;
-  background: color-mix(in srgb, var(--background) 88%, transparent);
-  backdrop-filter: blur(12px);
-  -webkit-backdrop-filter: blur(12px);
+  height: 64px;
+  background: color-mix(in srgb, var(--background) 80%, transparent);
+  backdrop-filter: saturate(160%) blur(16px);
+  -webkit-backdrop-filter: saturate(160%) blur(16px);
   border-bottom: 1px solid var(--border);
   font-family: var(--font, system-ui, -apple-system, sans-serif);
 }
@@ -54,12 +55,12 @@ event toggle
   display: inline-flex;
   align-items: center;
   gap: 9px;
-  font-weight: 700;
-  font-size: 16px;
-  letter-spacing: -0.025em;
+  font-weight: 800;
+  font-size: 17px;
+  letter-spacing: -0.04em;
   color: var(--foreground);
   text-decoration: none;
-  margin-right: 48px;
+  margin-right: 40px;
 }
 .mark {
   width: 22px;
@@ -68,24 +69,27 @@ event toggle
 .top {
   display: flex;
   align-items: center;
-  gap: 40px;
+  gap: 6px;
   flex: 1;
 }
 .top a {
   color: var(--muted);
   text-decoration: none;
   font-family: var(--font, system-ui, -apple-system, sans-serif);
-  font-size: 15px;
+  font-size: 14.5px;
   font-weight: 500;
   letter-spacing: -0.01em;
-  padding: 6px 0;
-  transition: color 0.15s ease;
+  padding: 7px 14px;
+  border-radius: 999px;
+  transition: color 0.15s ease, background 0.15s ease;
 }
 .top a:hover {
   color: var(--foreground);
+  background: var(--accent);
 }
 .top a.kreft-link-active {
-  color: var(--foreground);
+  color: var(--primary);
+  background: color-mix(in srgb, var(--primary) 10%, transparent);
   font-weight: 600;
 }
 .end {
@@ -125,11 +129,11 @@ event toggle
   color: var(--foreground);
   border: 1px solid var(--border);
   padding: 7px 16px;
-  border-radius: 8px;
+  border-radius: 999px;
   font-size: 13.5px;
   font-weight: 500;
   text-decoration: none;
-  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.04);
+  box-shadow: var(--shadow-sm);
   transition: all 0.15s ease;
 }
 .cart-btn:hover {
@@ -148,15 +152,20 @@ event toggle
   .brand { margin-right: 20px; }
   .menu-button { display: inline-flex; }
   .top.hide-small { display: none; }
-  .top { gap: 18px; }
+  .top { gap: 2px; }
+  .top a { padding: 7px 10px; }
 }
 /* three links and the buttons must fit a small phone: tighter, and Examples leaves the bar (it is in the footer and the menu) */
 @media (max-width: 560px) {
   .brand { margin-right: 12px; }
-  .top { gap: 12px; font-size: 13px; }
+  .top { gap: 0; font-size: 13px; }
+  .top a { padding: 7px 8px; font-size: 13.5px; }
 }
 @media (max-width: 440px) {
   .top .nav-extra { display: none; }
+}
+@media (max-width: 400px) {
+  .top .nav-mid { display: none; }
 }
 @media (max-width: 360px) {
   .bar-inner { padding: 0 10px; }

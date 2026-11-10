@@ -158,21 +158,37 @@ function cleanHtml(rawHtml, options = {}) {
   const allowStyle = options.allowStyle !== false;
 
   // 1. Unconditionally strip active execution tags (loop to prevent nested tag bypasses)
+  // Every pattern below is only run on the part of the text where it can still match (up to the last ">" , the last closing tag…).
+  // A "<" after that point has nothing that could close it, and trying it anyway makes the work grow with the square of the length.
   let prev;
+  const BLOCK_TAGS = ['script', 'style', 'iframe', 'object', 'embed', 'applet', 'form', 'svg', 'math', 'noscript', 'template'];
   const dangerousTagRegex = /<\/?(?:script|style|iframe|object|embed|applet|form|base|meta|link|svg|math|noscript|template)\b[^>]*>/gi;
-  const blockRegex = /<(script|style|iframe|object|embed|applet|form|svg|math|noscript|template)[\s\S]*?<\/\1>/gi;
+  const upTo = (text, last, re, repl) => {   // run re only on text[0 .. last], leave the rest as it is
+    if (last < 0) return text;
+    return text.slice(0, last).replace(re, repl) + text.slice(last);
+  };
   do {
     prev = html;
-    html = html
-      .replace(blockRegex, '')
-      .replace(dangerousTagRegex, '')
-      .replace(/<!--[\s\S]*?-->/g, '');
+    for (const name of BLOCK_TAGS) {
+      const lower = html.toLowerCase();
+      const close = lower.lastIndexOf('</' + name);
+      if (close < 0) continue;
+      const end = html.indexOf('>', close) + 1;
+      html = upTo(html, end, new RegExp(`<${name}[\\s\\S]*?<\\/${name}>`, 'gi'), '');
+    }
+    html = upTo(html, html.lastIndexOf('>') + 1, dangerousTagRegex, '');
+    const endComment = html.lastIndexOf('-->');
+    html = upTo(html, endComment < 0 ? -1 : endComment + 3, /<!--[\s\S]*?-->/g, '');
   } while (html !== prev);
 
   // 2. Parse and sanitize all tags and attributes
-  const tagRegex = /<\/?([a-zA-Z0-9:-]+)((?:\s+[^>"']*|"[^"]*"|'[^']*')*)\s*(\/?)>/g;
+  // The three parts of the attribute text cannot start with the same character, so there is only one way to read it (no backtracking).
+  // (a quote that never closes counts as an ordinary character, so a tag is always read up to its ">")
+  const tagRegex = /<\/?([a-zA-Z0-9:-]+)(?=[\s/>])((?:[^>"']|"[^"]*"|'[^']*'|["'])*?)\s*(\/?)>/g;
 
-  html = html.replace(tagRegex, (match, tagName, rawAttrs, selfClose) => {
+  const lastGt = html.lastIndexOf('>') + 1;
+  const tail = html.slice(lastGt);   // after the last ">" no tag can end
+  html = html.slice(0, lastGt).replace(tagRegex, (match, tagName, rawAttrs, selfClose) => {
     const tag = tagName.toLowerCase();
 
     // If tag is not allowed, strip it
@@ -241,7 +257,7 @@ function cleanHtml(rawHtml, options = {}) {
   //    (<img src="x"onerror=alert(1)>, an unfinished <img src=x onerror=…) used to pass through untouched,
   //    and a browser reads such tags happily. Only the exact form this function writes is allowed to stay a
   //    tag: every other "<" becomes text.
-  return html.replace(CLEAN_TAG_OR_LT, (m) => (m === '<' ? '&lt;' : m));
+  return (html + tail).replace(CLEAN_TAG_OR_LT, (m) => (m === '<' ? '&lt;' : m));
 }
 // <tag>, </tag>, <tag name="value" …> or <tag … />, with the quoted, escaped attributes step 2 writes
 const CLEAN_TAG_OR_LT = /<\/?[a-z0-9:-]+(?: [a-z0-9:-]+="[^"<>]*")* ?\/?>|</gi;

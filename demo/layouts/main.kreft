@@ -6,6 +6,7 @@ state menu = [
   { title: 'Start', links: [
     { to: '/', label: 'Start', hint: 'what Kreft is' },
     { to: '/docs', label: 'Documentation', hint: 'Guides and API reference' },
+    { to: '/platforms', label: 'Platforms', hint: 'desktop · mobile · TV' },
   ] },
   { title: 'Basics', links: [
     { to: '/basics', label: 'Basics', hint: 'state · derive · action' },
@@ -98,7 +99,7 @@ on destroy {
   width: 100%;
   max-width: calc(var(--container) + var(--container-pad) * 2);
   margin: 0 auto;
-  min-height: calc(100vh - 60px);
+  min-height: calc(100vh - 64px);
   box-sizing: border-box;
 }
 .sidebar-backdrop {
@@ -109,8 +110,8 @@ on destroy {
 }
 .sidebar {
   position: sticky;
-  top: 60px;
-  max-height: calc(100vh - 60px);
+  top: 64px;
+  max-height: calc(100vh - 64px);
   overflow-y: auto;
   padding: 20px 14px 28px 16px;
   border-inline-end: 1px solid var(--border);

@@ -48,6 +48,18 @@ state parts = [
   { title: 'Desktop & Vite', text: 'Build desktop apps with Electron or bundle with Vite.', to: '/tools' },
 ]
 
+// where a Kreft app runs (the Platforms page has the details and what is tested)
+state targets = [
+  { group: 'Web application', via: 'Browser · PWA', items: ['Every device', 'Installable', 'Works offline'], status: 'Available', tone: 'ok', text: 'The website itself: one `kreft build`, installable and offline with `kreft build --pwa`.' },
+  { group: 'Desktop', via: 'Electron · Tauri', items: ['macOS', 'Linux', 'Windows'], status: 'Available', tone: 'ok', text: 'Installers from one settings file: window, menu, DevTools, security, tray and updates.' },
+  { group: 'Mobile', via: 'Capacitor · ArkTS', items: ['iOS', 'Android', 'HarmonyOS'], status: 'Available', tone: 'ok', text: 'A phone UI kit, the native API, and a release guide for Google Play and the App Store.' },
+  { group: 'TV', via: 'Planned', items: ['Android TV', 'tvOS', 'webOS', 'Tizen'], status: 'Coming soon', tone: 'soon', text: 'Not available yet. Remote-control navigation and TV packaging are planned.' },
+]
+
+// the available targets become cards; the "coming soon" ones become a single bar below
+derive cards = targets.filter((t) => t.tone !== 'soon')
+derive upcoming = targets.filter((t) => t.tone === 'soon')
+
 action add() { count++ }
 action copy() {
   navigator.clipboard && navigator.clipboard.writeText('kreft new my-app --db sqlite')
@@ -57,7 +69,7 @@ action copy() {
 
 <view>
   <div class="welcome-container">
-    <!-- Ambient Red/Coral Glow Orbs -->
+    <!-- Ambient cobalt and cyan glow orbs -->
     <div class="glow-orb glow-top-left" aria-hidden="true"></div>
     <div class="glow-orb glow-bottom-right" aria-hidden="true"></div>
 
@@ -146,20 +158,20 @@ action copy() {
             <div class="preview-metrics" aria-hidden="true">
               <!-- Mini Bar Chart matching mockup -->
               <svg class="metric-chart" width="46" height="24" viewBox="0 0 46 24" fill="none">
-                <rect x="2" y="15" width="4" height="9" rx="1.5" fill="#e2e8f0"/>
-                <rect x="9" y="11" width="4" height="13" rx="1.5" fill="#cbd5e1"/>
-                <rect x="16" y="7" width="4" height="17" rx="1.5" fill="#94a3b8"/>
-                <rect x="23" y="1" width="4" height="23" rx="1.5" fill="#0f172a"/>
-                <rect x="30" y="9" width="4" height="15" rx="1.5" fill="#10b981"/>
-                <rect x="37" y="5" width="4" height="19" rx="1.5" fill="#059669"/>
+                <rect x="2" y="15" width="4" height="9" rx="1.5" fill="#7d9bff"/>
+                <rect x="9" y="11" width="4" height="13" rx="1.5" fill="#5b82ff"/>
+                <rect x="16" y="7" width="4" height="17" rx="1.5" fill="#2f5bff"/>
+                <rect x="23" y="1" width="4" height="23" rx="1.5" fill="#1f46e0"/>
+                <rect x="30" y="9" width="4" height="15" rx="1.5" fill="#0a9bd6"/>
+                <rect x="37" y="5" width="4" height="19" rx="1.5" fill="#22d3ee"/>
               </svg>
               <!-- Database Coin Stack Icon -->
               <svg class="metric-db" width="22" height="24" viewBox="0 0 24 24" fill="none">
-                <ellipse cx="12" cy="4.5" rx="8" ry="2.5" stroke="#475569" stroke-width="1.8" fill="#f8fafc"/>
-                <path d="M4 4.5v5c0 1.38 3.58 2.5 8 2.5s8-1.12 8-2.5v-5" stroke="#475569" stroke-width="1.8"/>
-                <path d="M4 9.5v5c0 1.38 3.58 2.5 8 2.5s8-1.12 8-2.5v-5" stroke="#475569" stroke-width="1.8"/>
-                <circle cx="16" cy="18" r="4.5" fill="#f8fafc" stroke="#475569" stroke-width="1.5"/>
-                <text x="16" y="20.5" font-size="6.5" font-weight="bold" fill="#475569" text-anchor="middle">K</text>
+                <ellipse cx="12" cy="4.5" rx="8" ry="2.5" stroke="#55627a" stroke-width="1.8" fill="#ffffff"/>
+                <path d="M4 4.5v5c0 1.38 3.58 2.5 8 2.5s8-1.12 8-2.5v-5" stroke="#55627a" stroke-width="1.8"/>
+                <path d="M4 9.5v5c0 1.38 3.58 2.5 8 2.5s8-1.12 8-2.5v-5" stroke="#55627a" stroke-width="1.8"/>
+                <circle cx="16" cy="18" r="4.5" fill="#ffffff" stroke="#55627a" stroke-width="1.5"/>
+                <text x="16" y="20.5" font-size="6.5" font-weight="bold" fill="#55627a" text-anchor="middle">K</text>
               </svg>
             </div>
           </div>
@@ -174,6 +186,37 @@ action copy() {
           </div>
         </div>
       </div>
+    </section>
+
+    <!-- Where it runs: desktop, mobile, TV -->
+    <section class="targets" aria-labelledby="targets-title">
+      <p class="kicker">Platforms</p>
+      <h2 id="targets-title">One codebase. <span class="grad-text">Every screen.</span></h2>
+      <div class="target-grid">
+        {for t in cards key t.group}
+          <article class="target {t.tone}">
+            <header>
+              <h3>{t.group}</h3>
+              <span class="chip {t.tone}">{t.status}</span>
+            </header>
+            <p class="via">{t.via}</p>
+            <ul class="os-list">
+              {for i in t.items key i}<li>{i}</li>{/for}
+            </ul>
+            <p class="target-text">{t.text}</p>
+          </article>
+        {/for}
+      </div>
+      {for t in upcoming key t.group}
+        <div class="target-bar">
+          <header>
+            <h3>{t.group}</h3>
+            <span class="chip {t.tone}">{t.status}</span>
+          </header>
+          <p class="target-bar-text"><span class="bar-items">{t.items.join(' · ')}</span><span class="bar-sep"> — </span>{t.text}</p>
+        </div>
+      {/for}
+      <p class="targets-more"><kreft-link to="/platforms" class="pill-btn primary">See every platform</kreft-link></p>
     </section>
 
     <!-- Additional Architecture Sections -->
@@ -213,7 +256,7 @@ action copy() {
   padding: 40px 0 72px;
 }
 
-/* Red/Coral Ambient Glow Orbs (Subtle in dark & light) */
+/* Ambient glow orbs: cobalt and cyan (subtle in dark & light) */
 .glow-orb {
   position: absolute;
   border-radius: 50%;
@@ -225,7 +268,7 @@ action copy() {
   left: -60px;
   width: 460px;
   height: 460px;
-  background: radial-gradient(circle, rgba(239, 68, 68, 0.18) 0%, rgba(239, 68, 68, 0.06) 45%, transparent 75%);
+  background: radial-gradient(circle, color-mix(in srgb, var(--primary) 18%, transparent) 0%, color-mix(in srgb, var(--primary) 6%, transparent) 45%, transparent 75%);
   filter: blur(60px);
 }
 .glow-bottom-right {
@@ -233,8 +276,32 @@ action copy() {
   right: 60px;
   width: 480px;
   height: 400px;
-  background: radial-gradient(circle, rgba(239, 68, 68, 0.15) 0%, rgba(239, 68, 68, 0.05) 50%, transparent 75%);
+  background: radial-gradient(circle, color-mix(in srgb, var(--primary) 15%, transparent) 0%, color-mix(in srgb, var(--primary) 5%, transparent) 50%, transparent 75%);
   filter: blur(65px);
+}
+
+/* Where it runs */
+.targets { position: relative; z-index: 1; padding: 8px 0 72px; }
+.targets h2 { font-size: clamp(28px, 4vw, 40px); letter-spacing: -0.04em; margin-bottom: 22px; }
+.target-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 16px; }
+.target { background: var(--card); border: 1px solid var(--card-border); border-radius: var(--radius-lg); padding: 22px; box-shadow: var(--shadow-md); min-width: 0; transition: transform .18s ease, box-shadow .18s ease; }
+.target:hover { transform: translateY(-2px); box-shadow: var(--shadow-lg); }
+.target.soon { border-style: dashed; box-shadow: none; background: color-mix(in srgb, var(--warm-bg) 45%, var(--card)); }
+.target header { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+.target h3 { margin: 0; font-size: 22px; letter-spacing: -0.035em; }
+.via { margin: 4px 0 14px; font-family: var(--mono); font-size: 11.5px; color: var(--muted); }
+.os-list { display: flex; flex-wrap: wrap; gap: 6px; list-style: none; margin: 0 0 14px; padding: 0; }
+.os-list li { padding: 4px 10px; font-size: 12.5px; font-weight: 600; border-radius: 999px; background: var(--accent); border: 1px solid var(--border); }
+.target-text { margin: 0; font-size: 13.5px; color: var(--muted); line-height: 1.5; }
+.target-bar { display: flex; align-items: center; gap: 16px; flex-wrap: wrap; margin-top: 16px; padding: 14px 20px; border: 1px dashed var(--border); border-radius: var(--radius-lg); background: color-mix(in srgb, var(--accent) 55%, var(--card)); }
+.target-bar header { display: flex; align-items: center; gap: 10px; }
+.target-bar h3 { margin: 0; font-size: 16px; letter-spacing: -0.02em; }
+.target-bar-text { margin: 0; font-size: 13px; color: var(--muted); line-height: 1.5; }
+.bar-items { font-family: var(--mono); font-size: 12px; color: var(--foreground); }
+.bar-sep { color: var(--muted); }
+.targets-more { margin: 22px 0 0; }
+@media (max-width: 860px) {
+  .target-grid { grid-template-columns: minmax(0, 1fr); }
 }
 
 /* 2-Column Hero Grid */
@@ -273,8 +340,8 @@ action copy() {
 /* the changing headline: each line slides in from the right (a marquee) with a flash of red light, then settles */
 .rotator { display: block; animation: rotator-flash 0.9s ease-out; }
 @keyframes rotator-flash {
-  0% { opacity: 0; transform: translateX(1.4em); filter: blur(6px); color: #ef4444; text-shadow: 0 0 0.7em rgba(239, 68, 68, 0.95); }
-  35% { opacity: 1; filter: blur(0); color: #ef4444; text-shadow: 0 0 0.55em rgba(239, 68, 68, 0.85); }
+  0% { opacity: 0; transform: translateX(1.4em); filter: blur(6px); color: var(--primary); text-shadow: 0 0 0.7em color-mix(in srgb, var(--primary) 95%, transparent); }
+  35% { opacity: 1; filter: blur(0); color: var(--primary); text-shadow: 0 0 0.55em color-mix(in srgb, var(--primary) 85%, transparent); }
   100% { opacity: 1; transform: none; filter: none; color: var(--foreground); text-shadow: none; }
 }
 @media (prefers-reduced-motion: reduce) { .rotator { animation: none; } }
@@ -361,10 +428,10 @@ action copy() {
   border: 1px solid var(--border);
 }
 .badge.highlight {
-  background: rgba(239, 68, 68, 0.15);
-  color: #ef4444;
-  border-color: rgba(239, 68, 68, 0.35);
-  box-shadow: 0 2px 8px rgba(239, 68, 68, 0.2);
+  background: color-mix(in srgb, var(--primary) 15%, transparent);
+  color: var(--primary);
+  border-color: color-mix(in srgb, var(--primary) 35%, transparent);
+  box-shadow: 0 2px 8px color-mix(in srgb, var(--primary) 20%, transparent);
 }
 
 /* Right Visual Stack */
@@ -378,10 +445,10 @@ action copy() {
 /* Code Terminal Window */
 .terminal-card {
   min-width: 0;
-  background: #0f172a;
+  background: #0a1020;
   border-radius: 18px;
   box-shadow: 0 25px 60px -15px rgba(0, 0, 0, 0.4), 0 0 1px 1px rgba(255, 255, 255, 0.08);
-  border: 1px solid #1e293b;
+  border: 1px solid #1b2740;
   overflow: hidden;
   width: 100%;
   max-width: 510px;
@@ -414,7 +481,7 @@ action copy() {
 .tab-title {
   font-family: var(--mono, ui-monospace, monospace);
   font-size: 13px;
-  color: #94a3b8;
+  color: #8d9bb5;
   letter-spacing: -0.01em;
   text-align: center;
 }
@@ -434,8 +501,8 @@ action copy() {
   width: 6px;
   height: 6px;
   border-radius: 50%;
-  background: #ef4444;
-  box-shadow: 0 0 8px rgba(239, 68, 68, 0.8);
+  background: var(--primary);
+  box-shadow: 0 0 8px color-mix(in srgb, var(--primary) 80%, transparent);
   z-index: 3;
 }
 
@@ -445,19 +512,19 @@ action copy() {
   font-family: 'JetBrains Mono', 'Fira Code', ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
   font-size: 14px;
   line-height: 1.75;
-  color: #f8fafc;
+  color: #e7eefc;
   overflow-x: auto;
 }
-.syn-k { color: #f87171; font-weight: 500; }
-.syn-id { color: #f8fafc; }
-.syn-colon { color: #94a3b8; }
+.syn-k { color: var(--primary-2); font-weight: 500; }
+.syn-id { color: #e7eefc; }
+.syn-colon { color: #8d9bb5; }
 .syn-t { color: #93c5fd; }
 .syn-s { color: #86efac; }
 .syn-n { color: #c084fc; }
-.syn-op { color: #f87171; }
+.syn-op { color: var(--primary-2); }
 .syn-tag { color: #60a5fa; }
 .syn-attr { color: #38bdf8; }
-.syn-expr { color: #f8fafc; }
+.syn-expr { color: #e7eefc; }
 
 /* Floating Live Preview Card */
 .floating-preview {
@@ -576,7 +643,7 @@ action copy() {
   border-radius: 50%;
   display: inline-block;
 }
-.dot-bullet.red-bullet { background: #ef4444; }
+.dot-bullet.red-bullet { background: var(--primary); }
 .dot-bullet.green-bullet { background: #10b981; }
 .dot-bullet.teal-bullet { background: #06b6d4; }
 

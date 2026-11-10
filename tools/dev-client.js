@@ -3,7 +3,7 @@
  *   • hot reload: a changed .kreft file is swapped in place and keeps its state;
  *     a changed .css file is reloaded; anything else reloads the page
  *   • error overlay: .kreft mistakes and runtime errors show on the page
- *   • DevTools: the "K" button (or Alt+Shift+D) opens the Kreft DevTools panel
+ *   • DevTools: Alt+Shift+D opens the Kreft DevTools panel (no floating button)
  * Not part of your app: `kreftjs build` never includes it.
  */
 (function () {
@@ -13,8 +13,14 @@
   /* ---------------- error overlay ---------------- */
   let overlay = null;
   const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+  // Every error is kept, oldest first: the first one is usually the cause (a later "Kreftjs is not defined" only follows a file that never started).
+  const entries = [];
+  const hintFor = (text) => (/SyntaxError|Unexpected token|Kreftjs is not defined|Kreft is not defined/.test(text)
+    ? 'If kreftjs.js could not start, this browser is probably too old to read it. On a phone, update "Android System WebView" (and Chrome) in the Play Store, then reload.' : '');
   function showError(title, message) {
     if (!document.body) return void addEventListener('DOMContentLoaded', () => showError(title, message));
+    const text = String(message);
+    if (!entries.some((x) => x.title === title && x.message === text) && entries.length < 8) entries.push({ title, message: text });
     if (!overlay) {
       overlay = document.createElement('div');
       overlay.setAttribute('data-kreft-overlay', '');
@@ -24,12 +30,17 @@
       overlay.addEventListener('click', (e) => { if (e.target.hasAttribute('data-close')) hideError(); });
       document.body.appendChild(overlay);
     }
+    const hint = entries.map((x) => hintFor(x.message)).find(Boolean);
     overlay.innerHTML = '<button data-close style="position:absolute;top:8px;right:10px;background:none;border:0;color:#EDEDF1;font-size:20px;cursor:pointer">×</button>' +
-      `<div style="color:#f87171;font-weight:700;margin-bottom:6px">${esc(title)}</div><pre style="margin:0;white-space:pre-wrap">${esc(message)}</pre>`;
+      (entries.length > 1 ? `<div style="color:#a1a1aa;margin-bottom:8px">${entries.length} errors. The first one is usually the cause.</div>` : '') +
+      entries.map((x) => `<div style="color:#f87171;font-weight:700;margin:6px 0">${esc(x.title)}</div><pre style="margin:0;white-space:pre-wrap">${esc(x.message)}</pre>`).join('') +
+      (hint ? `<div style="margin-top:10px;padding-top:8px;border-top:1px solid #27272a;color:#fbbf24">${esc(hint)}</div>` : '');
   }
-  function hideError() { if (overlay) { overlay.remove(); overlay = null; } }
+  function hideError() { if (overlay) { overlay.remove(); overlay = null; } entries.length = 0; }
   const errorText = (e) => (e && (e.stack || e.message)) || String(e);
-  addEventListener('error', (e) => showError('Error', errorText(e.error || e.message)));
+  // a script that cannot be read has no stack: say which file and line
+  const withWhere = (text, e) => (e && e.filename && !String(text).includes(e.filename) ? `${text}\n    at ${e.filename}:${e.lineno}:${e.colno}` : text);
+  addEventListener('error', (e) => showError('Error', withWhere(errorText(e.error || e.message), e)));
   addEventListener('unhandledrejection', (e) => showError('Error (promise)', errorText(e.reason)));
   const consoleError = console.error.bind(console);
   console.error = (...args) => {
@@ -86,40 +97,4 @@
   }
   window.__kreftOpenDevtools = openDevtools; // pages can offer a button
   window.addEventListener('keydown', (e) => { if (e.altKey && e.shiftKey && (e.key === 'D' || e.key === 'd' || e.code === 'KeyD')) openDevtools(); });
-  function isElectron() {
-    if (typeof window === 'undefined') return false;
-    if (window.kreftDesktop && window.kreftDesktop.isElectron) return true;
-    if (window.__KREFT_ELECTRON__) return true;
-    if (typeof navigator !== 'undefined' && /electron/i.test(navigator.userAgent)) return true;
-    if (typeof process !== 'undefined' && process.versions && process.versions.electron) return true;
-    return false;
-  }
-
-  function addButton() {
-    // In Electron, totally hide the Kreft in-page DevTools button
-    if (isElectron()) return;
-    let hidden = false;
-    try { hidden = localStorage.getItem('kreft:devtools-button') === 'off'; } catch (_) { /* blocked */ }
-    if (hidden) return;
-    const b = document.createElement('button');
-    b.type = 'button';
-    b.title = 'Kreft DevTools (Alt+Shift+D)';
-    b.setAttribute('data-kreft-devtools-button', '');
-    b.textContent = 'K';
-    b.style.cssText = 'position:fixed;right:14px;bottom:14px;z-index:2147483645;width:34px;height:34px;border:0;' +
-      'background:#18181b;color:#fafafa;font:700 16px/34px system-ui,sans-serif;cursor:pointer;border:1px solid #3f3f46;opacity:.9';
-    b.onclick = openDevtools;
-    b.oncontextmenu = (e) => { e.preventDefault(); b.remove(); try { localStorage.setItem('kreft:devtools-button', 'off'); } catch (_) {} };
-    document.body.appendChild(b);
-  }
-
-  if (isElectron()) {
-    // Ensure any devtools button is completely hidden in Electron
-    const s = document.createElement('style');
-    s.setAttribute('data-kreft-electron-style', '');
-    s.textContent = '[data-kreft-devtools-button] { display: none !important; }';
-    (document.head || document.documentElement).appendChild(s);
-  } else {
-    if (document.body) addButton(); else addEventListener('DOMContentLoaded', addButton);
-  }
 })();

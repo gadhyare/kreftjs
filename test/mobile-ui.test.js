@@ -270,3 +270,11 @@ test('the animated splash: an element in index.html, styles in edge.css, a nativ
   await N.splash.hide();
   assert.strictEqual(await N.splash.hide(), undefined, 'hiding twice is fine');
 });
+
+test('the phone layout has a dark side menu opened from the top bar', () => {
+  const fs = require('fs'), path = require('path');
+  const s = fs.readFileSync(path.join(__dirname, '..', 'templates', 'mobile', 'layouts', 'mobile.kreft'), 'utf8');
+  assert.match(s, /<edge-side-nav k-model="menuOpen"/);
+  assert.match(s, /icon: 'menu'/);
+  assert.match(s, /derive menuTitle = appName/);
+});

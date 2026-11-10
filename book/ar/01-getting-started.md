@@ -20,7 +20,7 @@ Kreft (يُكتب `kreftjs`) إطار عمل صغير، تفاعلي (reactive)�
 
 ```bash
 npm install -g kreftjs
-kreft --version        # مثال: 0.0.19-beta
+kreft --version        # مثال: 0.0.31-beta
 ```
 
 للتحقق من أن كل شيء سليم:
@@ -34,6 +34,25 @@ kreft about
 ```bash
 kreft vscode
 ```
+
+يعمل الأمر نفسه مع Antigravity و Windsurf، ويفعّل اختصارات Emmet داخل ملفات `.kreft`. وللمحررات الأخرى إضافة خاصة بكل واحد:
+
+```bash
+kreft editor sublime      # Sublime Text
+kreft editor zed          # Zed
+kreft editor jetbrains    # WebStorm و PhpStorm و IntelliJ IDEA
+kreft editor vim          # Vim و Neovim
+```
+
+ولتنزيل الإضافة كملف واحد بدل تثبيتها (لمشاركتها مع فريقك أو تثبيتها يدويًا) أضف `--download`:
+
+```bash
+kreft editor vscode --download        # kreft-vscode-<version>.vsix
+kreft editor jetbrains --download     # kreft-jetbrains-<version>.jar
+kreft editor all --download plugins   # الملفات الخمسة في مجلد plugins
+```
+
+يطبع الأمر مكان الملف وطريقة تثبيته في المحرر.
 
 ## أول تطبيق
 
@@ -151,7 +170,7 @@ state id = nanoid()
 </view>
 ```
 
-الأمر `kreft add` نسخة أكثر أمانًا من `npm install`: يمنع سكربتات التثبيت افتراضيًا، ويتحقق من أخطاء الكتابة المتعمدة في أسماء الحزم (typosquatting)، وينبّه إلى الحزم التي نُشرت قبل أقل من 14 يومًا، ثم يشغّل `npm audit`.
+يفحص `kreft add` شجرة اعتماديات npm والتنبيهات والرخص والسلامة قبل التثبيت، ثم يعرض **Allow / Disallow** للسماح أو الرفض بعد اجتياز السياسة. السكربتات معطلة، ولا يتجاوز `--yes` أو `--force` الحظر. راجع [أمان حزم npm](24-package-security.md) للإعدادات والتقارير وحدود الدعم.
 
 ## أوامر ستستخدمها كل يوم
 

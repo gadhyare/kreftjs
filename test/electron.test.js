@@ -46,69 +46,41 @@ test('electron:init removes the Google Fonts links of index.html and nothing els
   }
 });
 
-test('electron templates: main.js and preload.js support ELECTRON_DEVTOOLS variable and hide devtools', () => {
+test('electron templates: main.js reads the configuration for DevTools and the menu, the bridge keeps its functions', () => {
   const { TEMPLATES } = require(path.join(__dirname, '..', 'bin/electron.js'));
   const mainCode = TEMPLATES.main();
   const preloadCode = TEMPLATES.preload();
 
-  assert.match(mainCode, /ELECTRON_DEVTOOLS/, 'main.js reads ELECTRON_DEVTOOLS variable');
-  assert.match(mainCode, /openDevTools\(\{ mode: devTools\.mode \}\)/, 'main.js opens devtools with configured mode (default right sidebar)');
+  assert.match(mainCode, /kreft\.resolved\.json/, 'main.js reads the checked configuration (ELECTRON_DEVTOOLS and ELECTRON_MENU are read by the CLI, not here)');
+  assert.match(mainCode, /openDevTools\(\{ mode: C\.devtools\.mode \}\)/, 'main.js opens devtools with the configured mode');
   assert.match(mainCode, /ipcMain\.handle\('kreft:devtools:open'/, 'main.js has devtools:open IPC');
   assert.match(mainCode, /ipcMain\.handle\('kreft:devtools:close'/, 'main.js has devtools:close IPC');
   assert.match(preloadCode, /__KREFT_ELECTRON__/, 'preload.js exposes __KREFT_ELECTRON__');
   assert.match(preloadCode, /openDevTools:/, 'preload.js exposes openDevTools');
   assert.match(preloadCode, /closeDevTools:/, 'preload.js exposes closeDevTools');
-  assert.match(mainCode, /if\s*\(isDev\s*\|\|\s*process\.platform\s*!==\s*'darwin'\)\s*app\.quit\(\)/, 'dev mode quits cleanly on window close');
+  assert.match(mainCode, /if \(isDev \|\| process\.platform !== 'darwin'\) app\.quit\(\)/, 'dev mode quits cleanly on window close');
 });
 
-test('dev-client.js: in Electron, the Kreft devtools button is totally hidden', () => {
+test('dev-client.js: there is no floating DevTools button anywhere; Alt+Shift+D opens the panel', () => {
   const vm = require('node:vm');
   const code = fs.readFileSync(path.join(__dirname, '..', 'tools/dev-client.js'), 'utf8');
-
-  // Case 1: Standard browser -> button is added
-  const browserContext = {
-    navigator: { userAgent: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36' },
-    document: {
-      body: {},
-      head: { appendChild() {} },
-      createElement() {
-        return { setAttribute(k, v) { this[k] = v; }, style: {} };
-      },
-      addEventListener() {},
-    },
-    addEventListener() {},
-    location: { origin: 'http://localhost:8000', reload() {} },
-    localStorage: { getItem() { return null; } },
-    console: { error() {}, log() {} },
-  };
-  browserContext.window = browserContext;
-  browserContext.document.body.appendChild = (el) => { browserContext.button = el; };
-  vm.runInNewContext(code, browserContext);
-  assert.ok(browserContext.button, 'browser gets the devtools button');
-  assert.strictEqual(browserContext.button['data-kreft-devtools-button'], '');
-
-  // Case 2: Electron environment -> button is totally hidden
-  const electronContext = {
-    kreftDesktop: { isElectron: true },
-    __KREFT_ELECTRON__: true,
-    navigator: { userAgent: 'Mozilla/5.0 (Macintosh) AppleWebKit/537.36 Chrome/130.0.0.0 Electron/34.2.0 Safari/537.36' },
-    document: {
-      body: {},
-      head: { appendChild(el) { this.style = el; } },
-      createElement() {
-        return { setAttribute(k, v) { this[k] = v; }, style: {} };
-      },
-      addEventListener() {},
-    },
-    addEventListener() {},
-    location: { origin: 'http://localhost:8000', reload() {} },
-    localStorage: { getItem() { return null; } },
-    console: { error() {}, log() {} },
-  };
-  electronContext.window = electronContext;
-  electronContext.document.body.appendChild = (el) => { electronContext.button = el; };
-  vm.runInNewContext(code, electronContext);
-  assert.strictEqual(electronContext.button, undefined, 'electron does NOT receive the in-page devtools button');
-  assert.ok(electronContext.document.head.style, 'electron receives the hiding stylesheet');
-  assert.match(electronContext.document.head.style.textContent, /display:\s*none\s*!important/);
+  assert.doesNotMatch(code, /data-kreft-devtools-button/, 'the floating K button is gone');
+  for (const [name, extra, ua] of [['a browser', {}, 'Mozilla/5.0 (Macintosh) AppleWebKit/537.36'], ['Electron', { kreftDesktop: { isElectron: true }, __KREFT_ELECTRON__: true }, 'Mozilla/5.0 Electron/34.2.0']]) {
+    const added = [];
+    const listeners = {};
+    const ctx = {
+      ...extra,
+      navigator: { userAgent: ua },
+      document: { body: { appendChild: (el) => added.push(el) }, head: { appendChild: (el) => added.push(el) }, createElement: () => ({ setAttribute() {}, style: {}, addEventListener() {} }), addEventListener() {} },
+      addEventListener(type, fn) { listeners[type] = fn; },
+      location: { origin: 'http://localhost:8000', reload() {} },
+      localStorage: { getItem() { return null; } },
+      console: { error() {}, log() {} },
+    };
+    ctx.window = ctx;
+    vm.runInNewContext(code, ctx);
+    assert.strictEqual(added.length, 0, `${name}: nothing is added to the page by the dev client at start`);
+    assert.strictEqual(typeof ctx.__kreftOpenDevtools, 'function', `${name}: pages can open the panel themselves`);
+    assert.ok(listeners.keydown, `${name}: Alt+Shift+D is listened for`);
+  }
 });

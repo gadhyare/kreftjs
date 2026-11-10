@@ -13,7 +13,20 @@
 (function (global) {
   'use strict';
   const K = global.Kreftjs;
-  if (!K) { if (global.console) console.warn('kreftjs-native.js: load kreftjs.js first.'); return; }
+  if (!K) {
+    // kreftjs.js did not start: it is missing, loaded after this file, or the browser is too old to read it. Say so on the screen
+    // instead of leaving a blank white page.
+    if (global.console) console.warn('kreftjs-native.js: kreftjs.js did not start (load it first; or this browser is too old to read it).');
+    const show = () => {
+      const box = document.createElement('div');
+      box.setAttribute('role', 'alert');
+      box.textContent = 'This app could not start. If your phone is old, update "Android System WebView" and Chrome in the Play Store, then open the app again.';
+      box.style.cssText = 'position:fixed;left:16px;right:16px;bottom:16px;z-index:2147483000;padding:14px 16px;border-radius:12px;background:#111;color:#fff;font:15px/1.4 system-ui,sans-serif';
+      document.body.appendChild(box);
+    };
+    if (document.body) show(); else document.addEventListener('DOMContentLoaded', show);
+    return;
+  }
 
   /* ------------------------------------------------------------ platform and plugins */
   const cap = () => global.Capacitor || null;
@@ -21,6 +34,7 @@
     const c = cap();
     if (c && c.isNativePlatform && c.isNativePlatform()) return c.getPlatform();
     if (global.kreftDesktop || global.__KREFT_ELECTRON__) return 'electron';
+    if (global.__TAURI__ || global.__TAURI_INTERNALS__) return 'tauri';
     return 'web';
   };
   const isNative = () => { const p = platform(); return p === 'android' || p === 'ios'; };
@@ -137,9 +151,18 @@
   };
 
   /* ------------------------------------------------------------ system */
+  // true for a dark colour, false for a light one, null when it is not #rgb / #rrggbb
+  function isDarkColor(c) {
+    const m = /^#([0-9a-f]{3}|[0-9a-f]{6})$/i.exec(String(c || '').trim());
+    if (!m) return null;
+    const h = m[1].length === 3 ? m[1].replace(/./g, (x) => x + x) : m[1];
+    const [r, g, b] = [0, 2, 4].map((i) => parseInt(h.slice(i, i + 2), 16));
+    return (0.299 * r + 0.587 * g + 0.114 * b) < 140;
+  }
+
   const system = {
     platform, isNative,
-    isDesktop: () => platform() === 'electron',
+    isDesktop: () => platform() === 'electron' || platform() === 'tauri',
     isWeb: () => platform() === 'web',
     async openUrl(url) {
       if (!/^(https?:|mailto:|tel:|sms:)/i.test(String(url))) return false; // never javascript: or file:
@@ -179,7 +202,9 @@
       hide() { return call('Keyboard', 'hide'); },
     },
     // statusBar.set({ color: '#111', style: 'light' | 'dark', overlay: false }): on the phone the real status bar, in a browser the address bar colour
+    // statusBar({ color: '#111827', style: 'auto' }): 'auto' picks light icons on a dark colour and dark icons on a light one
     async statusBar(o = {}) {
+      if (o.style === 'auto') { const dark = isDarkColor(o.color); o = { ...o, style: dark === null ? undefined : (dark ? 'light' : 'dark') }; }
       if (isNative()) {
         if (o.color) await call('StatusBar', 'setBackgroundColor', { color: o.color });
         if (o.style) await call('StatusBar', 'setStyle', { style: o.style === 'light' ? 'DARK' : 'LIGHT' }); // plugin names the style by the text colour it expects under
@@ -334,8 +359,8 @@
   /* ------------------------------------------------------------ the edge store: the top bar and the bottom bar */
   // Change it anywhere: edge.setTop({ title: 'Cart', bg: '#111', color: '#fff' })   edge.setBottom({ labels: 'never' })   edge.reset()
   const defaults = () => ({
-    top: { show: true, title: '', subtitle: '', back: 'auto', bg: '', color: '', border: true, height: 0, center: false, elevated: false, left: [], right: [], blur: false },
-    bottom: { show: true, items: [], bg: '', color: '', active: '', indicator: 'pill', labels: 'always', border: true, height: 0, floating: false, blur: false, haptics: true },
+    top: { show: true, title: '', subtitle: '', back: 'auto', bg: '', color: '', border: true, borderColor: '', height: 0, center: false, elevated: false, left: [], right: [], blur: false },
+    bottom: { show: true, items: [], bg: '', color: '', active: '', activeColor: '', indicatorColor: '', borderColor: '', indicator: 'pill', labels: 'always', border: true, height: 0, floating: false, blur: false, haptics: true },
   });
   const edge = K.store('edge', {
     ...defaults(),
@@ -387,7 +412,7 @@
   }
 
   /* ------------------------------------------------------------ start */
-  const N = { platform, isNative, isDesktop: system.isDesktop, isWeb: system.isWeb, plugin: call, device, haptics, file, system, splash, position, dialog, on, emit, pushBack, back: handleBack, safeArea, asset, edge };
+  const N = { platform, isNative, isDesktop: system.isDesktop, isWeb: system.isWeb, isDarkColor, plugin: call, device, haptics, file, system, splash, position, dialog, on, emit, pushBack, back: handleBack, safeArea, asset, edge };
   K.native = N;
 
   function start() {

@@ -83,6 +83,21 @@ function sqlite(cfg, root) {
       return { changes: Number(r.changes), insertId: r.lastInsertRowid == null ? null : Number(r.lastInsertRowid) };
     },
     async exec(sql) { conn.exec(sql); },
+    // The engine itself decides what a query may read, however the SQL is written (quoted names, parentheses, aliases):
+    // decide(table, column) returns 'deny' (the statement fails), 'null' (that column reads as NULL) or anything else (allowed).
+    // Returns a function that removes the guard, or null when this Node.js has no authorizer. The guard is connection-wide,
+    // so it must be removed before anything else can run on the connection (use it around one synchronous statement).
+    guardReads(decide) {
+      let constants;
+      try { ({ constants } = require('node:sqlite')); } catch (_) { return null; }
+      if (typeof conn.setAuthorizer !== 'function' || !constants) return null;
+      conn.setAuthorizer((code, table, column) => {
+        if (code !== constants.SQLITE_READ) return constants.SQLITE_OK;
+        const verdict = decide(String(table || ''), String(column || ''));
+        return verdict === 'deny' ? constants.SQLITE_DENY : verdict === 'null' ? constants.SQLITE_IGNORE : constants.SQLITE_OK;
+      });
+      return () => conn.setAuthorizer(null);
+    },
     // one connection: nested transactions become savepoints
     async transaction(fn) {
       const depth = (db.__depth = (db.__depth || 0) + 1);

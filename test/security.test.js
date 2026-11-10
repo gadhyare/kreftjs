@@ -111,6 +111,21 @@ test('MCP query_database: names, tables and tricks that reach credentials are re
   await refused("SELECT pg_read_file('/etc/passwd')");
   await refused('SELECT * INTO copy_of_users FROM users');
   await refused('SELECT randomblob(1000000000)');
+  // SQLite reads a name in single quotes as a column or table name
+  await refused("SELECT users.'password' FROM users");
+  await refused("SELECT u.'password' AS x FROM users u");
+  await refused("SELECT * FROM 'personal_access_tokens'");
+  await refused("SELECT * FROM users, 'sessions'");
+  assert.doesNotMatch(JSON.stringify(await mcpQuery("SELECT name FROM users WHERE name = 'password'")), /Access denied/, 'a value that looks like a name is still just a value');
+  // the engine decides, not the wording
+  await db.exec("CREATE TABLE sessions(id INTEGER PRIMARY KEY, payload TEXT)");
+  await db.run('INSERT INTO sessions(payload) VALUES(?)', ['SESSION-SECRET-VALUE']);
+  for (const q of ["SELECT payload FROM (('sessions'))", "SELECT payload FROM ( ( 'sessions' ) )", "SELECT payload FROM \"sessions\"", "SELECT s.payload FROM main.'sessions' s", "SELECT payload FROM (SELECT * FROM 'sessions')"]) {
+    assert.doesNotMatch(JSON.stringify(await mcpQuery(q)), /SESSION-SECRET-VALUE/, q);
+  }
+  const viaQuote = JSON.stringify(await mcpQuery("SELECT (SELECT u.'password') AS x FROM users u"));
+  assert.doesNotMatch(viaQuote, /scrypt|BBBB/, 'a credential column reads as nothing, however it is named');
+  await db.exec('DROP TABLE sessions');
 
   const ok = JSON.stringify(await mcpQuery('SELECT * FROM users'));
   assert.doesNotMatch(ok, /BBBB|DDDD/, 'hashes must be masked by column and by shape');
@@ -327,4 +342,73 @@ test('kreftjs.js loads when the page ships its own translations (window.__KREFT_
   const Kreftjs = ctx.Kreft || win.Kreftjs;
   assert.strictEqual(typeof Kreft, 'object');
   assert.deepStrictEqual([...Kreftjs.locales()].sort(), ['ar', 'en']);
+});
+
+/* ------------------------------------------------------------------ external review (second round) */
+test('db-api: a path with a percent sign is read as it is, and does not stop the server', async () => {
+  const { connect } = require(path.join(ROOT, 'bin/db.js'));
+  const { createDbApi } = require(path.join(ROOT, 'bin/db-api.js'));
+  const db = await connect('sqlite::memory:');
+  await db.exec('CREATE TABLE users(id INTEGER PRIMARY KEY, name TEXT)');
+  await db.run('INSERT INTO users(name) VALUES(?)', ['a']);
+  const api = createDbApi(db, { tables: { users: {} }, log: { error() {} } });
+  const call = (urlPath) => new Promise((ok, no) => { let status; api({ url: urlPath, method: 'GET', on() {}, headers: {} }, { writeHead(s) { status = s; }, end: (b) => ok({ status, body: b }) }, urlPath).catch(no); });
+  assert.strictEqual((await call('/api/not_a_table/%')).status, 404);
+  assert.strictEqual((await call('/api/users/%')).status, 404, 'no row has the id "%"');
+  assert.strictEqual((await call('/api/users/%41')).status, 404, 'the path was decoded once already: %41 is not "A"');
+});
+
+test('cleanHtml: unfinished tags and quotes are answered at once, and stay harmless', () => {
+  const { cleanHtml } = require(path.join(ROOT, 'bin/backend/html.js'));
+  const slow = (s) => { const t = Date.now(); const out = cleanHtml(s); return [Date.now() - t, out]; };
+  for (const bad of ['<a' + ' x'.repeat(40), '<a '.repeat(30000), '<a "'.repeat(30000), "<a '".repeat(30000), '<style '.repeat(30000), '<script'.repeat(30000), '<!--'.repeat(30000), '<a ' + ' '.repeat(50000)]) {
+    const [ms, out] = slow(bad);
+    assert.ok(ms < 500, `${bad.slice(0, 12)}… took ${ms} ms`);
+    assert.doesNotMatch(out, /<(?!\/?[a-z0-9:-]+(?: [a-z0-9:-]+="[^"<>]*")* ?\/?>)/, 'every "<" that is left is a tag this function wrote');
+  }
+  assert.strictEqual(cleanHtml('<p class="a" onclick="x()">hi <br/> <img src=x onerror=alert(1)><script>1</script></p>'), '<p class="a">hi <br /> <img src="x" /></p>');
+  assert.strictEqual(cleanHtml('<a title="a>b" href="https://e.com/">x</a>'), '<a title="a&gt;b" href="https://e.com/">x</a>', 'a ">" inside quotes does not end the tag');
+});
+
+test('sqlite read guard: the engine refuses credential tables and blanks credential columns, and is gone afterwards', async () => {
+  const { connect } = require(path.join(ROOT, 'bin/db.js'));
+  const db = await connect('sqlite::memory:');
+  await db.exec('CREATE TABLE users(id INTEGER PRIMARY KEY, name TEXT, password TEXT); CREATE TABLE sessions(id INTEGER PRIMARY KEY, payload TEXT)');
+  await db.run('INSERT INTO users(name,password) VALUES(?,?)', ['ann', 'HASH']);
+  await db.run('INSERT INTO sessions(payload) VALUES(?)', ['PAYLOAD']);
+  const release = db.guardReads((t, c) => (t === 'sessions' ? 'deny' : c === 'password' ? 'null' : 'ok'));
+  if (!release) return;   // a Node.js without an authorizer: the SQL checks are all there is
+  try {
+    await assert.rejects(() => db.query("SELECT payload FROM (('sessions'))"), /prohibited|not authorized/i);
+    assert.deepStrictEqual((await db.query('SELECT name, password FROM users')).map((r) => ({ ...r })), [{ name: 'ann', password: null }]);
+  } finally { release(); }
+  assert.deepStrictEqual((await db.query('SELECT password FROM users')).map((r) => ({ ...r })), [{ password: 'HASH' }], 'the application itself reads normally again');
+  assert.strictEqual((await db.query('SELECT payload FROM sessions'))[0].payload, 'PAYLOAD');
+});
+
+test('MCP query_database is off, with a clear message, when the engine gives no read protection; the other tools stay on', async () => {
+  const { connect } = require(path.join(ROOT, 'bin/db.js'));
+  const { setConnection } = require(path.join(ROOT, 'bin/backend/query.js'));
+  const db = await connect('sqlite::memory:');
+  await db.exec('CREATE TABLE users(id INTEGER PRIMARY KEY, name TEXT, password TEXT)');
+  await db.run('INSERT INTO users(name,password) VALUES(?,?)', ['ann', 'PLAIN-SECRET']);
+  const guard = db.guardReads;
+  db.guardReads = undefined;   // an engine without a guard (MySQL, PostgreSQL, an older Node.js)
+  setConnection(db);
+  const saved = process.env.MCP_DATABASE_RESTRICTED;
+  delete process.env.MCP_DATABASE_RESTRICTED;
+  try {
+    const bypass = 'SELECT v FROM (WITH t(a,b,v) AS (SELECT * FROM users) SELECT v FROM t)';
+    const off = JSON.stringify(await mcpQuery(bypass));
+    assert.match(off, /query_database is turned off/);
+    assert.doesNotMatch(off, /PLAIN-SECRET/);
+    process.env.MCP_DATABASE_RESTRICTED = 'true';   // the operator says the connection is limited
+    assert.doesNotMatch(JSON.stringify(await mcpQuery('SELECT name FROM users')), /turned off/);
+    const { getMcpServer } = require(path.join(ROOT, 'bin/backend/mcp.js'));
+    const tools = await getMcpServer({ baseDir: ROOT }).handleMessage({ jsonrpc: '2.0', id: 2, method: 'tools/list' });
+    assert.ok(JSON.stringify(tools).includes('list_routes'), 'the other tools are still listed');
+  } finally {
+    if (saved === undefined) delete process.env.MCP_DATABASE_RESTRICTED; else process.env.MCP_DATABASE_RESTRICTED = saved;
+    db.guardReads = guard;
+  }
 });

@@ -3,6 +3,22 @@ try {
   vscode = require('vscode');
 } catch {}
 
+// Text that must keep its spaces exactly: what is inside <pre> and <textarea> in the view, and a template literal (`…`)
+// that runs over several lines in the script or style. Those lines are copied as they are.
+const countBackticks = (line) => (String(line).replace(/\\./g, '').match(/`/g) || []).length;
+function rawStart(line, inView) {
+  if (inView) {
+    const found = [...String(line).matchAll(/<(pre|textarea)\b[^>]*>/gi)].pop();
+    if (found && !new RegExp('</' + found[1] + '\\s*>', 'i').test(line.slice(found.index + found[0].length))) return { tag: found[1].toLowerCase() };
+    return null;
+  }
+  return countBackticks(line) % 2 === 1 ? { tpl: true } : null;
+}
+function rawNext(raw, line) {
+  if (raw.tag) return new RegExp('</' + raw.tag + '\\s*>', 'i').test(line) ? null : raw;
+  return countBackticks(line) % 2 === 1 ? null : raw;
+}
+
 function formatKreft(text, options = {}) {
   const tabSize = options.tabSize || 2;
   const indentStr = options.insertSpaces !== false ? ' '.repeat(tabSize) : '\t';
@@ -22,9 +38,19 @@ function formatKreft(text, options = {}) {
     'link', 'meta', 'param', 'source', 'track', 'wbr'
   ]);
 
+  let raw = null;   // inside text that keeps its spaces
   for (let i = 0; i < lines.length; i++) {
     const rawLine = lines[i];
     const trimmed = rawLine.trim();
+
+    if (raw) {
+      result.push(rawLine);
+      const was = raw;
+      raw = rawNext(raw, rawLine);
+      if (!raw && was.tag) viewIndent = Math.max(1, viewIndent - 1);   // the closing </pre> was not counted
+      continue;
+    }
+    if (trimmed) raw = rawStart(rawLine, inView);   // from the next line on
 
     if (!trimmed) {
       if (result.length > 0 && result[result.length - 1] !== '') {
@@ -157,6 +183,7 @@ function formatKreft(text, options = {}) {
     }
   }
 
+  while (result.length && result[result.length - 1] === '') result.pop();   // one newline at the end, not two
   return result.join('\n') + '\n';
 }
 
@@ -176,8 +203,30 @@ function activate(context) {
   });
 
   context.subscriptions.push(provider);
+  offerEmmet(context);
+}
+
+/* Emmet: package.json maps kreftjs to html by default (configurationDefaults), so `ul>li*3` works in <view> and `m10` in
+   <style>. A user who has their own "emmet.includeLanguages" replaces that default: ask once, then add kreftjs to theirs. */
+function emmetIsOn(includeLanguages) {
+  return Boolean(includeLanguages && typeof includeLanguages === 'object' && includeLanguages.kreftjs);
+}
+function withKreftEmmet(includeLanguages) {
+  return { ...(includeLanguages && typeof includeLanguages === 'object' ? includeLanguages : {}), kreftjs: 'html' };
+}
+async function offerEmmet(context) {
+  try {
+    const config = vscode.workspace.getConfiguration('emmet');
+    if (emmetIsOn(config.get('includeLanguages'))) return;
+    if (context.globalState.get('kreft.emmetAsked')) return;
+    await context.globalState.update('kreft.emmetAsked', true);
+    const answer = await vscode.window.showInformationMessage('Turn on Emmet abbreviations in .kreft files?', 'Yes', 'No');
+    if (answer !== 'Yes') return;
+    const own = (config.inspect('includeLanguages') || {}).globalValue;
+    await config.update('includeLanguages', withKreftEmmet(own), vscode.ConfigurationTarget.Global);
+  } catch {}
 }
 
 function deactivate() {}
 
-module.exports = { activate, deactivate, formatKreft };
+module.exports = { activate, deactivate, formatKreft, emmetIsOn, withKreftEmmet };
