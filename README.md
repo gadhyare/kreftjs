@@ -6,7 +6,7 @@
 
 You write components in `.kreft` files in plain words: `state`, `derive`, `action`. The same project also gives you routing, controllers, an Active Record ORM, migrations, queues, mail, sign-in pages with two-factor codes, and a development server with hot reload that keeps your state.
 
-📖 **[Read the documentation](docs/README.md)** · run `npm run dev` and open `/demo/docs` for the searchable version.
+🌐 **[kreftjs.com](https://kreftjs.com)** · 📖 **[Read the documentation](docs/README.md)** ([online](https://kreftjs.com/docs)) · run `npm run dev` and open `/demo/docs` for the searchable version.
 
 ```html
 <!-- Counter.kreft -->

@@ -1,5 +1,7 @@
 # Kreft for Zed
 
+[Kreft](https://kreftjs.com) · [Documentation](https://kreftjs.com/docs) · [Source](https://github.com/gadhyare/kreftjs)
+
 Highlighting for `.kreft` (and legacy `.kreftjs`) component files: markup, `k-*` / `@event` / `:bind`
 attributes, and the embedded `<script>` (JavaScript) and `<style>` (CSS) blocks. Emmet is built in.
 

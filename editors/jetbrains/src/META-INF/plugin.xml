@@ -2,9 +2,9 @@
   <id>com.kreft.jetbrains</id>
   <name>Kreft</name>
   <version>0.1.0</version>
-  <vendor url="https://github.com/gadhyare/kreftjs">Kreft</vendor>
+  <vendor url="https://kreftjs.com">Kreft</vendor>
   <description><![CDATA[
-    <p>Support for <a href="https://github.com/gadhyare/kreftjs">Kreft</a> <code>.kreft</code> component files
+    <p>Support for <a href="https://kreftjs.com">Kreft</a> <code>.kreft</code> component files
     (and <code>.kreftjs</code> files from the 0.0.x betas) in WebStorm, PhpStorm, IntelliJ IDEA, PyCharm, RubyMine,
     GoLand, Rider and Android Studio.</p>
     <ul>
@@ -15,6 +15,8 @@
       <li><b>Live templates</b>: <code>kreftjs</code>, <code>state</code>, <code>action</code>, <code>for</code>,
       <code>kreft-wait</code> and more, then Tab.</li>
     </ul>
+    <p>Documentation: <a href="https://kreftjs.com/docs">kreftjs.com/docs</a>. Source:
+    <a href="https://github.com/gadhyare/kreftjs">GitHub</a>.</p>
   ]]></description>
   <change-notes><![CDATA[
     <p>0.1.0: the first version. .kreft files as HTML, Emmet, live templates.</p>

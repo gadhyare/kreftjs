@@ -1,5 +1,7 @@
 # Kreft for JetBrains IDEs
 
+[Kreft](https://kreftjs.com) · [Documentation](https://kreftjs.com/docs) · [Source](https://github.com/gadhyare/kreftjs)
+
 For WebStorm, PhpStorm, IntelliJ IDEA, PyCharm, RubyMine, GoLand, Rider and Android Studio (2022.3 or newer).
 
 - **Colors and completion**: `.kreft` (and legacy `.kreftjs`) files open as HTML, so the `<view>` markup, the CSS in `<style>` and the JavaScript in `<script>` are highlighted and completed.

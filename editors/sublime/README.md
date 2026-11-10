@@ -1,5 +1,7 @@
 # Kreft for Sublime Text
 
+[Kreft](https://kreftjs.com) · [Documentation](https://kreftjs.com/docs) · [Source](https://github.com/gadhyare/kreftjs)
+
 Syntax for `.kreft` / `.kreftjs` files (extends Sublime's built-in HTML syntax, so `<script>` is JavaScript and `<style>` is CSS), comment toggling, snippets, and Emmet.
 
 ## Install

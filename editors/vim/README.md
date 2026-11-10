@@ -1,5 +1,7 @@
 # Kreft for Vim and Neovim
 
+[Kreft](https://kreftjs.com) · [Documentation](https://kreftjs.com/docs) · [Source](https://github.com/gadhyare/kreftjs)
+
 File type, colors (HTML with CSS and JavaScript, plus the Kreft keywords and `k-*` / `@event` attributes), comments, and Emmet for `.kreft` / `.kreftjs` files.
 
 ## Install

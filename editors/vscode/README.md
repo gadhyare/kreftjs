@@ -1,6 +1,6 @@
 # Kreft for VS Code
 
-Language support for [Kreft](https://github.com/gadhyare/kreftjs) `.kreft` component files.
+Language support for [Kreft](https://kreftjs.com) `.kreft` component files. Documentation: [kreftjs.com/docs](https://kreftjs.com/docs) · Source: [GitHub](https://github.com/gadhyare/kreftjs).
 
 ## Features
 

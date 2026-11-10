@@ -1853,7 +1853,7 @@ state caught = null
 
 ## Editor plugins
 
-Kreft has a plugin for each editor. Every one gives `.kreft` files colors, snippets and **Emmet**: type `ul>li.item*3` in `<view>`, or `m10`, `df`, `bgc` in `<style>`, and expand it.
+Kreft has a plugin for each editor (this page online: [kreftjs.com/docs](https://kreftjs.com/docs#editor-plugins)). Every one gives `.kreft` files colors, snippets and **Emmet**: type `ul>li.item*3` in `<view>`, or `m10`, `df`, `bgc` in `<style>`, and expand it.
 
 | Editor | Install | Download as a file | Source |
 |---|---|---|---|
